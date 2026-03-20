@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v1.8
+# platform.pub — Deployment Reference v1.8.1
 
 **Date:** 20 March 2026
-**Replaces:** v1.7 (see bottom for change log)
+**Replaces:** v1.8 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -348,25 +348,27 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 
 | Token | Hex | Usage |
 |-------|-----|-------|
-| surface | #FAE8E2 | Page background (pale salmon) |
-| surface-raised | #FDF6F0 | Article body, cards, inputs (cream) |
-| surface-sunken | #F0D5CB | Hover states, dividers |
-| surface-strong | #E0C0B5 | Borders, separators |
-| ink-900 | #1A1512 | Primary text, logo border |
-| content-primary | #2A2320 | Body text |
-| content-secondary | #5C5347 | Supporting text |
-| content-muted | #7A6E5D | Labels, meta |
-| content-faint | #A8977F | Timestamps, tertiary |
-| terracotta | #A85141 | Nav bar, note tiles, accent buttons |
-| terracotta-dark | #8C4035 | Nav/tile borders, input bg on terracotta |
-| terracotta-light | #C1614F | Hover/rule accents |
-| accent | #A85141 | Links, active states (= terracotta) |
-| accent-50..900 | Terracotta ramp | Highlights, rule-accent |
+| surface | #F7F5F3 | Page background (cool off-white) |
+| surface-raised | #FFFFFF | Article body, cards, inputs |
+| surface-sunken | #EDECEA | Hover states, dividers |
+| surface-strong | #D4D1CC | Borders, separators |
+| ink-900 | #111111 | Primary text, logo border |
+| content-primary | #1A1A1A | Body text |
+| content-secondary | #4A4845 | Supporting text |
+| content-muted | #7A7774 | Labels, meta |
+| content-faint | #9E9B97 | Timestamps, tertiary |
+| crimson | #9B1C20 | Nav bar, accent buttons |
+| crimson-dark | #7A1519 | Nav borders, hover states |
+| crimson-light | #B52226 | Hover/rule accents |
+| slate | #3D4A52 | Note tiles in feed |
+| slate-dark | #2E383F | Note tile borders |
+| accent | #9B1C20 | Links, active states (= crimson) |
+| accent-50..900 | Crimson ramp | Highlights, rule-accent |
 
-Text on terracotta backgrounds uses cream/salmon tokens only:
-- Primary: `text-surface-raised` (#FDF6F0)
-- Secondary: `text-surface` (#FAE8E2)
-- Muted: `text-surface-sunken` (#F0D5CB)
+Text on crimson/slate backgrounds uses white:
+- Primary: `text-white` / `text-surface-raised` (#FFFFFF)
+- Secondary: `text-surface` (#F7F5F3)
+- Muted: `text-surface-sunken` (#EDECEA)
 
 ### Typography
 
@@ -478,6 +480,19 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v1.8.1 — 20 March 2026
+
+**Bug fixes**
+- `web/src/app/article/[dTag]/page.tsx`: `article.id` is now always set to `meta.nostrEventId` (the gateway DB value) when merging relay and metadata. Prevents "Comment indexing failed: 404" when the relay holds a newer event ID than the one indexed in the DB.
+- `gateway/src/routes/articles.ts`: Tightened `gatePositionPct` Zod validation to `min(1).max(99)`, matching the DB check constraint `gate_position_pct >= 1 AND gate_position_pct <= 99`. Previously `max(100)` allowed the DB insert to fail with a 500.
+- `web/src/components/editor/ArticleEditor.tsx`: Clamped computed `gatePositionPct` to `[1, 99]` to prevent sending 0 or 100 when the gate marker is placed at the very beginning or end of an article.
+
+**Design**
+- Full colour scheme overhaul to a literary, LRB-inspired palette. Replaced warm salmon/terracotta tones with cool off-white backgrounds (`#F7F5F3`) and deep crimson (`#9B1C20`) as the sole accent. Tailwind token `terracotta` renamed to `crimson`.
+- Note tiles in the feed use dark slate (`#3D4A52`) rather than crimson to reduce visual weight on the feed page.
+
+---
 
 ### v1.8 — 20 March 2026
 

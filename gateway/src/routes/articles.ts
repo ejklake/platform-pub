@@ -31,7 +31,7 @@ const IndexArticleSchema = z.object({
   content: z.string(),                // free section content
   isPaywalled: z.boolean(),
   pricePence: z.number().int().min(0),
-  gatePositionPct: z.number().int().min(0).max(100),
+  gatePositionPct: z.number().int().min(1).max(99),
   vaultEventId: z.string().optional(),
 })
 

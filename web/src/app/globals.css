@@ -14,12 +14,12 @@
   }
 
   ::selection {
-    background-color: #D4806E;
-    color: #FDF6F0;
+    background-color: #9B1C20;
+    color: #FFFFFF;
   }
 
   hr {
-    border-color: #DDD3CB;
+    border-color: #D4D1CC;
     border-width: 0.5px;
   }
 
@@ -40,7 +40,7 @@
   textarea:focus,
   select:focus {
     @apply outline-none ring-0;
-    background-color: #FDF6F0;
+    background-color: #FFFFFF;
   }
 
   ::placeholder {
@@ -51,7 +51,7 @@
   /* Checkbox and radio styling */
   input[type="checkbox"],
   input[type="radio"] {
-    accent-color: #C1614F;
+    accent-color: #9B1C20;
   }
   input[type="checkbox"] {
     @apply rounded border-ink-300;
@@ -59,22 +59,22 @@
     height: 1rem;
   }
   input[type="checkbox"]:checked {
-    background-color: #C1614F;
-    border-color: #C1614F;
+    background-color: #9B1C20;
+    border-color: #9B1C20;
   }
   input[type="checkbox"]:focus {
-    box-shadow: 0 0 0 2px #E4AC9F;
+    box-shadow: 0 0 0 2px #F5D5D6;
   }
 
   /* Range slider */
   input[type="range"] {
-    accent-color: #C1614F;
+    accent-color: #9B1C20;
   }
   input[type="range"]::-webkit-slider-thumb {
-    background: #C1614F;
+    background: #9B1C20;
   }
   input[type="range"]::-moz-range-thumb {
-    background: #C1614F;
+    background: #9B1C20;
   }
 }
 
@@ -85,7 +85,7 @@
     font-family: 'IBM Plex Mono', monospace;
     letter-spacing: 0.5em;
     font-size: 0.75rem;
-    color: #A8977F;
+    color: #9E9B97;
   }
   .ornament::before {
     content: '· · ·';
@@ -93,13 +93,13 @@
 
   /* ----- Rules ----- */
   .rule {
-    border-top: 0.5px solid #DDD3CB;
+    border-top: 0.5px solid #D4D1CC;
   }
   .rule-accent {
-    border-top: 2px solid #A85141;
+    border-top: 2px solid #9B1C20;
   }
   .rule-blue {
-    border-top: 0.5px solid #DDD3CB;
+    border-top: 0.5px solid #D4D1CC;
   }
 
   /* ----- Label styles ----- */
@@ -117,7 +117,7 @@
     font-weight: 500;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #7A6E5D;
+    color: #7A7774;
   }
 
   /* ----- Tab pills ----- */
@@ -134,21 +134,21 @@
     transition: background-color 0.15s ease, color 0.15s ease;
   }
   .tab-pill-active {
-    background: #1A1512;
-    color: #FDF6F0;
+    background: #111111;
+    color: #FFFFFF;
   }
   .tab-pill-inactive {
     @apply bg-surface-raised text-content-secondary;
   }
   .tab-pill-inactive:hover {
     @apply text-content-primary;
-    background: #EBE3DE;
+    background: #EDECEA;
   }
 
   /* ----- Buttons ----- */
   .btn {
-    background: #1A1512;
-    color: #FDF6F0;
+    background: #111111;
+    color: #FFFFFF;
     font-family: 'Instrument Sans', system-ui, sans-serif;
     font-size: 0.8125rem;
     font-weight: 500;
@@ -160,12 +160,12 @@
     transition: background-color 0.15s ease;
     cursor: pointer;
   }
-  .btn:hover { background: #3D3530; }
+  .btn:hover { background: #333333; }
   .btn:disabled { opacity: 0.5; }
 
   .btn-accent {
-    background: #A85141;
-    color: #FDF6F0;
+    background: #9B1C20;
+    color: #FFFFFF;
     font-family: 'Instrument Sans', system-ui, sans-serif;
     font-size: 0.8125rem;
     font-weight: 500;
@@ -177,7 +177,7 @@
     transition: background-color 0.15s ease;
     cursor: pointer;
   }
-  .btn-accent:hover { background: #8C4035; }
+  .btn-accent:hover { background: #7A1519; }
   .btn-accent:disabled { opacity: 0.5; }
 
   .btn-soft {
@@ -194,18 +194,18 @@
     cursor: pointer;
   }
   .btn-soft:hover {
-    background: #EBE3DE;
+    background: #EDECEA;
   }
 
   /* ----- Editor selection highlight ----- */
   .ProseMirror ::selection,
   .tiptap ::selection,
   .prose ::selection {
-    background-color: #D4806E !important;
-    color: #FDF6F0 !important;
+    background-color: #9B1C20 !important;
+    color: #FFFFFF !important;
   }
   .ProseMirror .is-editor-empty:first-child::before {
-    color: #A8977F;
+    color: #9E9B97;
   }
 
   /* ----- Paywall gate marker in editor ----- */
@@ -213,8 +213,8 @@
     position: relative;
     margin: 2rem 0;
     padding: 0.75rem 1rem;
-    background: #FAF0ED;
-    border: 1px dashed #D4806E;
+    background: #FDF2F2;
+    border: 1px dashed #D46F72;
     cursor: default;
     user-select: none;
     display: flex;
@@ -229,23 +229,23 @@
     width: 3px;
     height: 60%;
     transform: translateY(-50%);
-    background: #A85141;
+    background: #9B1C20;
   }
   .paywall-gate-marker .gate-label {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.6875rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #A85141;
+    color: #9B1C20;
   }
   .paywall-gate-marker .gate-remove {
     font-size: 0.75rem;
-    color: #A8977F;
+    color: #9E9B97;
     cursor: pointer;
     transition: color 0.15s ease;
   }
   .paywall-gate-marker .gate-remove:hover {
-    color: #5C5347;
+    color: #4A4845;
   }
 
   /* ----- Article hero image ----- */
@@ -263,7 +263,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(26, 21, 18, 0.75) 0%, rgba(26, 21, 18, 0.15) 60%, transparent 100%);
+    background: linear-gradient(to top, rgba(17, 17, 17, 0.75) 0%, rgba(17, 17, 17, 0.15) 60%, transparent 100%);
   }
   .article-hero-content {
     position: relative;

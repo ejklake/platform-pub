@@ -164,7 +164,7 @@ export function ArticleEditor({
         paywallContent = splitResult.paywall
         // Calculate approximate gate position for the DB
         const totalLen = freeContent.length + paywallContent.length
-        gatePositionPct = totalLen > 0 ? Math.round((freeContent.length / totalLen) * 100) : 50
+        gatePositionPct = totalLen > 0 ? Math.min(99, Math.max(1, Math.round((freeContent.length / totalLen) * 100))) : 50
       }
 
       const data: PublishData = {

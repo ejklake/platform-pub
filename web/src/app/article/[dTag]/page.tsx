@@ -62,9 +62,12 @@ export default function ArticlePage() {
             isPaywalled: meta.isPaywalled,
           })
         } else {
-          // Merge: relay has content, gateway has paywall config
+          // Merge: relay has content, gateway has paywall config.
+          // Always use meta.nostrEventId as the canonical id — the relay may
+          // have a newer event (different id) that hasn't been re-indexed yet.
           setArticle({
             ...articleEvent,
+            id: meta.nostrEventId,
             pricePence: meta.pricePence ?? articleEvent.pricePence,
             gatePositionPct: meta.gatePositionPct ?? articleEvent.gatePositionPct,
             isPaywalled: meta.isPaywalled,

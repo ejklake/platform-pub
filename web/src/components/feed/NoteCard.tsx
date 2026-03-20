@@ -58,12 +58,12 @@ export function NoteCard({ note, onDeleted }: NoteCardProps) {
   }
 
   return (
-    <div className="px-5 py-4 bg-terracotta border-b border-terracotta-dark">
+    <div className="px-5 py-4 bg-slate border-b border-slate-dark">
       <div className="flex items-start gap-3">
         {writerInfo?.avatar ? (
           <img src={writerInfo.avatar} alt="" className="h-8 w-8 rounded-full object-cover flex-shrink-0 mt-0.5" />
         ) : (
-          <span className="flex h-8 w-8 items-center justify-center bg-terracotta-dark text-[10px] font-medium text-surface-sunken flex-shrink-0 mt-0.5 rounded-full">
+          <span className="flex h-8 w-8 items-center justify-center bg-slate-dark text-[10px] font-medium text-surface-sunken flex-shrink-0 mt-0.5 rounded-full">
             {(writerInfo?.displayName?.[0] ?? note.pubkey[0]).toUpperCase()}
           </span>
         )}
@@ -128,7 +128,7 @@ export function NoteCard({ note, onDeleted }: NoteCardProps) {
 
       {/* Comments — cream panel at tile bottom */}
       {showComments && (
-        <div className="-mx-5 -mb-4 mt-3 px-5 py-3 bg-surface-raised border-t border-terracotta-dark">
+        <div className="-mx-5 -mb-4 mt-3 px-5 py-3 bg-surface-raised border-t border-slate-dark">
           <CommentSection targetEventId={note.id} targetKind={1} targetAuthorPubkey={note.pubkey} compact />
         </div>
       )}
@@ -139,7 +139,7 @@ export function NoteCard({ note, onDeleted }: NoteCardProps) {
 function EmbedPreview({ url }: { url: string }) {
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
   if (yt) return <div className="relative overflow-hidden rounded" style={{ paddingBottom: '56.25%' }}><iframe src={`https://www.youtube.com/embed/${yt[1]}`} className="absolute inset-0 w-full h-full" frameBorder="0" allowFullScreen loading="lazy" /></div>
-  return <a href={url} target="_blank" rel="noopener noreferrer" className="block bg-terracotta-dark p-3 rounded hover:opacity-80 transition-opacity"><p className="text-ui-xs text-surface-sunken truncate">{url}</p></a>
+  return <a href={url} target="_blank" rel="noopener noreferrer" className="block bg-slate-dark p-3 rounded hover:opacity-80 transition-opacity"><p className="text-ui-xs text-surface-sunken truncate">{url}</p></a>
 }
 
 function formatDate(ts: number) {
