@@ -85,8 +85,9 @@ Key variables:
 | `SESSION_SECRET` | gateway | JWT signing key (min 32 chars) |
 | `COOKIE_SECRET` | gateway | Cookie signing (can equal SESSION_SECRET) |
 | `PLATFORM_SERVICE_PRIVKEY` | gateway, payment, key-service | 64-hex Nostr private key for platform service events |
-| `READER_HASH_KEY` | payment | HMAC key for reader pubkey privacy hashing |
+| `READER_HASH_KEY` | gateway | HMAC key for reader pubkey privacy hashing |
 | `INTERNAL_SECRET` | gateway, key-custody | Shared secret authenticating gateway→key-custody calls |
+| `INTERNAL_SERVICE_TOKEN` | payment-service | Shared secret authenticating cron→payment-service calls (`/payout-cycle`, `/settlement-check/monthly`) |
 | `ACCOUNT_KEY_HEX` | key-custody **only** | AES-256 key for encrypting custodial Nostr privkeys at rest |
 | `KMS_MASTER_KEY_HEX` | key-service | AES-256 master key for vault content key envelope encryption |
 | `STRIPE_SECRET_KEY` | gateway, payment | Stripe API key |
@@ -134,6 +135,7 @@ openssl rand -hex 32   # SESSION_SECRET, COOKIE_SECRET, READER_HASH_KEY
 openssl rand -hex 32   # ACCOUNT_KEY_HEX (key-custody only)
 openssl rand -hex 32   # KMS_MASTER_KEY_HEX (key-service only)
 openssl rand -base64 32  # INTERNAL_SECRET (gateway + key-custody)
+openssl rand -base64 32  # INTERNAL_SERVICE_TOKEN (payment-service cron auth)
 # For PLATFORM_SERVICE_PRIVKEY: generate a Nostr keypair — any hex ed25519 privkey
 ```
 
@@ -321,6 +323,7 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | GET | /api/v1/articles/:dTag | optional | Article metadata by d-tag |
 | POST | /api/v1/articles/:eventId/vault | session | Encrypt paywalled body, store vault key |
 | POST | /api/v1/articles/:eventId/gate-pass | session | Paywall gate pass |
+| PATCH | /api/v1/articles/:id | session | Update article metadata (replies toggle) |
 | DELETE | /api/v1/articles/:id | session | Delete article |
 | POST | /api/v1/notes | session | Index published note |
 | DELETE | /api/v1/notes/:nostrEventId | session | Delete note |
@@ -565,6 +568,23 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.0.1 — 21 March 2026
+
+**Security and correctness fixes**
+
+- **Security (critical):** `payment-service` `/payout-cycle` and `/settlement-check/monthly` now reject requests when `INTERNAL_SERVICE_TOKEN` is unset. Previously, if the env var was absent, both the expected and actual token resolved to `undefined`, silently bypassing auth.
+- **Security (critical):** `gateway` no longer falls back to a hardcoded HMAC key if `READER_HASH_KEY` is unset. The gate-pass handler now throws at runtime so the misconfiguration is visible immediately.
+- **Documentation:** `INTERNAL_SERVICE_TOKEN` (payment-service cron auth secret) added to the env-var table and secret-generation commands — it was previously only in `payment-service/.env.example`. `READER_HASH_KEY` service attribution corrected (gateway, not payment-service).
+- **Reliability:** Removed duplicate `publishToRelay` implementation from `gateway/src/routes/articles.ts`; the function is now imported from `gateway/src/lib/nostr-publisher.ts`.
+- **Code quality:** Dynamic `await import('../db/client.js')` calls inside request handlers in `payment-service` replaced with a top-level import.
+- **Validation:** UUID path-param regex in `payment-service` earnings routes tightened to full UUID4 format. `PATCH /articles/:id` now validates the article ID param and parses the body through Zod.
+- **Logging:** `shared/src/db/client.ts` pool error now logged via pino (previously `console.error`).
+- **Moderation:** `requireAdmin` no longer dynamically re-imports `requireAuth` on every call. Admin ID list computed once at module load; a startup warning is emitted if `ADMIN_ACCOUNT_IDS` is unset.
+
+**No schema changes. Rebuild gateway and payment-service.**
+
+---
 
 ### v3.0 — 21 March 2026
 

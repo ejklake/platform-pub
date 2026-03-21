@@ -56,14 +56,10 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   // ---------------------------------------------------------------------------
-  // POST /auth/login — magic link (placeholder)
+  // POST /auth/login — magic link
   //
-  // At launch: passwordless email login via magic link.
-  // The flow is: user enters email → we send a one-time link → link contains
-  // a signed token → POST /auth/verify validates it → session set.
-  //
-  // Full implementation requires an email sending service (Postmark, SES, etc).
-  // This route stubs the flow so the frontend can be built against it.
+  // Passwordless email login: user enters email → one-time link sent →
+  // link contains a signed token → POST /auth/verify validates it → session set.
   // ---------------------------------------------------------------------------
 
   const LoginSchema = z.object({

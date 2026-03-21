@@ -94,7 +94,8 @@ Zustand stores in `web/src/stores/`. The TipTap editor (`web/src/components/edit
 | `KEY_SERVICE_URL` | gateway | Internal URL for key-service |
 | `KEY_CUSTODY_URL` | gateway | Internal URL for key-custody service |
 | `PAYMENT_SERVICE_URL` | gateway | Internal URL for payment-service |
-| `INTERNAL_SECRET` | gateway, key-custody | Shared secret for internal service calls |
+| `INTERNAL_SECRET` | gateway, key-custody | Shared secret for gateway→key-custody calls |
+| `INTERNAL_SERVICE_TOKEN` | payment-service | Shared secret for cron→payment-service calls |
 | `RELAY_URL` | payment, key | strfry WebSocket URL |
 
 See each service's `.env.example` for the full list.

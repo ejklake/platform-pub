@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { WebSocket } from 'ws'
 import { pool, withTransaction } from '../../shared/src/db/client.js'
 import { requireAuth, optionalAuth } from '../middleware/auth.js'
 import { checkArticleAccess, recordSubscriptionRead, recordPurchaseUnlock } from '../services/access.js'
 import { signEvent } from '../lib/key-custody-client.js'
+import { publishToRelay } from '../lib/nostr-publisher.js'
 import logger from '../../shared/src/lib/logger.js'
 
 // =============================================================================
@@ -330,7 +330,8 @@ export async function articleRoutes(app: FastifyInstance) {
 
         // Compute reader pubkey hash (keyed HMAC for privacy)
         const { createHmac } = await import('crypto')
-        const hmacKey = process.env.READER_HASH_KEY ?? 'platform-pub-reader-hash-key'
+        const hmacKey = process.env.READER_HASH_KEY
+        if (!hmacKey) throw new Error('READER_HASH_KEY not set')
         const readerPubkeyHash = createHmac('sha256', hmacKey)
           .update(readerPubkey)
           .digest('hex')
@@ -527,12 +528,26 @@ export async function articleRoutes(app: FastifyInstance) {
   // PATCH /articles/:id — update article metadata
   // ---------------------------------------------------------------------------
 
+  const PatchArticleSchema = z.object({
+    repliesEnabled: z.boolean().optional(),
+    commentsEnabled: z.boolean().optional(),
+  })
+
   app.patch<{ Params: { id: string } }>(
     '/articles/:id',
     { preHandler: requireAuth },
     async (req, reply) => {
+      if (!req.params.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
+        return reply.status(400).send({ error: 'Invalid article ID' })
+      }
+
+      const parsed = PatchArticleSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() })
+      }
+
       const writerId = req.session!.sub!
-      const body = req.body as Record<string, any>
+      const body = parsed.data
 
       const updates: string[] = []
       const params: any[] = []
@@ -628,35 +643,6 @@ export async function articleRoutes(app: FastifyInstance) {
       })
     }
   )
-}
-
-// =============================================================================
-// Relay publisher — sends a signed Nostr event to the platform strfry relay
-// =============================================================================
-
-async function publishToRelay(event: object): Promise<void> {
-  const relayUrl = process.env.PLATFORM_RELAY_WS_URL
-  if (!relayUrl) throw new Error('PLATFORM_RELAY_WS_URL not set')
-
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(relayUrl)
-    const timeout = setTimeout(() => { ws.close(); reject(new Error('Relay publish timeout')) }, 5_000)
-
-    ws.onopen = () => { ws.send(JSON.stringify(['EVENT', event])) }
-
-    ws.onmessage = (msg) => {
-      try {
-        const [type, , success, message] = JSON.parse(msg.data as string)
-        if (type === 'OK') {
-          clearTimeout(timeout)
-          ws.close()
-          success ? resolve() : reject(new Error(`Relay rejected event: ${message}`))
-        }
-      } catch { /* ignore NOTICE etc */ }
-    }
-
-    ws.onerror = (err) => { clearTimeout(timeout); reject(err) }
-  })
 }
 
 // =============================================================================

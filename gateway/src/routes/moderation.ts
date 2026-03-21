@@ -22,15 +22,14 @@ import logger from '../../shared/src/lib/logger.js'
 
 // Admin check — at launch this is a hardcoded list of account IDs.
 // Replace with a proper role system post-launch.
+const adminIds = (process.env.ADMIN_ACCOUNT_IDS ?? '').split(',').filter(Boolean)
+
 function isAdmin(accountId: string): boolean {
-  const adminIds = (process.env.ADMIN_ACCOUNT_IDS ?? '').split(',').filter(Boolean)
   return adminIds.includes(accountId)
 }
 
 async function requireAdmin(req: any, reply: any): Promise<void> {
-  // First require auth
-  const { requireAuth: ra } = await import('../middleware/auth.js')
-  await ra(req, reply)
+  await requireAuth(req, reply)
   if (reply.sent) return
 
   if (!isAdmin(req.session!.sub!)) {
@@ -51,6 +50,10 @@ const ResolveReportSchema = z.object({
 })
 
 export async function moderationRoutes(app: FastifyInstance) {
+  if (adminIds.length === 0) {
+    logger.warn('ADMIN_ACCOUNT_IDS is not set — all admin routes will return 403')
+  }
+
 
   // ---------------------------------------------------------------------------
   // POST /reports — submit a content report

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { pool } from '../db/client.js'
 import { accrualService } from '../services/accrual.js'
 import { settlementService } from '../services/settlement.js'
 import { payoutService } from '../services/payout.js'
@@ -13,10 +14,9 @@ import logger from '../lib/logger.js'
 // Auth is handled at the gateway; these routes trust the caller.
 // =============================================================================
 
-// FIX #11: Removed onFreeAllowance from the schema. The accrual service
-// determines free-allowance status from the database (whether the reader has
-// a stripe_customer_id), not from the caller's assertion. Including it in the
-// API contract was misleading — the field was accepted but ignored.
+// onFreeAllowance is intentionally absent: the accrual service determines
+// free-allowance status from the database (whether the reader has a
+// stripe_customer_id), not from the caller's assertion.
 const GatePassSchema = z.object({
   readerId: z.string().uuid(),
   articleId: z.string().uuid(),
@@ -78,7 +78,6 @@ export async function paymentRoutes(app: FastifyInstance) {
     const { readerId, stripeCustomerId } = parsed.data
 
     // Record the Stripe customer ID on the account
-    const { pool } = await import('../db/client.js')
     await pool.query(
       `UPDATE accounts SET stripe_customer_id = $1, updated_at = now() WHERE id = $2`,
       [stripeCustomerId, readerId]
@@ -105,7 +104,7 @@ export async function paymentRoutes(app: FastifyInstance) {
   app.get('/earnings/:writerId', async (req, reply) => {
     const { writerId } = req.params as { writerId: string }
 
-    if (!writerId.match(/^[0-9a-f-]{36}$/)) {
+    if (!writerId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
       return reply.status(400).send({ error: 'Invalid writer ID' })
     }
 
@@ -122,7 +121,7 @@ export async function paymentRoutes(app: FastifyInstance) {
   app.get('/earnings/:writerId/articles', async (req, reply) => {
     const { writerId } = req.params as { writerId: string }
 
-    if (!writerId.match(/^[0-9a-f-]{36}$/)) {
+    if (!writerId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)) {
       return reply.status(400).send({ error: 'Invalid writer ID' })
     }
 
@@ -136,8 +135,8 @@ export async function paymentRoutes(app: FastifyInstance) {
 
   app.post('/payout-cycle', async (req, reply) => {
     // Validate internal caller token
-    const token = req.headers['x-internal-token']
-    if (token !== process.env.INTERNAL_SERVICE_TOKEN) {
+    const expectedToken = process.env.INTERNAL_SERVICE_TOKEN
+    if (!expectedToken || req.headers['x-internal-token'] !== expectedToken) {
       return reply.status(403).send({ error: 'Forbidden' })
     }
 
@@ -148,18 +147,17 @@ export async function paymentRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
   // POST /settlement-check/monthly (internal — called by monthly fallback cron)
   //
-  // FIX #3: The query now filters for tabs with last_read_at older than
-  // 30 days (matching the ADR's "one month after the last payment" language),
-  // rather than blindly processing all tabs with any balance.
+  // Filters for tabs with last_read_at older than 30 days, matching the ADR's
+  // "one month after the last payment" language. Tabs with recent reads are
+  // excluded to avoid early settlement.
   // ---------------------------------------------------------------------------
 
   app.post('/settlement-check/monthly', async (req, reply) => {
-    const token = req.headers['x-internal-token']
-    if (token !== process.env.INTERNAL_SERVICE_TOKEN) {
+    const expectedToken = process.env.INTERNAL_SERVICE_TOKEN
+    if (!expectedToken || req.headers['x-internal-token'] !== expectedToken) {
       return reply.status(403).send({ error: 'Forbidden' })
     }
 
-    const { pool } = await import('../db/client.js')
     const { rows } = await pool.query<{ reader_id: string }>(
       `SELECT DISTINCT reader_id FROM reading_tabs
        WHERE balance_pence > 0

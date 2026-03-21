@@ -78,7 +78,7 @@ export async function publishSubscriptionEvent(params: SubscriptionEventParams):
 // Internal relay publisher — identical pattern to payment-service/src/lib/nostr.ts
 // ---------------------------------------------------------------------------
 
-async function publishToRelay(event: ReturnType<typeof finalizeEvent>): Promise<void> {
+export async function publishToRelay(event: ReturnType<typeof finalizeEvent>): Promise<void> {
   const relayUrl = process.env.PLATFORM_RELAY_WS_URL
   if (!relayUrl) throw new Error('PLATFORM_RELAY_WS_URL not set')
 

@@ -1,6 +1,7 @@
 import pg from 'pg'
 import type { PoolClient } from 'pg'
 import type { PlatformConfig } from '../types/config.js'
+import logger from '../lib/logger.js'
 
 // =============================================================================
 // Shared Database Client
@@ -26,7 +27,7 @@ export const pool = new Pool({
 
 // Log pool errors — a pool error that goes unhandled crashes the process
 pool.on('error', (err) => {
-  console.error('[db] Unexpected pool error', err)
+  logger.error({ err }, 'Unexpected database pool error')
 })
 
 // =============================================================================
