@@ -72,8 +72,10 @@ export async function articleRoutes(app: FastifyInstance) {
            is_paywalled, price_pence, gate_position_pct, vault_event_id,
            published_at
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'tier1', $8, $9, $10, $11, now())
-         ON CONFLICT (nostr_event_id) DO UPDATE SET
+         ON CONFLICT (writer_id, nostr_d_tag) WHERE deleted_at IS NULL DO UPDATE SET
+           nostr_event_id = EXCLUDED.nostr_event_id,
            title = EXCLUDED.title,
+           slug = EXCLUDED.slug,
            content_free = EXCLUDED.content_free,
            word_count = EXCLUDED.word_count,
            is_paywalled = EXCLUDED.is_paywalled,
@@ -606,10 +608,11 @@ export async function articleRoutes(app: FastifyInstance) {
 
       const article = rows[0]
 
-      // Soft delete
+      // Soft-delete all live rows for this d-tag (there may be duplicates from
+      // previous publishes/edits that pre-date the unique-live-row constraint).
       await pool.query(
-        'UPDATE articles SET deleted_at = now() WHERE id = $1',
-        [article.id]
+        'UPDATE articles SET deleted_at = now() WHERE writer_id = $1 AND nostr_d_tag = $2 AND deleted_at IS NULL',
+        [writerId, article.nostr_d_tag]
       )
 
       logger.info(

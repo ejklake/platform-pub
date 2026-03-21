@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.1.4
+# platform.pub — Deployment Reference v3.1.5
 
 **Date:** 21 March 2026
-**Replaces:** v3.1.3 (see bottom for change log)
+**Replaces:** v3.1.4 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -202,6 +202,63 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 
 ## Upgrading from a previous version
 
+### From v3.1.4
+
+Schema change: migration `008_deduplicate_articles.sql` must be applied. It deduplicates any multiple live rows that accumulated for the same article (caused by a bug in the index endpoint) and adds a partial unique index to prevent recurrence.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+```
+
+The migration runner (`shared/src/db/migrate.ts`) tracks applied migrations in a `_migrations` table. If this is the first time you are using the runner (i.e. it was not used for migrations 001–007), bootstrap the table first so it does not re-apply already-applied migrations:
+
+```bash
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "
+CREATE TABLE IF NOT EXISTS _migrations (
+  id SERIAL PRIMARY KEY,
+  filename TEXT NOT NULL UNIQUE,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO _migrations (filename) VALUES
+  ('001_add_email_and_magic_links.sql'),
+  ('002_draft_upsert_index.sql'),
+  ('003_comments.sql'),
+  ('004_media_uploads.sql'),
+  ('005_subscriptions.sql'),
+  ('006_receipt_portability.sql'),
+  ('007_subscription_nostr_event.sql')
+ON CONFLICT DO NOTHING;"
+```
+
+Then run the migration runner (resolves `DATABASE_URL` from the service `.env`):
+
+```bash
+DATABASE_URL=postgresql://platformpub:<POSTGRES_PASSWORD>@127.0.0.1:5432/platformpub \
+  npx tsx shared/src/db/migrate.ts
+```
+
+Rebuild and restart the gateway (the index and delete endpoints changed):
+
+```bash
+docker compose build --no-cache gateway
+docker compose up -d gateway
+```
+
+Verify:
+
+```bash
+# Partial unique index is present
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
+  "\d articles" | grep unique_live
+# Expected: "idx_articles_unique_live" UNIQUE, btree (writer_id, nostr_d_tag) WHERE deleted_at IS NULL
+
+docker logs platform-pub-gateway-1 --tail 5
+# Publish an article, delete it, refresh the dashboard — it should not reappear
+```
+
+---
+
 ### From v3.1.3
 
 No schema changes. Rebuild web only:
@@ -400,6 +457,7 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 | 005_subscriptions.sql | Subscriptions, subscription_events, article_unlocks |
 | 006_receipt_portability.sql | `reader_pubkey` + `receipt_token` columns on read_events |
 | 007_subscription_nostr_event.sql | `nostr_event_id` column on subscriptions |
+| 008_deduplicate_articles.sql | Deduplicate articles rows; add partial unique index on `(writer_id, nostr_d_tag) WHERE deleted_at IS NULL` |
 
 Run all pending migrations:
 ```bash
@@ -691,6 +749,27 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.1.5 — 21 March 2026
+
+**Article deletion fix — deleted articles no longer reappear after feed refresh**
+
+**Root cause:** `POST /articles` (the indexing endpoint called by the publishing pipeline) used `ON CONFLICT (nostr_event_id)`. Because every publish or edit produces a new Nostr event with a new ID, the conflict clause never fired: each edit inserted a new row instead of updating the existing one. For paywalled articles, both the v1 (free content) and v2 (encrypted payload) events were indexed as separate rows. Over time a single article accumulated one row per edit plus one extra row per paywalled publish cycle. `DELETE /articles/:id` only soft-deleted the one row the user clicked on (matched by UUID); older rows remained with `deleted_at IS NULL`, causing the article to reappear when the dashboard re-fetched.
+
+The "can't delete again" error was a symptom of the same bug: the first delete did correctly set `deleted_at` on the clicked row (causing a 404 on retry), but sibling rows were untouched and continued to appear in `GET /my/articles`.
+
+**Fix:**
+
+- **Migration `008_deduplicate_articles.sql`:** soft-deletes all but the newest live row per `(writer_id, nostr_d_tag)`, then adds a partial unique index `idx_articles_unique_live` on `(writer_id, nostr_d_tag) WHERE deleted_at IS NULL`. The index is partial (not a full unique constraint) so multiple deleted rows with the same d-tag are allowed and a writer can re-publish a deleted article with the same slug.
+
+- **`POST /articles` index endpoint:** `ON CONFLICT (nostr_event_id)` replaced with `ON CONFLICT (writer_id, nostr_d_tag) WHERE deleted_at IS NULL DO UPDATE SET ...`. The update clause now includes `nostr_event_id` (so edits update the event ID in place) and `slug`, but excludes `published_at` (original publish date is preserved across edits).
+
+- **`DELETE /articles/:id`:** the final `UPDATE` now matches by `writer_id + nostr_d_tag` rather than `id`, so all live rows for the article are soft-deleted in a single statement regardless of how many accumulated before the migration ran.
+
+**Files changed:** `gateway/src/routes/articles.ts`, `migrations/008_deduplicate_articles.sql`
+**Schema change:** migration 008 must be applied. **Rebuild gateway only.**
+
+---
 
 ### v3.1.4 — 21 March 2026
 
