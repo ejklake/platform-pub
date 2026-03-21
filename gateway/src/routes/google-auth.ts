@@ -4,7 +4,7 @@ import { generateKeypair } from '../lib/key-custody-client.js'
 import { createSession } from '../../shared/src/auth/session.js'
 import { getAccount } from '../../shared/src/auth/accounts.js'
 import logger from '../../shared/src/lib/logger.js'
-import { randomBytes } from 'crypto'
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto'
 
 // =============================================================================
 // Google OAuth Routes
@@ -16,14 +16,14 @@ import { randomBytes } from 'crypto'
 //
 // Flow:
 //   1. Browser clicks "Continue with Google" → GET /api/v1/auth/google
-//   2. Gateway sets pp_oauth_state cookie, redirects to Google
+//   2. Gateway generates an HMAC-signed state, redirects to Google
 //   3. Google redirects to ${APP_URL}/auth/google/callback (Next.js page)
 //   4. That page POSTs { code, state } to /api/v1/auth/google/exchange
-//   5. Gateway validates state cookie, exchanges code, sets pp_session cookie
+//   5. Gateway verifies state HMAC, exchanges code, sets pp_session cookie
 //   6. Page calls /auth/me to hydrate the store, then navigates to /feed
 //
-// This avoids setting a session cookie inside a redirect response, which
-// Next.js rewrite proxies do not reliably forward to the browser.
+// State is verified by HMAC signature (not a cookie) because Next.js rewrite
+// proxies do not reliably forward Set-Cookie headers in redirect responses.
 // =============================================================================
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -54,15 +54,10 @@ export async function googleAuthRoutes(app: FastifyInstance) {
   app.get('/auth/google', async (req, reply) => {
     const { clientId, redirectUri } = getGoogleConfig()
 
-    const state = randomBytes(16).toString('hex')
-
-    reply.setCookie('pp_oauth_state', state, {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 600,
-    })
+    // Use an HMAC-signed state so no cookie is needed.
+    // A cookie set in a redirect response is not reliably forwarded by the
+    // Next.js rewrite proxy, so we moved state verification server-side.
+    const state = generateSignedState()
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -79,9 +74,9 @@ export async function googleAuthRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
   // POST /auth/google/exchange — complete OAuth from the frontend callback page
   //
-  // Called with credentials (cookies) so the pp_oauth_state cookie is present.
-  // Sets the pp_session cookie in the response body — a normal JSON response,
-  // not a redirect, so Next.js reliably forwards Set-Cookie to the browser.
+  // Verifies the HMAC-signed state, exchanges the code for tokens, then sets
+  // the session cookie in a normal JSON response (not a redirect) so Next.js
+  // reliably forwards Set-Cookie to the browser.
   // ---------------------------------------------------------------------------
 
   app.post<{
@@ -93,21 +88,10 @@ export async function googleAuthRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Missing code or state' })
     }
 
-    const cookies = req.cookies as Record<string, string> | undefined
-    const savedState = cookies?.pp_oauth_state
-    if (!savedState || savedState !== state) {
-      logger.warn('Google OAuth state mismatch in exchange')
+    if (!verifySignedState(state)) {
+      logger.warn('Google OAuth state verification failed in exchange')
       return reply.status(400).send({ error: 'State mismatch' })
     }
-
-    // Clear the one-time state cookie
-    reply.setCookie('pp_oauth_state', '', {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 0,
-    })
 
     try {
       const { clientId, clientSecret, redirectUri } = getGoogleConfig()
@@ -186,6 +170,42 @@ export async function googleAuthRoutes(app: FastifyInstance) {
 // =============================================================================
 // Helpers
 // =============================================================================
+
+// ---------------------------------------------------------------------------
+// HMAC-signed OAuth state — avoids setting a cookie in a redirect response,
+// which Next.js rewrite proxies don't reliably forward to the browser.
+//
+// Format: <nonce>.<timestamp>.<hmac-sha256-hex>
+// The exchange endpoint verifies the HMAC and that the token is not expired.
+// ---------------------------------------------------------------------------
+
+function getStateSecret(): string {
+  const secret = process.env.SESSION_SECRET
+  if (!secret) throw new Error('SESSION_SECRET not set')
+  return secret
+}
+
+function generateSignedState(): string {
+  const nonce = randomBytes(16).toString('hex')
+  const timestamp = Math.floor(Date.now() / 1000)
+  const payload = `${nonce}.${timestamp}`
+  const sig = createHmac('sha256', getStateSecret()).update(payload).digest('hex')
+  return `${payload}.${sig}`
+}
+
+function verifySignedState(state: string, maxAgeSeconds = 600): boolean {
+  const parts = state.split('.')
+  if (parts.length !== 3) return false
+  const [nonce, ts, sig] = parts
+  const timestamp = parseInt(ts, 10)
+  if (isNaN(timestamp)) return false
+  if (Math.floor(Date.now() / 1000) - timestamp > maxAgeSeconds) return false
+  const payload = `${nonce}.${ts}`
+  const expectedSig = createHmac('sha256', getStateSecret()).update(payload).digest()
+  const sigBuf = Buffer.from(sig, 'hex')
+  if (sigBuf.length !== expectedSig.length) return false
+  return timingSafeEqual(sigBuf, expectedSig)
+}
 
 function decodeIdToken(idToken: string): {
   email?: string

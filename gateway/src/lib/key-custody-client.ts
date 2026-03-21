@@ -24,7 +24,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${baseUrl()}${path}`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       'X-Internal-Secret': secret(),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,

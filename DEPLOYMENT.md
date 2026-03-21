@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.1.2
+# platform.pub — Deployment Reference v3.1.3
 
 **Date:** 21 March 2026
-**Replaces:** v3.1.1 (see bottom for change log)
+**Replaces:** v3.1.2 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -201,6 +201,33 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+### From v3.1.2
+
+Schema change: migration `001_add_email_and_magic_links.sql` must be applied if it was not applied when first deploying v3.1.2. Check first:
+
+```bash
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\d accounts" | grep email
+```
+
+If the `email` column is absent, apply it now:
+
+```bash
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub < migrations/001_add_email_and_magic_links.sql
+```
+
+Then rebuild the gateway (fixes HMAC-signed OAuth state and key-custody client header bug):
+
+```bash
+cd /root/platform-pub
+git pull origin master
+docker compose build --no-cache gateway
+docker compose up -d
+```
+
+Also verify `gateway/.env` has `POSTMARK_API_KEY` (not `POSTMARK_SERVER_TOKEN`) and a real token value if email sending is required.
+
+---
 
 ### From v3.1.1
 
@@ -644,6 +671,23 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.1.3 — 21 March 2026
+
+**Auth fixes: Google OAuth, magic link emails, missing migration**
+
+- **Bug fix (Google OAuth `google_failed`):** The OAuth state was verified by reading a `pp_oauth_state` cookie that was set inside a 302 redirect response — the same proxy-forwarding problem noted in v3.1.2, but for the state cookie rather than the session cookie. Next.js never forwarded the state cookie to the browser, so every exchange request had no cookie to compare against and returned 400. Fixed by replacing cookie-based state with an HMAC-signed state token (`nonce.timestamp.hmac-sha256` signed with `SESSION_SECRET`). The gateway generates and embeds the signed state in the redirect URL; Google echoes it back; the exchange endpoint verifies the HMAC directly — no cookie required. No frontend changes.
+
+- **Bug fix (magic link emails not sending):** `gateway/.env` had `POSTMARK_SERVER_TOKEN` but the email service reads `process.env.POSTMARK_API_KEY`. The mismatch caused a silent throw (caught and logged, not surfaced to the caller), so the API returned 200 while sending nothing. Fixed by renaming the env var to `POSTMARK_API_KEY`.
+
+- **Bug fix (migration 001 not applied):** The `accounts` table was missing the `email` column and the `magic_links` table entirely because `001_add_email_and_magic_links.sql` had never been run against the production database. Both Google OAuth (`SELECT id FROM accounts WHERE email = $1`) and magic link login were broken as a result. Fixed by applying the migration.
+
+- **Bug fix (key-custody `generate` returning 400):** `gateway/src/lib/key-custody-client.ts` always sent `Content-Type: application/json` regardless of whether a body was present. When `generateKeypair()` is called with no body, Fastify rejected the request with `FST_ERR_CTP_EMPTY_JSON_BODY`. Fixed by only setting `Content-Type: application/json` when a body is actually being serialised.
+
+**Files changed:** `gateway/src/routes/google-auth.ts`, `gateway/src/lib/key-custody-client.ts`
+**Schema change:** `migrations/001_add_email_and_magic_links.sql` must be applied (adds `email` column to `accounts`, creates `magic_links` table).
+
+---
 
 ### v3.1.2 — 21 March 2026
 
