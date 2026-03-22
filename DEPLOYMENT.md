@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.1.8
+# platform.pub — Deployment Reference v3.1.9
 
 **Date:** 22 March 2026
-**Replaces:** v3.1.7 (see bottom for change log)
+**Replaces:** v3.1.8 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -202,6 +202,36 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 
 ## Upgrading from a previous version
 
+### From v3.1.8
+
+No schema changes. Gateway and web both changed. Rebuild both:
+
+```bash
+cd /root/platform-pub
+git pull origin master
+docker compose build --no-cache gateway web
+docker compose up -d gateway web
+```
+
+After the gateway restarts, clean up any relay events from notes that were deleted before this fix (they have no kind 5 events and would otherwise stay in strfry indefinitely):
+
+```bash
+docker compose exec strfry /app/strfry delete --filter '{"kinds":[1,5,7]}'
+```
+
+This wipes all notes, deletion events, and reactions from the relay. Live notes will need to be re-posted; given the platform is early-stage this is preferable to running a targeted reconciliation script. Skip this step if you want to preserve existing notes.
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+# Delete a note — on feed refresh the note should not reappear
+# Delete an article — on feed refresh it should not reappear even if relay publish failed
+# Note, Reply, and Composer components should show the new rounded white card design
+```
+
+---
+
 ### From v3.1.7
 
 No schema changes. Bug fixes in key-service and web. Rebuild both:
@@ -224,7 +254,7 @@ docker logs platform-pub-web-1 --tail 3
 
 ---
 
-### From v3.1.6
+### From v3.1.6 or v3.1.7
 
 No schema changes. Visual redesign only (web service). Rebuild web only:
 
@@ -564,9 +594,10 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | POST | /api/v1/articles/:eventId/vault | session | Encrypt paywalled body, store vault key |
 | POST | /api/v1/articles/:eventId/gate-pass | session | Paywall gate pass |
 | PATCH | /api/v1/articles/:id | session | Update article metadata (replies toggle) |
-| DELETE | /api/v1/articles/:id | session | Delete article |
+| DELETE | /api/v1/articles/:id | session | Delete article (soft-delete + kind 5 to relay) |
+| GET | /api/v1/articles/deleted?pubkeys= | session | Recently deleted article event IDs + coordinates for given Nostr pubkeys (used by feed to cross-reference DB deletions) |
 | POST | /api/v1/notes | session | Index published note |
-| DELETE | /api/v1/notes/:nostrEventId | session | Delete note |
+| DELETE | /api/v1/notes/:nostrEventId | session | Delete note (hard-delete + kind 5 to relay) |
 | GET | /api/v1/content/resolve?eventId= | — | Resolve event ID for quote cards |
 | POST | /api/v1/drafts | session | Save/upsert draft |
 | GET | /api/v1/drafts | session | List drafts |
@@ -626,7 +657,7 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | 0 | Metadata | User (via key-custody) | Profile (name, bio, avatar) |
 | 1 | Note | User (via key-custody) | Short-form post |
 | 3 | Contacts | User (via key-custody) | Follow list |
-| 5 | Deletion | User (via key-custody) | Soft-delete article or note |
+| 5 | Deletion | User (via key-custody) | Soft-delete article or note. Published by the gateway on article delete and note delete — used by feed clients to filter deleted events from relay query results |
 | 7003 | Subscription | Platform service key | Subscription status (provisional NIP-88) |
 | 30023 | Long-form article | User (via key-custody) | NIP-23 article with optional `['payload', ciphertext, algorithm]` tag for paywalled content |
 | 30024 | Draft | User (via key-custody) | NIP-23 draft |
@@ -813,6 +844,83 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.1.9 — 22 March 2026
+
+**Note deletion fix, article deletion hardening, social component reskin, about page copy**
+
+**Bug fix — deleted notes reappearing in feed**
+
+`DELETE /notes/:nostrEventId` hard-deleted notes from the DB but never published a kind 5 deletion event to strfry. The feed's note filter (`!deletedIds.has(e.id)`) checks kind 5 events, so with no kind 5 in the relay `deletedIds` was always empty for that note. The note disappeared via the optimistic `handleNoteDeleted` callback, but reappeared on every subsequent `loadFeed()` call because strfry still had the kind 1 event.
+
+Fixed by adding kind 5 publication to the note deletion handler, identical in structure to the existing article deletion handler. Notes are kind 1 (not replaceable) so the kind 5 carries only an `['e', nostrEventId]` tag — no `['a']` coordinate needed.
+
+A comment in the old handler claimed "the feed code already filters for [kind 5 deletion events]" — true, but only if a kind 5 exists. The comment has been updated.
+
+**Hardening — article deletion no longer depends solely on relay publish**
+
+Previously, if the gateway's kind 5 WebSocket publish to strfry failed (timeout, relay unavailable), the article remained in strfry and reappeared in strfry-based feeds. A frontend fallback publish existed but both could fail simultaneously (same root cause: relay unreachable).
+
+Fix: `GET /api/v1/articles/deleted?pubkeys=<hex>,<hex>,...` — returns `{ deletedEventIds, deletedCoords }` for articles soft-deleted in the last 90 days for the given Nostr pubkeys. The `FeedView` now calls this in parallel with its strfry queries and seeds `deletedIds` / `deletedCoords` from both the DB response and any kind 5 events on the relay. The DB soft-delete is immediate and reliable, so feed filtering no longer depends on kind 5 delivery.
+
+**Social component reskin — Notes, Replies, Composers**
+
+Full visual redesign of the note and reply surface:
+- **NoteCard**: white `rounded-xl` card with `border-surface-strong/50`; warm gradient fallback avatar (`#F5D5D6 → #E8A5A7`); note text promoted to `text-content-primary`; action buttons invisible at rest, fill on hover; reply panel stays inside card separated by a thin rule.
+- **QuoteCard**: accent stripe + tinted fill (`bg-surface-sunken/60 border-l-[2.5px] border-accent`); outer border removed.
+- **ReplyItem**: inline name+text layout; 20px avatars; timestamps shortened ("2h" not "2h ago", "now" not "just now"); threading border softened (`border-surface-strong/40`).
+- **ReplyComposer**: pill input that expands to a bordered textarea on focus; dark pill Post button; SVG image icon; character count only near limit.
+- **NoteComposer**: matches NoteCard card style; transparent textarea; dark pill Post button; SVG image icon; quote preview uses accent stripe, no outer border.
+- **Tailwind**: `surface-sunken` and `surface-strong` converted to RGB alpha-value format (`rgb(... / <alpha-value>)`) to enable `/50` opacity modifiers.
+
+**About page copy**
+
+Replaced the three-section (Platform / What makes Platform different / You're free to leave) layout with a single flowing section. Updated copy describes the product, the tab billing model, the Nostr underpinnings, Platform's 8% fee, and account portability. Keyline divider removed.
+
+**Files changed:** `gateway/src/routes/notes.ts`, `gateway/src/routes/articles.ts`, `web/src/components/feed/FeedView.tsx`, `web/src/components/feed/NoteCard.tsx`, `web/src/components/feed/QuoteCard.tsx`, `web/src/components/feed/NoteComposer.tsx`, `web/src/components/replies/ReplyItem.tsx`, `web/src/components/replies/ReplyComposer.tsx`, `web/tailwind.config.js`, `web/src/app/about/page.tsx`
+**No schema changes. Rebuild gateway and web.**
+
+---
+
+### v3.1.8 — 22 March 2026
+
+**Fix paywalled article publishing (key-service and web)**
+
+Two bugs prevented vault encryption from working end-to-end:
+
+1. **key-service — vault response missing ciphertext and algorithm:** `POST /articles/:id/vault` was not returning `ciphertext` and `algorithm` in its response. The frontend needs both to build the NIP-23 v2 event with a `['payload', ciphertext, algorithm]` tag. Without them the double-publish produced a v2 event with no payload tag and readers could not decrypt the article body.
+
+2. **PaywallGateNode — missing Tiptap markdown serializer:** `PaywallGateNode` had no `toMarkdown` serializer registered with the `tiptap-markdown` extension. Without it the `<!-- paywall-gate -->` marker was never written into the markdown output, so `paywallContent` was always an empty string and the vault call was never reached.
+
+**Files changed:** `key-service/src/routes/keys.ts`, `web/src/components/editor/PaywallGateNode.ts`
+**No schema changes. Rebuild key-service and web.**
+
+---
+
+### v3.1.7 — 22 March 2026
+
+**Broadsheet Confidence visual redesign (web only)**
+
+Full visual overhaul to a warmer, more editorial aesthetic:
+
+- **Navigation sidebar:** crimson → near-black (`ink-900`); active link indicated by a 3px crimson left-border accent instead of a crimson background fill.
+- **Page background:** updated to a warmer papery tone (`#F5F0E8`).
+- **Headline weight:** `font-light` → `font-medium` (500) across all pages; letter-spacing tightened to `-0.025em`.
+- **Buttons:** sentence-case, 14px, visible border (previously uppercase, 13px, no border).
+- **Tab pills:** sentence-case (previously uppercase).
+- **Feed cards:** top-rule layout; left crimson accent reserved for paywalled articles only (previously on all article cards).
+- **Article body:** crimson drop cap on the first letter of body text.
+- **Ornament divider:** grey → crimson.
+- **Rule accent:** 2px → 3px.
+- **Blockquote border:** light red → full crimson.
+- **PaywallGate unlock button:** `btn` → `btn-accent`.
+
+Also introduces `DESIGN-BRIEF.md` (design system reference document, not committed to docs).
+
+**Files changed:** `web/src/app/globals.css`, `web/src/app/page.tsx`, `web/src/app/about/page.tsx`, `web/src/app/auth/page.tsx`, `web/src/components/layout/Nav.tsx`, `web/src/components/feed/ArticleCard.tsx`, `web/src/components/article/ArticleReader.tsx`, `web/src/components/article/PaywallGate.tsx`, `web/tailwind.config.js`
+**No schema changes. Rebuild web only.**
+
+---
 
 ### v3.1.6 — 21 March 2026
 
