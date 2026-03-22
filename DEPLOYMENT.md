@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.5.0
+# platform.pub — Deployment Reference v3.5.1
 
 **Date:** 22 March 2026
-**Replaces:** v3.4.0 (see bottom for change log)
+**Replaces:** v3.5.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -201,6 +201,25 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+### From v3.5.0
+
+No schema changes. Gateway only. Rebuild and restart the gateway:
+
+```bash
+cd /root/platform-pub
+git pull origin master
+docker compose build --no-cache gateway
+docker compose up -d gateway
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+# Visit any /:username profile page — it should load fully with Notes visible
+```
+
+---
 
 ### From v3.4.0
 
@@ -971,6 +990,20 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.5.1 — 22 March 2026
+
+**Hotfix: user profile pages failing to load Notes**
+
+The `GET /writers/:username/notes` endpoint added in v3.4.0 included `AND deleted_at IS NULL` in its SQL query. The `notes` table has no `deleted_at` column (unlike `comments` and `articles`), so PostgreSQL threw a column-not-found error on every request. This caused the gateway to return a 500 for the notes fetch, which in turn triggered the `profileError` state on the profile page and prevented it from rendering.
+
+**Fix:** removed the invalid `AND deleted_at IS NULL` clause from the notes query. The `comments` table does have `deleted_at` so the replies endpoint is unaffected.
+
+**Files changed:** `gateway/src/routes/writers.ts`
+
+**No schema changes. Rebuild gateway only.**
+
+---
 
 ### v3.5.0 — 22 March 2026
 
