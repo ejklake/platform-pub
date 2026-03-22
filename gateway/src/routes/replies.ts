@@ -121,6 +121,21 @@ export async function replyRoutes(app: FastifyInstance) {
         [authorId, data.targetEventId, contentAuthorId]
       ).catch(() => {}) // Non-critical
 
+      // Notify content author of new reply (skip if replying to own content)
+      if (authorId !== contentAuthorId) {
+        const articleRow = data.targetKind === 30023
+          ? await pool.query<{ id: string }>(
+              `SELECT id FROM articles WHERE nostr_event_id = $1 AND deleted_at IS NULL`,
+              [data.targetEventId]
+            ).then((r) => r.rows[0] ?? null)
+          : null
+        pool.query(
+          `INSERT INTO notifications (recipient_id, actor_id, type, article_id, comment_id)
+           VALUES ($1, $2, 'new_reply', $3, $4)`,
+          [contentAuthorId, authorId, articleRow?.id ?? null, result.rows[0].id]
+        ).catch((err) => logger.warn({ err }, 'Failed to insert new_reply notification'))
+      }
+
       logger.info(
         { replyId: result.rows[0].id, authorId, targetEventId: data.targetEventId },
         'Reply indexed'

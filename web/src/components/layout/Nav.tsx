@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '../../stores/auth'
+import { NotificationBell } from '../ui/NotificationBell'
 
 export function Nav() {
   const { user, loading, logout } = useAuth()
@@ -155,6 +156,7 @@ export function Nav() {
               <Link href="/dashboard" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/dashboard') ? 'text-white font-medium' : 'text-ink-400'}`}>Dashboard</Link>
               <Link href="/following" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/following') ? 'text-white font-medium' : 'text-ink-400'}`}>Following</Link>
               <Link href="/followers" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/followers') ? 'text-white font-medium' : 'text-ink-400'}`}>Followers</Link>
+              <Link href="/notifications" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${pathname === '/notifications' ? 'text-white font-medium' : 'text-ink-400'}`}>Notifications</Link>
               <Link href="/about" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/about') ? 'text-white font-medium' : 'text-ink-400'}`}>About</Link>
 
               <form onSubmit={handleSearch} className="mt-3">
@@ -230,6 +232,7 @@ export function Nav() {
             <Link href="/dashboard" onClick={handleNavClick} className={sidebarLinkClass('/dashboard')}>Dashboard</Link>
             <Link href="/following" onClick={handleNavClick} className={sidebarLinkClass('/following')}>Following</Link>
             <Link href="/followers" onClick={handleNavClick} className={sidebarLinkClass('/followers')}>Followers</Link>
+            <NotificationBell />
             <Link href="/about" onClick={handleNavClick} className={sidebarLinkClass('/about')}>About</Link>
           </>
         ) : (

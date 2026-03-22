@@ -307,3 +307,32 @@ export const myArticles = {
       { method: 'DELETE' }
     ),
 }
+
+// =============================================================================
+// Notifications
+// =============================================================================
+
+export interface NotificationActor {
+  id: string
+  username: string | null
+  displayName: string | null
+  avatar: string | null
+}
+
+export interface Notification {
+  id: string
+  type: 'new_follower' | 'new_reply'
+  read: boolean
+  createdAt: string
+  actor: NotificationActor | null
+  article: { id: string; title: string | null; slug: string | null } | null
+  comment: { id: string; content: string | null } | null
+}
+
+export const notifications = {
+  list: () =>
+    request<{ notifications: Notification[]; unreadCount: number }>('/notifications'),
+
+  readAll: () =>
+    request<{ ok: boolean }>('/notifications/read-all', { method: 'POST' }),
+}

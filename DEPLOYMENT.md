@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.1.9
+# platform.pub — Deployment Reference v3.2.0
 
 **Date:** 22 March 2026
-**Replaces:** v3.1.8 (see bottom for change log)
+**Replaces:** v3.1.9 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -171,7 +171,7 @@ Verify:
 docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\dt"
 ```
 
-You should see 18+ tables.
+You should see 19+ tables.
 
 ### 5. Build and start all services
 
@@ -201,6 +201,31 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+### From v3.1.9
+
+Schema change: migration `009_notifications.sql` must be applied.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+DATABASE_URL=postgresql://platformpub:<POSTGRES_PASSWORD>@127.0.0.1:5432/platformpub \
+  npx tsx shared/src/db/migrate.ts
+docker compose build --no-cache gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+# Notification bell should appear between Followers and About in the left sidebar
+# Follow a writer — the writer should see a new_follower notification
+# Reply to an article — the article author should see a new_reply notification
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\d notifications"
+```
+
+---
 
 ### From v3.1.8
 
@@ -553,6 +578,7 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 | 006_receipt_portability.sql | `reader_pubkey` + `receipt_token` columns on read_events |
 | 007_subscription_nostr_event.sql | `nostr_event_id` column on subscriptions |
 | 008_deduplicate_articles.sql | Deduplicate articles rows; add partial unique index on `(writer_id, nostr_d_tag) WHERE deleted_at IS NULL` |
+| 009_notifications.sql | `notifications` table: new_follower and new_reply events, with actor/article/comment FK refs |
 
 Run all pending migrations:
 ```bash
@@ -621,6 +647,12 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | GET | /api/v1/follows/pubkeys | session | Followed writer pubkeys (for feed filter) |
 | GET | /api/v1/follows/followers | session | List accounts who follow you |
 | POST | /api/v1/reports | session | Submit content report |
+
+### Notifications
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | /api/v1/notifications | session | List recent notifications (max 50) with actor info, article title, comment excerpt, and unread count |
+| POST | /api/v1/notifications/read-all | session | Mark all notifications as read |
 
 ### Subscriptions
 | Method | Path | Auth | Purpose |
@@ -774,6 +806,7 @@ Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), conver
 | /feed | Sticky composer + Following / Add tabs |
 | /following | Writers you follow, with unfollow action |
 | /followers | Accounts who follow you |
+| /notifications | Recent notifications (new followers, new replies) — full-page view used on mobile |
 | /write | Article editor with paywall gate marker |
 | /article/:dTag | Article reader with paywall unlock |
 | /:username | Writer profile |
@@ -835,7 +868,6 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 
 - Subscription renewal is not yet automated (requires a scheduled worker)
 - RSS feed ingestion not yet built
-- Notification centre not yet built
 - NIP-07 browser extension support not yet built
 - Cash-out-at-will (writer-initiated payout) not yet implemented
 - Stripe payment collection not yet live — free allowance goes negative as a testing workaround
@@ -844,6 +876,47 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.2.0 — 22 March 2026
+
+**Notification centre**
+
+Adds a `notifications` table and a bell icon to the left-hand nav showing new-follower and new-reply events in real time.
+
+**Schema change:** migration `009_notifications.sql` — creates the `notifications` table:
+
+```sql
+notifications (
+  id            UUID PRIMARY KEY,
+  recipient_id  UUID REFERENCES accounts ON DELETE CASCADE,
+  actor_id      UUID REFERENCES accounts ON DELETE SET NULL,
+  type          TEXT,        -- 'new_follower' | 'new_reply'
+  article_id    UUID REFERENCES articles ON DELETE CASCADE,
+  comment_id    UUID REFERENCES comments ON DELETE CASCADE,
+  read          BOOLEAN DEFAULT false,
+  created_at    TIMESTAMPTZ DEFAULT now()
+)
+```
+
+**New gateway routes:**
+- `GET /api/v1/notifications` — returns the 50 most recent notifications for the session user, with actor display info, article title, comment excerpt (truncated to 200 chars), and `unreadCount`.
+- `POST /api/v1/notifications/read-all` — marks all unread as read.
+
+**Trigger points:**
+- `POST /follows/:writerId` — inserts a `new_follower` notification for the followed writer (fire-and-forget).
+- `POST /replies` — inserts a `new_reply` notification for the content author, skipped when replying to your own content (fire-and-forget).
+
+**Frontend:**
+- `NotificationBell` component in `web/src/components/ui/NotificationBell.tsx`: bell icon with a crimson unread-count badge; clicking opens a fixed-positioned dropdown panel (rendered via React portal to escape the nav's `overflow-y-auto`). Fetches on mount and refreshes on open; marks all as read when the panel is opened.
+- Desktop sidebar (`lg+`): `NotificationBell` rendered between Followers and About.
+- Mobile drawer (`< md`): "Notifications" link to `/notifications`.
+- `/notifications` page (`web/src/app/notifications/page.tsx`): full-page notification list with the same actor/article/comment display, used on mobile.
+
+**Files changed:** `migrations/009_notifications.sql`, `gateway/src/routes/notifications.ts`, `gateway/src/index.ts`, `gateway/src/routes/follows.ts`, `gateway/src/routes/replies.ts`, `web/src/lib/api.ts`, `web/src/components/ui/NotificationBell.tsx`, `web/src/components/layout/Nav.tsx`, `web/src/app/notifications/page.tsx`
+
+**Schema change: migration 009 must be applied. Rebuild gateway and web.**
+
+---
 
 ### v3.1.9 — 22 March 2026
 
