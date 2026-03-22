@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { ArticleEvent } from '../../lib/ndk'
 import { useWriterName } from '../../hooks/useWriterName'
 import { useAuth } from '../../stores/auth'
@@ -15,6 +16,7 @@ interface ArticleCardProps {
 
 export function ArticleCard({ article, onQuote }: ArticleCardProps) {
   const { user } = useAuth()
+  const router = useRouter()
   const writerInfo = useWriterName(article.pubkey)
   const [replyCount, setReplyCount] = useState<number | null>(null)
   const wordCount = article.content.split(/\s+/).length
@@ -26,6 +28,10 @@ export function ArticleCard({ article, onQuote }: ArticleCardProps) {
   useEffect(() => {
     repliesApi.getForTarget(article.id).then(d => setReplyCount(d.totalCount)).catch(() => {})
   }, [article.id])
+
+  function handleCardClick() {
+    router.push(`/article/${article.dTag}`)
+  }
 
   function handleQuote(e: React.MouseEvent) {
     e.preventDefault()
@@ -40,8 +46,10 @@ export function ArticleCard({ article, onQuote }: ArticleCardProps) {
     })
   }
 
+  const authorHref = writerInfo?.username ? `/${writerInfo.username}` : null
+
   return (
-    <Link href={`/article/${article.dTag}`} className="group block overflow-hidden">
+    <div onClick={handleCardClick} className="group block overflow-hidden cursor-pointer">
       {heroImage ? (
         <div
           className="relative p-6 min-h-[220px] flex flex-col justify-end"
@@ -49,7 +57,17 @@ export function ArticleCard({ article, onQuote }: ArticleCardProps) {
         >
           <div className="absolute inset-0 bg-gradient-to-t from-ink-900/80 via-ink-900/40 to-transparent" />
           <div className="relative z-10">
-            <p className="label-ui text-accent-200 mb-2">{writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}</p>
+            {authorHref ? (
+              <Link
+                href={authorHref}
+                onClick={(e) => e.stopPropagation()}
+                className="label-ui text-accent-200 mb-2 hover:text-white transition-colors inline-block"
+              >
+                {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
+              </Link>
+            ) : (
+              <p className="label-ui text-accent-200 mb-2">{writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}</p>
+            )}
             <h2 className="font-serif text-xl font-normal text-white group-hover:opacity-90 transition-opacity mb-2 leading-snug tracking-tight">
               {article.title}
             </h2>
@@ -66,9 +84,19 @@ export function ArticleCard({ article, onQuote }: ArticleCardProps) {
         </div>
       ) : (
         <div className={`py-5 border-t border-ink-300 ${article.isPaywalled ? 'pl-4 border-l-[3px] border-l-accent' : ''}`}>
-          <p className="label-ui text-content-muted mb-3">
-            {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
-          </p>
+          {authorHref ? (
+            <Link
+              href={authorHref}
+              onClick={(e) => e.stopPropagation()}
+              className="label-ui text-content-muted mb-3 hover:text-content-primary transition-colors inline-block"
+            >
+              {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
+            </Link>
+          ) : (
+            <p className="label-ui text-content-muted mb-3">
+              {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
+            </p>
+          )}
           <h2 className="font-serif text-xl font-medium text-content-primary group-hover:text-accent transition-colors mb-2 leading-snug" style={{ letterSpacing: '-0.015em' }}>
             {article.title}
           </h2>
@@ -91,7 +119,7 @@ export function ArticleCard({ article, onQuote }: ArticleCardProps) {
           </div>
         </div>
       )}
-    </Link>
+    </div>
   )
 }
 

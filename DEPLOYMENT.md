@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.2.0
+# platform.pub — Deployment Reference v3.3.0
 
 **Date:** 22 March 2026
-**Replaces:** v3.1.9 (see bottom for change log)
+**Replaces:** v3.2.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -201,6 +201,30 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+### From v3.2.0
+
+No schema changes. Gateway and web both changed. Rebuild both:
+
+```bash
+cd /root/platform-pub
+git pull origin master
+docker compose build --no-cache gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+# Left nav should show: Write, Profile, Notifications (with count), Following, Followers, Dashboard, About, Search
+# Clicking Profile in the nav should open the /profile settings page
+# Upload an avatar and save — the avatar should update in the nav bottom bar immediately
+# Author names on feed cards, notes, and replies should be clickable links to /:username
+# PATCH /api/v1/auth/profile should return { ok: true }
+```
+
+---
 
 ### From v3.1.9
 
@@ -606,7 +630,8 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | POST | /api/v1/auth/login | — | Request magic link |
 | POST | /api/v1/auth/verify | — | Verify magic link token |
 | POST | /api/v1/auth/logout | session | Clear session |
-| GET | /api/v1/auth/me | session | Current user info |
+| GET | /api/v1/auth/me | session | Current user info (includes `bio`) |
+| PATCH | /api/v1/auth/profile | session | Update display name, bio, avatar URL |
 | GET | /api/v1/auth/google | — | Google OAuth redirect |
 | POST | /api/v1/auth/google/exchange | `{ code, state }` | Google OAuth code exchange |
 | POST | /api/v1/auth/upgrade-writer | session | Start Stripe Connect |
@@ -804,12 +829,13 @@ Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), conver
 |------|---------|
 | / | Landing (redirects to /feed if logged in) |
 | /feed | Sticky composer + Following / Add tabs |
+| /profile | Edit your display name, bio, and avatar photo |
 | /following | Writers you follow, with unfollow action |
 | /followers | Accounts who follow you |
 | /notifications | Recent notifications (new followers, new replies) — full-page view used on mobile |
 | /write | Article editor with paywall gate marker |
 | /article/:dTag | Article reader with paywall unlock |
-| /:username | Writer profile |
+| /:username | Writer profile (public) |
 | /auth | Signup / login |
 | /auth/google/callback | Google OAuth callback (handles Google redirect, exchanges code, sets session) |
 | /auth/verify | Magic link verification |
@@ -876,6 +902,57 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.3.0 — 22 March 2026
+
+**Profile settings page, nav reorder, clickable author names, about page copy**
+
+**Profile settings page (`/profile`)**
+
+New page for editing your own profile. Reached via a "Profile" link in the nav or by clicking your avatar/name at the bottom of the sidebar.
+
+- **Avatar:** file-picker button uploads via the existing Blossom pipeline (`POST /api/v1/media/upload`). Supports JPEG, PNG, GIF, WebP. Current avatar is previewed; a Remove button clears it.
+- **Display name:** free-text input, max 100 characters.
+- **Bio:** textarea, max 500 characters, with live character count.
+- **Username:** displayed read-only (cannot be changed).
+- Saving calls `PATCH /api/v1/auth/profile` then re-hydrates the auth store via `fetchMe()` — the nav bar and any component reading `useAuth()` update immediately.
+
+**New gateway route:** `PATCH /auth/profile` — accepts `{ displayName?, bio?, avatar?: string | null }`. Validates with Zod (displayName max 100, bio max 500, avatar a URL). Calls `updateProfile()` in `shared/src/auth/accounts.ts`. Returns `{ ok: true }`.
+
+`GET /auth/me` now includes `bio` in its response. `MeResponse` and `AccountInfo` updated accordingly.
+
+**Nav reorder and icon removal**
+
+The left sidebar (desktop), mobile drawer, and mid-breakpoint inline bar have been updated:
+
+- **Order:** Write → Profile → Notifications → Following → Followers → Dashboard → About → Search
+- **Icons removed:** the magnifying glass search icon and the bell icon are gone. Both items are now plain text.
+- **Notification count:** unread count appears as a number in crimson next to the word "Notifications" (e.g. `Notifications 3`) rather than as a badge on an icon.
+- **Search:** clicking "Search" in the sidebar expands an inline text input (behaviour unchanged); the icon trigger is replaced with a text button.
+- **Sidebar bottom:** user avatar and name now link to `/profile` (previously linked to `/:username`).
+
+**Clickable author names in feed furniture**
+
+Author names and avatars are now hyperlinks to the author's public profile page:
+
+- **ArticleCard:** outer `<Link>` wrapper converted to a `<div onClick>` (using `useRouter`); author name rendered as an inner `<Link href="/:username">` with `stopPropagation` to prevent card-click conflict.
+- **NoteCard:** avatar and display name both wrapped in `<Link href="/:username">`.
+- **ReplyItem:** author name span replaced with `<Link href="/:username">` when `username` is available.
+- **CommentItem:** same as ReplyItem.
+
+**About page copy**
+
+Replaced previous copy with new text. Two section headings added: "Built on open ground" and "You don't need to think about any of that", rendered as `<h2>` elements in the serif type scale.
+
+**TypeScript fix — `shared/src/auth/session.ts`**
+
+Added `import '@fastify/cookie'` to activate the package's module augmentation, which adds `setCookie()` to `FastifyReply` and `cookies` to `FastifyRequest`. Previously the compiler reported three errors against these properties because the augmentation was never loaded. The package was already a declared dependency and installed; only the import was missing.
+
+**Files changed:** `gateway/src/routes/auth.ts`, `shared/src/auth/accounts.ts`, `shared/src/auth/session.ts`, `web/src/lib/api.ts`, `web/src/app/profile/page.tsx` *(new)*, `web/src/components/layout/Nav.tsx`, `web/src/components/ui/NotificationBell.tsx`, `web/src/components/feed/ArticleCard.tsx`, `web/src/components/feed/NoteCard.tsx`, `web/src/components/replies/ReplyItem.tsx`, `web/src/components/comments/CommentItem.tsx`, `web/src/app/about/page.tsx`
+
+**No schema changes. Rebuild gateway and web.**
+
+---
 
 ### v3.2.0 — 22 March 2026
 

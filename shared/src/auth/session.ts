@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
 import type { FastifyRequest, FastifyReply } from 'fastify'
+import '@fastify/cookie'
 
 // =============================================================================
 // Session Management

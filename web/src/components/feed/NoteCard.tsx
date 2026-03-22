@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import type { NoteEvent } from '../../lib/ndk'
 import { useWriterName } from '../../hooks/useWriterName'
 import { useAuth } from '../../stores/auth'
@@ -72,7 +73,20 @@ export function NoteCard({ note, onDeleted, onQuote }: NoteCardProps) {
       <div className="p-4">
         <div className="flex items-start gap-3">
           {/* Avatar — warm gradient for fallback */}
-          {writerInfo?.avatar ? (
+          {writerInfo?.username ? (
+            <Link href={`/${writerInfo.username}`} className="flex-shrink-0">
+              {writerInfo.avatar ? (
+                <img src={writerInfo.avatar} alt="" className="h-9 w-9 rounded-full object-cover" />
+              ) : (
+                <span
+                  className="flex h-9 w-9 items-center justify-center text-xs font-medium text-accent-700 rounded-full"
+                  style={{ background: 'linear-gradient(135deg, #F5D5D6, #E8A5A7)' }}
+                >
+                  {(writerInfo.displayName?.[0] ?? note.pubkey[0]).toUpperCase()}
+                </span>
+              )}
+            </Link>
+          ) : writerInfo?.avatar ? (
             <img src={writerInfo.avatar} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
           ) : (
             <span
@@ -86,9 +100,15 @@ export function NoteCard({ note, onDeleted, onQuote }: NoteCardProps) {
           <div className="flex-1 min-w-0">
             {/* Name + time */}
             <div className="flex items-center gap-2">
-              <span className="text-ui-sm font-medium text-content-primary">
-                {writerInfo?.displayName ?? note.pubkey.slice(0, 12) + '...'}
-              </span>
+              {writerInfo?.username ? (
+                <Link href={`/${writerInfo.username}`} className="text-ui-sm font-medium text-content-primary hover:text-accent transition-colors">
+                  {writerInfo.displayName ?? note.pubkey.slice(0, 12) + '...'}
+                </Link>
+              ) : (
+                <span className="text-ui-sm font-medium text-content-primary">
+                  {writerInfo?.displayName ?? note.pubkey.slice(0, 12) + '...'}
+                </span>
+              )}
               <span className="text-ui-xs text-content-faint">
                 {formatDate(note.publishedAt)}
               </span>

@@ -193,25 +193,19 @@ export function NotificationBell() {
 
   return (
     <div>
-      {/* Bell button */}
+      {/* Notifications button */}
       <button
         ref={buttonRef}
         onClick={handleOpen}
-        className="flex items-center gap-3 pl-4 py-2.5 text-ink-400 hover:bg-white/5 hover:text-white transition-colors w-full"
+        className="flex items-center gap-2 pl-4 py-2.5 text-ink-400 hover:bg-white/5 hover:text-white transition-colors w-full"
         title="Notifications"
       >
-        <span className="relative flex-shrink-0">
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5v2.25L2 10h12l-1.5-1.75V6A4.5 4.5 0 0 0 8 1.5Z" />
-            <path d="M6.5 10.5a1.5 1.5 0 0 0 3 0" />
-          </svg>
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-crimson text-[8px] font-bold text-white leading-none">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </span>
         <span className="font-serif text-sm">Notifications</span>
+        {unreadCount > 0 && (
+          <span className="font-serif text-sm text-crimson font-medium">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
       </button>
 
       {/* Dropdown panel — rendered via portal to escape overflow:hidden */}

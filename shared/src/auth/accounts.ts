@@ -135,6 +135,7 @@ export interface AccountInfo {
   nostrPubkey: string
   username: string | null
   displayName: string | null
+  bio: string | null
   avatarBlossomUrl: string | null
   isWriter: boolean
   isReader: boolean
@@ -151,6 +152,7 @@ export async function getAccount(accountId: string): Promise<AccountInfo | null>
     nostr_pubkey: string
     username: string | null
     display_name: string | null
+    bio: string | null
     avatar_blossom_url: string | null
     is_writer: boolean
     is_reader: boolean
@@ -160,7 +162,7 @@ export async function getAccount(accountId: string): Promise<AccountInfo | null>
     stripe_connect_kyc_complete: boolean
     free_allowance_remaining_pence: number
   }>(
-    `SELECT id, nostr_pubkey, username, display_name, avatar_blossom_url,
+    `SELECT id, nostr_pubkey, username, display_name, bio, avatar_blossom_url,
             is_writer, is_reader, status, stripe_customer_id, stripe_connect_id,
             stripe_connect_kyc_complete, free_allowance_remaining_pence
      FROM accounts WHERE id = $1`,
@@ -175,6 +177,7 @@ export async function getAccount(accountId: string): Promise<AccountInfo | null>
     nostrPubkey: r.nostr_pubkey,
     username: r.username,
     displayName: r.display_name,
+    bio: r.bio,
     avatarBlossomUrl: r.avatar_blossom_url,
     isWriter: r.is_writer,
     isReader: r.is_reader,
@@ -184,6 +187,42 @@ export async function getAccount(accountId: string): Promise<AccountInfo | null>
     stripeConnectKycComplete: r.stripe_connect_kyc_complete,
     freeAllowanceRemainingPence: r.free_allowance_remaining_pence,
   }
+}
+
+// ---------------------------------------------------------------------------
+// updateProfile — update display name, bio, and/or avatar
+// ---------------------------------------------------------------------------
+
+export async function updateProfile(
+  accountId: string,
+  updates: { displayName?: string; bio?: string; avatarBlossomUrl?: string | null }
+): Promise<void> {
+  const setParts: string[] = []
+  const values: any[] = []
+  let i = 1
+
+  if (updates.displayName !== undefined) {
+    setParts.push(`display_name = $${i++}`)
+    values.push(updates.displayName)
+  }
+  if (updates.bio !== undefined) {
+    setParts.push(`bio = $${i++}`)
+    values.push(updates.bio)
+  }
+  if (updates.avatarBlossomUrl !== undefined) {
+    setParts.push(`avatar_blossom_url = $${i++}`)
+    values.push(updates.avatarBlossomUrl)
+  }
+
+  if (setParts.length === 0) return
+
+  values.push(accountId)
+  await pool.query(
+    `UPDATE accounts SET ${setParts.join(', ')}, updated_at = now() WHERE id = $${i}`,
+    values
+  )
+
+  logger.info({ accountId }, 'Profile updated')
 }
 
 // ---------------------------------------------------------------------------

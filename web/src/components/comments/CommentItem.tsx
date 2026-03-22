@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { ReportButton } from '../ui/ReportButton'
 
 // =============================================================================
@@ -82,9 +83,15 @@ export function CommentItem({
               {initial}
             </div>
           )}
-          <span className="text-xs font-medium text-ink-600">
-            {authorName}
-          </span>
+          {comment.author.username ? (
+            <Link href={`/${comment.author.username}`} className="text-xs font-medium text-ink-600 hover:text-ink-900 transition-colors">
+              {authorName}
+            </Link>
+          ) : (
+            <span className="text-xs font-medium text-ink-600">
+              {authorName}
+            </span>
+          )}
           <span className="text-xs text-ink-300">&middot;</span>
           <time
             dateTime={comment.publishedAt}

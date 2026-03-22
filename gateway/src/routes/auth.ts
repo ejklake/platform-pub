@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { signup, SignupSchema, getAccount, connectStripeAccount, connectPaymentMethod } from '../../shared/src/auth/accounts.js'
+import { signup, SignupSchema, getAccount, updateProfile, connectStripeAccount, connectPaymentMethod } from '../../shared/src/auth/accounts.js'
 import { createSession, destroySession } from '../../shared/src/auth/session.js'
 import { requestMagicLink, verifyMagicLink } from '../../shared/src/auth/magic-links.js'
 import { sendMagicLinkEmail } from '../../shared/src/lib/email.js'
@@ -157,12 +157,40 @@ export async function authRoutes(app: FastifyInstance) {
       pubkey: account.nostrPubkey,
       username: account.username,
       displayName: account.displayName,
+      bio: account.bio,
       avatar: account.avatarBlossomUrl,
       isWriter: account.isWriter,
       hasPaymentMethod: account.stripeCustomerId !== null,
       stripeConnectKycComplete: account.stripeConnectKycComplete,
       freeAllowanceRemainingPence: account.freeAllowanceRemainingPence,
     })
+  })
+
+  // ---------------------------------------------------------------------------
+  // PATCH /auth/profile — update display name, bio, avatar
+  // ---------------------------------------------------------------------------
+
+  const UpdateProfileSchema = z.object({
+    displayName: z.string().min(1).max(100).optional(),
+    bio: z.string().max(500).optional(),
+    avatar: z.string().url().max(500).nullable().optional(),
+  })
+
+  app.patch('/auth/profile', { preHandler: requireAuth }, async (req, reply) => {
+    const parsed = UpdateProfileSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.flatten() })
+    }
+
+    const accountId = req.session!.sub!
+
+    await updateProfile(accountId, {
+      displayName: parsed.data.displayName,
+      bio: parsed.data.bio,
+      avatarBlossomUrl: parsed.data.avatar === null ? null : parsed.data.avatar,
+    })
+
+    return reply.status(200).send({ ok: true })
   })
 
   // ---------------------------------------------------------------------------

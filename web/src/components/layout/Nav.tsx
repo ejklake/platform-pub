@@ -20,6 +20,8 @@ export function Nav() {
     if (path === '/about') return pathname === '/about'
     if (path === '/following') return pathname === '/following'
     if (path === '/followers') return pathname === '/followers'
+    if (path === '/profile') return pathname === '/profile'
+    if (path === '/search') return pathname === '/search'
     return false
   }
 
@@ -103,19 +105,16 @@ export function Nav() {
               <Link href="/about" className={topLinkClass('/about')}>About</Link>
 
               <form onSubmit={handleSearch} className="relative flex items-center">
-                <svg className="absolute left-2.5 h-3.5 w-3.5 text-surface-sunken pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <circle cx="6.5" cy="6.5" r="5" />
-                  <line x1="10" y1="10" x2="14.5" y2="14.5" />
-                </svg>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-28 bg-ink-800 pl-8 pr-2 py-1.5 text-xs text-surface-raised placeholder-surface-sunken focus:w-44 focus:ring-1 focus:ring-surface-raised/40 transition-all"
+                  placeholder="Search…"
+                  className="w-28 bg-ink-800 px-3 py-1.5 text-xs text-surface-raised placeholder-surface-sunken focus:w-44 focus:ring-1 focus:ring-surface-raised/40 transition-all"
                 />
               </form>
 
-              <Link href={`/${user.username}`} className="flex items-center gap-2 font-serif text-sm text-surface hover:text-surface-raised transition-colors">
+              <Link href={`/profile`} className="flex items-center gap-2 font-serif text-sm text-surface hover:text-surface-raised transition-colors">
                 {user.avatar ? (
                   <img src={user.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
                 ) : (
@@ -153,10 +152,11 @@ export function Nav() {
           ) : user ? (
             <>
               <Link href="/write" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/write') ? 'text-white font-medium' : 'text-ink-400'}`}>Write</Link>
-              <Link href="/dashboard" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/dashboard') ? 'text-white font-medium' : 'text-ink-400'}`}>Dashboard</Link>
+              <Link href="/profile" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/profile') ? 'text-white font-medium' : 'text-ink-400'}`}>Profile</Link>
+              <Link href="/notifications" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${pathname === '/notifications' ? 'text-white font-medium' : 'text-ink-400'}`}>Notifications</Link>
               <Link href="/following" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/following') ? 'text-white font-medium' : 'text-ink-400'}`}>Following</Link>
               <Link href="/followers" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/followers') ? 'text-white font-medium' : 'text-ink-400'}`}>Followers</Link>
-              <Link href="/notifications" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${pathname === '/notifications' ? 'text-white font-medium' : 'text-ink-400'}`}>Notifications</Link>
+              <Link href="/dashboard" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/dashboard') ? 'text-white font-medium' : 'text-ink-400'}`}>Dashboard</Link>
               <Link href="/about" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-ink-800 ${isActive('/about') ? 'text-white font-medium' : 'text-ink-400'}`}>About</Link>
 
               <form onSubmit={handleSearch} className="mt-3">
@@ -196,13 +196,17 @@ export function Nav() {
           <div className="px-4 py-3 h-4 w-24 animate-pulse bg-ink-800 rounded" />
         ) : user ? (
           <>
-            {/* Search — icon only, expands on click */}
+            <Link href="/write" onClick={handleNavClick} className={sidebarLinkClass('/write')}>Write</Link>
+            <Link href="/profile" onClick={handleNavClick} className={sidebarLinkClass('/profile')}>Profile</Link>
+            <NotificationBell />
+            <Link href="/following" onClick={handleNavClick} className={sidebarLinkClass('/following')}>Following</Link>
+            <Link href="/followers" onClick={handleNavClick} className={sidebarLinkClass('/followers')}>Followers</Link>
+            <Link href="/dashboard" onClick={handleNavClick} className={sidebarLinkClass('/dashboard')}>Dashboard</Link>
+            <Link href="/about" onClick={handleNavClick} className={sidebarLinkClass('/about')}>About</Link>
+
+            {/* Search */}
             {searchOpen ? (
-              <form onSubmit={handleSearch} className="mx-3 mb-1 flex items-center gap-2 bg-ink-800 px-3 py-2">
-                <svg className="h-3.5 w-3.5 text-surface-sunken flex-shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <circle cx="6.5" cy="6.5" r="5" />
-                  <line x1="10" y1="10" x2="14.5" y2="14.5" />
-                </svg>
+              <form onSubmit={handleSearch} className="mx-3 mt-1 flex items-center gap-2 bg-ink-800 px-3 py-2">
                 <input
                   type="text"
                   value={searchQuery}
@@ -217,23 +221,13 @@ export function Nav() {
             ) : (
               <button
                 onClick={() => setSearchOpen(true)}
-                className="flex items-center gap-3 pl-4 py-2.5 text-ink-400 hover:bg-white/5 hover:text-white transition-colors w-full"
-                title="Search"
+                className={`block font-serif text-sm py-2.5 pl-4 pr-4 transition-colors w-full text-left ${
+                  isActive('/search') ? 'pl-[13px] border-l-[3px] border-crimson text-white font-medium' : 'text-ink-400 hover:bg-white/5 hover:text-white'
+                }`}
               >
-                <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <circle cx="6.5" cy="6.5" r="5" />
-                  <line x1="10" y1="10" x2="14.5" y2="14.5" />
-                </svg>
-                <span className="font-serif text-sm">Search</span>
+                Search
               </button>
             )}
-
-            <Link href="/write" onClick={handleNavClick} className={sidebarLinkClass('/write')}>Write</Link>
-            <Link href="/dashboard" onClick={handleNavClick} className={sidebarLinkClass('/dashboard')}>Dashboard</Link>
-            <Link href="/following" onClick={handleNavClick} className={sidebarLinkClass('/following')}>Following</Link>
-            <Link href="/followers" onClick={handleNavClick} className={sidebarLinkClass('/followers')}>Followers</Link>
-            <NotificationBell />
-            <Link href="/about" onClick={handleNavClick} className={sidebarLinkClass('/about')}>About</Link>
           </>
         ) : (
           <>
@@ -248,7 +242,7 @@ export function Nav() {
       {user && (
         <div className="hidden lg:block border-t border-ink-800 px-4 py-4 space-y-3">
           {/* User */}
-          <Link href={`/${user.username}`} className="flex items-center gap-2 group">
+          <Link href="/profile" className="flex items-center gap-2 group">
             {user.avatar ? (
               <img src={user.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
             ) : (

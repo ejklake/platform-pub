@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { ReportButton } from '../ui/ReportButton'
 
 // =============================================================================
@@ -94,9 +95,15 @@ export function ReplyItem({
             <p className={`text-sm leading-relaxed ${
               reply.isDeleted ? 'text-content-faint italic' : ''
             }`}>
-              <span className="font-medium text-content-secondary text-ui-xs">
-                {authorName}
-              </span>{' '}
+              {reply.author.username ? (
+                <Link href={`/${reply.author.username}`} className="font-medium text-content-secondary text-ui-xs hover:text-content-primary transition-colors">
+                  {authorName}
+                </Link>
+              ) : (
+                <span className="font-medium text-content-secondary text-ui-xs">
+                  {authorName}
+                </span>
+              )}{' '}
               <span className={reply.isDeleted ? 'text-content-faint' : 'text-content-primary'}>
                 {reply.content}
               </span>

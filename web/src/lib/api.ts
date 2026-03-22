@@ -57,6 +57,7 @@ export interface MeResponse {
   pubkey: string
   username: string | null
   displayName: string | null
+  bio: string | null
   avatar: string | null
   isWriter: boolean
   hasPaymentMethod: boolean
@@ -96,6 +97,12 @@ export const auth = {
     request<{ ok: boolean; hasPaymentMethod: boolean }>('/auth/connect-card', {
       method: 'POST',
       body: JSON.stringify({ paymentMethodId }),
+    }),
+
+  updateProfile: (data: { displayName?: string; bio?: string; avatar?: string | null }) =>
+    request<{ ok: boolean }>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
 }
 
