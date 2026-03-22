@@ -30,6 +30,7 @@ import { uploadImage } from '../../lib/media'
 
 interface EditorProps {
   initialTitle?: string
+  initialDek?: string
   initialContent?: string
   initialGatePosition?: number
   initialPrice?: number
@@ -41,6 +42,7 @@ interface EditorProps {
 
 export interface PublishData {
   title: string
+  dek: string
   content: string
   freeContent: string
   paywallContent: string
@@ -52,6 +54,7 @@ export interface PublishData {
 
 export function ArticleEditor({
   initialTitle = '',
+  initialDek = '',
   initialContent = '',
   initialGatePosition = 50,
   initialPrice,
@@ -63,6 +66,7 @@ export function ArticleEditor({
   const { user } = useAuth()
 
   const [title, setTitle] = useState(initialTitle)
+  const [dek, setDek] = useState(initialDek)
   const [pricePence, setPricePence] = useState(initialPrice ?? 0)
   const [commentsEnabled, setCommentsEnabled] = useState(initialCommentsEnabled)
   const [publishing, setPublishing] = useState(false)
@@ -120,7 +124,7 @@ export function ArticleEditor({
       // Auto-save draft
       const content = editor.storage.markdown.getMarkdown()
       autoSaver(
-        { title, content, gatePositionPct: 50, pricePence },
+        { title, dek, content, gatePositionPct: 50, pricePence },
         (saved) => {
           setCurrentDraftId(saved.draftId)
           setDraftStatus('Saved')
@@ -169,6 +173,7 @@ export function ArticleEditor({
 
       const data: PublishData = {
         title: title.trim(),
+        dek: dek.trim(),
         content: fullContent.replace(PAYWALL_GATE_MARKER, '').trim(),
         freeContent,
         paywallContent,
@@ -207,6 +212,13 @@ export function ArticleEditor({
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Article title"
         className="w-full border-none bg-transparent font-serif text-3xl font-bold text-ink-900 placeholder:text-ink-300 focus:outline-none mb-3 pt-4 sm:text-4xl"
+      />
+      <input
+        type="text"
+        value={dek}
+        onChange={(e) => setDek(e.target.value)}
+        placeholder="Add a subtitle or standfirst…"
+        className="w-full border-none bg-transparent font-serif text-lg text-content-secondary italic placeholder:text-ink-300 focus:outline-none mb-3"
       />
 
       {/* Editor toolbar */}
@@ -369,7 +381,7 @@ export function ArticleEditor({
             try {
               const content = editor.storage.markdown.getMarkdown()
               const saved = await saveDraft({
-                title, content, gatePositionPct: 50, pricePence,
+                title, dek, content, gatePositionPct: 50, pricePence,
               })
               setCurrentDraftId(saved.draftId)
               setDraftStatus('Saved')

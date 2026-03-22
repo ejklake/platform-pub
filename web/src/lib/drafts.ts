@@ -16,6 +16,7 @@ const API_BASE = '/api/v1'
 
 export interface DraftData {
   title: string
+  dek?: string              // optional standfirst/subtitle
   content: string           // full raw editor content
   gatePositionPct: number
   pricePence: number

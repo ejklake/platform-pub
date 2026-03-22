@@ -23,6 +23,7 @@ import { receiptRoutes } from './routes/receipts.js'
 import { exportRoutes } from './routes/export.js'
 import { notificationRoutes } from './routes/notifications.js'
 import { voteRoutes } from './routes/votes.js'
+import { historyRoutes } from './routes/history.js'
 import { pool } from '../shared/src/db/client.js'
 import logger from '../shared/src/lib/logger.js'
 
@@ -117,6 +118,9 @@ async function start() {
 
   // Votes (upvote/downvote articles, notes, replies)
   await app.register(voteRoutes, { prefix: '/api/v1' })
+
+  // Reading history (list previously-read articles for the current reader)
+  await app.register(historyRoutes, { prefix: '/api/v1' })
 
   // ---------------------------------------------------------------------------
   // Service proxies

@@ -8,6 +8,7 @@ import { useWriterName } from '../../hooks/useWriterName'
 import { useAuth } from '../../stores/auth'
 import { replies as repliesApi } from '../../lib/api'
 import { VoteControls } from '../ui/VoteControls'
+import { ShareButton } from '../ui/ShareButton'
 import type { VoteTally, MyVoteCount } from '../../lib/api'
 import type { QuoteTarget } from '../../lib/publishNote'
 
@@ -92,6 +93,9 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
                   initialMyVotes={myVoteCounts}
                 />
               </span>
+              <span onClick={e => e.stopPropagation()}>
+                <ShareButton url={`/article/${article.dTag}`} title={article.title} />
+              </span>
             </div>
           </div>
         </div>
@@ -137,6 +141,9 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
                 initialTally={voteTally}
                 initialMyVotes={myVoteCounts}
               />
+            </span>
+            <span onClick={e => e.stopPropagation()}>
+              <ShareButton url={`/article/${article.dTag}`} title={article.title} />
             </span>
           </div>
         </div>

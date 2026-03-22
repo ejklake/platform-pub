@@ -28,6 +28,7 @@ const IndexArticleSchema = z.object({
   nostrEventId: z.string().min(1),
   dTag: z.string().min(1),
   title: z.string().min(1),
+  summary: z.string().optional(),
   content: z.string(),                // free section content
   isPaywalled: z.boolean(),
   pricePence: z.number().int().min(0),
@@ -67,15 +68,16 @@ export async function articleRoutes(app: FastifyInstance) {
     try {
       const result = await pool.query<{ id: string }>(
         `INSERT INTO articles (
-           writer_id, nostr_event_id, nostr_d_tag, title, slug,
+           writer_id, nostr_event_id, nostr_d_tag, title, slug, summary,
            content_free, word_count, tier,
            is_paywalled, price_pence, gate_position_pct, vault_event_id,
            published_at
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'tier1', $8, $9, $10, $11, now())
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'tier1', $9, $10, $11, $12, now())
          ON CONFLICT (writer_id, nostr_d_tag) WHERE deleted_at IS NULL DO UPDATE SET
            nostr_event_id = EXCLUDED.nostr_event_id,
            title = EXCLUDED.title,
            slug = EXCLUDED.slug,
+           summary = EXCLUDED.summary,
            content_free = EXCLUDED.content_free,
            word_count = EXCLUDED.word_count,
            is_paywalled = EXCLUDED.is_paywalled,
@@ -90,6 +92,7 @@ export async function articleRoutes(app: FastifyInstance) {
           data.dTag,
           data.title,
           slug,
+          data.summary ?? null,
           data.content,
           wordCount,
           data.isPaywalled,

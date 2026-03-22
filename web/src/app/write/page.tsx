@@ -30,6 +30,7 @@ export default function WritePage() {
   const [editorReady, setEditorReady] = useState(false)
   const [initialData, setInitialData] = useState<{
     title: string
+    dek: string
     content: string
     gatePosition: number
     price: number
@@ -65,11 +66,13 @@ export default function WritePage() {
 
           const dTag = event.tagValue('d') ?? ''
           const title = event.tagValue('title') ?? ''
+          const summary = event.tagValue('summary') ?? ''
           const priceTag = event.tags.find(t => t[0] === 'price')
           const gateTag = event.tags.find(t => t[0] === 'gate')
 
           setInitialData({
             title,
+            dek: summary,
             content: event.content,
             gatePosition: gateTag ? parseInt(gateTag[1], 10) : 50,
             price: priceTag ? parseInt(priceTag[1], 10) : 0,
@@ -89,12 +92,13 @@ export default function WritePage() {
             return
           }
           setInitialData({
-            title: (draft as any).title ?? '',
-            content: (draft as any).content ?? '',
-            gatePosition: (draft as any).gatePositionPct ?? 50,
-            price: (draft as any).pricePence ?? 0,
+            title: draft.title ?? '',
+            dek: draft.dek ?? '',
+            content: draft.content ?? '',
+            gatePosition: draft.gatePositionPct ?? 50,
+            price: draft.pricePence ?? 0,
             commentsEnabled: true,
-            editingDTag: (draft as any).dTag ?? undefined,
+            editingDTag: draft.dTag ?? undefined,
           })
         } catch {
           setLoadError('Failed to load draft.')
@@ -152,6 +156,7 @@ export default function WritePage() {
   return (
     <ArticleEditor
       initialTitle={initialData?.title}
+      initialDek={initialData?.dek}
       initialContent={initialData?.content}
       initialGatePosition={initialData?.gatePosition}
       initialPrice={initialData?.price}

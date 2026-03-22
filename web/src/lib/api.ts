@@ -187,6 +187,7 @@ export const articles = {
     nostrEventId: string
     dTag: string
     title: string
+    summary?: string
     content: string
     isPaywalled: boolean
     pricePence: number
@@ -318,6 +319,30 @@ export const myArticles = {
 }
 
 // =============================================================================
+// Reading History
+// =============================================================================
+
+export interface ReadingHistoryItem {
+  articleId: string
+  readAt: string
+  title: string | null
+  slug: string | null
+  dTag: string | null
+  wordCount: number | null
+  isPaywalled: boolean
+  writer: {
+    username: string | null
+    displayName: string | null
+    avatar: string | null
+  }
+}
+
+export const readingHistory = {
+  list: (limit = 50, offset = 0) =>
+    request<{ items: ReadingHistoryItem[] }>(`/my/reading-history?limit=${limit}&offset=${offset}`),
+}
+
+// =============================================================================
 // Notifications
 // =============================================================================
 
@@ -334,7 +359,8 @@ export interface Notification {
   read: boolean
   createdAt: string
   actor: NotificationActor | null
-  article: { id: string; title: string | null; slug: string | null } | null
+  article: { id: string; title: string | null; slug: string | null; writerUsername: string | null } | null
+  note: { id: string; nostrEventId: string | null } | null
   comment: { id: string; content: string | null } | null
 }
 

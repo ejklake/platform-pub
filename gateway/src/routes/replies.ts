@@ -129,10 +129,16 @@ export async function replyRoutes(app: FastifyInstance) {
               [data.targetEventId]
             ).then((r) => r.rows[0] ?? null)
           : null
+        const noteRow = data.targetKind === 1
+          ? await pool.query<{ id: string }>(
+              `SELECT id FROM notes WHERE nostr_event_id = $1`,
+              [data.targetEventId]
+            ).then((r) => r.rows[0] ?? null)
+          : null
         pool.query(
-          `INSERT INTO notifications (recipient_id, actor_id, type, article_id, comment_id)
-           VALUES ($1, $2, 'new_reply', $3, $4)`,
-          [contentAuthorId, authorId, articleRow?.id ?? null, result.rows[0].id]
+          `INSERT INTO notifications (recipient_id, actor_id, type, article_id, note_id, comment_id)
+           VALUES ($1, $2, 'new_reply', $3, $4, $5)`,
+          [contentAuthorId, authorId, articleRow?.id ?? null, noteRow?.id ?? null, result.rows[0].id]
         ).catch((err) => logger.warn({ err }, 'Failed to insert new_reply notification'))
       }
 

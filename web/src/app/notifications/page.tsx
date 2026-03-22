@@ -25,12 +25,36 @@ function timeAgo(iso: string): string {
   return `${days}d ago`
 }
 
+function getDestUrl(n: Notification): string {
+  switch (n.type) {
+    case 'new_follower':
+    case 'new_subscriber':
+      return n.actor?.username ? `/${n.actor.username}` : '#'
+    case 'new_reply':
+    case 'new_quote':
+    case 'new_mention':
+      return n.article?.slug ? `/article/${n.article.slug}` : '#'
+    default:
+      return '#'
+  }
+}
+
 function NotificationRow({ n }: { n: Notification }) {
   const actorName = n.actor?.displayName ?? n.actor?.username ?? 'Someone'
-  const articleHref = n.article?.slug ? `/article/${n.article.slug}` : null
+  const destUrl = getDestUrl(n)
+
+  const labels: Partial<Record<Notification['type'], string>> = {
+    new_follower: 'followed you',
+    new_subscriber: 'subscribed to your content',
+    new_quote: 'quoted you',
+    new_mention: 'mentioned you',
+  }
 
   return (
-    <div className={`flex items-start gap-3 py-4 border-b border-surface-strong ${!n.read ? 'bg-surface/50' : ''}`}>
+    <Link
+      href={destUrl}
+      className={`flex items-start gap-3 py-4 border-b border-surface-strong hover:bg-surface-raised transition-colors ${!n.read ? 'bg-surface/50' : ''}`}
+    >
       {n.actor?.avatar ? (
         <img src={n.actor.avatar} alt="" className="h-10 w-10 rounded-full object-cover flex-shrink-0 mt-0.5" />
       ) : (
@@ -40,77 +64,30 @@ function NotificationRow({ n }: { n: Notification }) {
       )}
 
       <div className="min-w-0 flex-1">
-        {n.type === 'new_follower' && (
-          <p className="text-sm text-content-primary leading-snug">
-            <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:opacity-75 transition-opacity">
-              {actorName}
-            </Link>
-            {' '}followed you
-          </p>
-        )}
-
-        {n.type === 'new_reply' && (
+        {n.type === 'new_reply' ? (
           <>
             <p className="text-sm text-content-primary leading-snug">
-              <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:opacity-75 transition-opacity">
-                {actorName}
-              </Link>
+              <span className="font-medium">{actorName}</span>
               {' replied'}
-              {n.article?.title && (
-                <>
-                  {' to '}
-                  {articleHref ? (
-                    <Link href={articleHref} className="hover:opacity-75 transition-opacity italic">
-                      {n.article.title}
-                    </Link>
-                  ) : (
-                    <span className="italic">{n.article.title}</span>
-                  )}
-                </>
-              )}
+              {n.article?.title && <>{' to '}<span className="italic">{n.article.title}</span></>}
             </p>
             {n.comment?.content && (
-              <p className="text-sm text-content-muted mt-1 line-clamp-2 leading-snug">
-                {n.comment.content}
-              </p>
+              <p className="text-sm text-content-muted mt-1 line-clamp-2 leading-snug">{n.comment.content}</p>
             )}
           </>
-        )}
-
-        {n.type === 'new_subscriber' && (
+        ) : (
           <p className="text-sm text-content-primary leading-snug">
-            <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:opacity-75 transition-opacity">
-              {actorName}
-            </Link>
-            {' '}subscribed to your content
+            <span className="font-medium">{actorName}</span>
+            {' '}{labels[n.type] ?? n.type}
           </p>
         )}
-
-        {n.type === 'new_quote' && (
-          <p className="text-sm text-content-primary leading-snug">
-            <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:opacity-75 transition-opacity">
-              {actorName}
-            </Link>
-            {' '}quoted you
-          </p>
-        )}
-
-        {n.type === 'new_mention' && (
-          <p className="text-sm text-content-primary leading-snug">
-            <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:opacity-75 transition-opacity">
-              {actorName}
-            </Link>
-            {' '}mentioned you
-          </p>
-        )}
-
         <p className="text-xs text-content-muted mt-1">{timeAgo(n.createdAt)}</p>
       </div>
 
       {!n.read && (
         <span className="flex-shrink-0 mt-2 h-2 w-2 rounded-full bg-crimson" />
       )}
-    </div>
+    </Link>
   )
 }
 
@@ -127,14 +104,12 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!user) return
     notificationsApi.list()
-      .then(({ notifications }) => setItems(notifications))
+      .then(({ notifications }) => {
+        setItems(notifications)
+        notificationsApi.readAll().catch(() => {})
+      })
       .catch(() => {})
       .finally(() => setDataLoading(false))
-    // Mark as read after a short delay
-    const timer = setTimeout(() => {
-      notificationsApi.readAll().catch(() => {})
-    }, 1000)
-    return () => clearTimeout(timer)
   }, [user])
 
   if (loading || !user) {

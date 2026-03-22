@@ -31,24 +31,32 @@ export async function notificationRoutes(app: FastifyInstance) {
       article_id: string | null
       article_title: string | null
       article_slug: string | null
+      article_writer_username: string | null
       comment_id: string | null
       comment_content: string | null
+      note_id: string | null
+      note_nostr_event_id: string | null
     }>(
       `SELECT
          n.id, n.type, n.read, n.created_at,
          n.actor_id,
-         a.username          AS actor_username,
-         a.display_name      AS actor_display_name,
+         a.username           AS actor_username,
+         a.display_name       AS actor_display_name,
          a.avatar_blossom_url AS actor_avatar,
          n.article_id,
-         ar.title            AS article_title,
-         ar.nostr_d_tag      AS article_slug,
+         ar.title             AS article_title,
+         ar.nostr_d_tag       AS article_slug,
+         aw.username          AS article_writer_username,
          n.comment_id,
-         LEFT(c.content, 200) AS comment_content
+         LEFT(c.content, 200) AS comment_content,
+         n.note_id,
+         no.nostr_event_id    AS note_nostr_event_id
        FROM notifications n
-       LEFT JOIN accounts a  ON a.id  = n.actor_id
-       LEFT JOIN articles ar ON ar.id = n.article_id
-       LEFT JOIN comments c  ON c.id  = n.comment_id
+       LEFT JOIN accounts a   ON a.id   = n.actor_id
+       LEFT JOIN articles ar  ON ar.id  = n.article_id
+       LEFT JOIN accounts aw  ON aw.id  = ar.writer_id
+       LEFT JOIN comments c   ON c.id   = n.comment_id
+       LEFT JOIN notes no     ON no.id  = n.note_id
        WHERE n.recipient_id = $1
        ORDER BY n.created_at DESC
        LIMIT 50`,
@@ -71,10 +79,13 @@ export async function notificationRoutes(app: FastifyInstance) {
           }
         : null,
       article: r.article_id
-        ? { id: r.article_id, title: r.article_title, slug: r.article_slug }
+        ? { id: r.article_id, title: r.article_title, slug: r.article_slug, writerUsername: r.article_writer_username }
         : null,
       comment: r.comment_id
         ? { id: r.comment_id, content: r.comment_content }
+        : null,
+      note: r.note_id
+        ? { id: r.note_id, nostrEventId: r.note_nostr_event_id }
         : null,
     }))
 

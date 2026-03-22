@@ -7,6 +7,7 @@ import { unwrapContentKey, decryptVaultContent } from '../../lib/vault'
 import { getNdk, fetchVaultEvent } from '../../lib/ndk'
 import { renderMarkdown } from '../../lib/markdown'
 import { ReportButton } from '../ui/ReportButton'
+import { ShareButton } from '../ui/ShareButton'
 import { ReplySection } from '../replies/ReplySection'
 import { AllowanceExhaustedModal } from '../ui/AllowanceExhaustedModal'
 import { NoteComposer } from '../feed/NoteComposer'
@@ -137,6 +138,9 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
   const isUnlocked = !article.isPaywalled || paywallBody !== null
   const pricePounds = article.pricePence ? (article.pricePence / 100).toFixed(2) : null
   const publishDate = new Date(article.publishedAt * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  const articleUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/article/${article.dTag}`
+    : `/article/${article.dTag}`
 
   return (
     <div className="min-h-screen bg-surface">
@@ -203,6 +207,11 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
             <h1 className="font-serif text-3xl font-medium leading-tight text-white sm:text-4xl" style={{ letterSpacing: '-0.025em' }}>
               {article.title}
             </h1>
+            {article.summary && (
+              <p className="font-serif text-xl text-white/80 italic leading-relaxed mt-4 mb-2">
+                {article.summary}
+              </p>
+            )}
           </div>
         </div>
       ) : (
@@ -222,10 +231,18 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
                 <p className="text-mono-xs text-content-muted">{publishDate}</p>
               </div>
             </div>
-            <ReportButton targetNostrEventId={article.id} />
+            <div className="flex items-center gap-3">
+              <ShareButton url={articleUrl} title={article.title} />
+              <ReportButton targetNostrEventId={article.id} />
+            </div>
           </div>
-          <h1 className="font-serif text-3xl font-medium leading-tight text-ink-900 sm:text-4xl mb-10" style={{ letterSpacing: '-0.025em' }}>{article.title}</h1>
-          <div className="rule-accent mb-10" />
+          <h1 className="font-serif text-3xl font-medium leading-tight text-ink-900 sm:text-4xl mb-4" style={{ letterSpacing: '-0.025em' }}>{article.title}</h1>
+          {article.summary && (
+            <p className="font-serif text-xl text-content-secondary italic leading-relaxed mt-4 mb-2">
+              {article.summary}
+            </p>
+          )}
+          <div className="rule-accent mb-10 mt-10" />
         </div>
       )}
 
@@ -234,7 +251,10 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
         {heroImage && (
           <div className="flex items-center justify-between mb-8">
             <div />
-            <ReportButton targetNostrEventId={article.id} />
+            <div className="flex items-center gap-3">
+              <ShareButton url={articleUrl} title={article.title} />
+              <ReportButton targetNostrEventId={article.id} />
+            </div>
           </div>
         )}
 

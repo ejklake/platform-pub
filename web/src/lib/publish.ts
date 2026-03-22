@@ -61,6 +61,7 @@ export async function publishArticle(
       nostrEventId: signedV1.id,
       dTag,
       title: data.title,
+      summary: data.dek?.trim() || undefined,
       content: data.freeContent,
       isPaywalled: data.isPaywalled,
       pricePence: data.pricePence,
@@ -133,6 +134,7 @@ export async function publishArticle(
     nostrEventId: signedV2.id,
     dTag,
     title: data.title,
+    summary: data.dek?.trim() || undefined,
     content: data.freeContent,
     isPaywalled: data.isPaywalled,
     pricePence: data.pricePence,
@@ -160,6 +162,10 @@ function buildNip23Event(
     ['title', data.title],
     ['published_at', String(Math.floor(Date.now() / 1000))],
   ]
+
+  if (data.dek?.trim()) {
+    event.tags.push(['summary', data.dek.trim()])
+  }
 
   if (data.isPaywalled) {
     event.tags.push(

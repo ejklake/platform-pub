@@ -23,109 +23,87 @@ function timeAgo(iso: string): string {
   return `${days}d ago`
 }
 
-function NotificationItem({ n }: { n: Notification }) {
+function getDestUrl(n: Notification): string {
+  switch (n.type) {
+    case 'new_follower':
+    case 'new_subscriber':
+      return n.actor?.username ? `/${n.actor.username}` : '#'
+    case 'new_reply':
+    case 'new_quote':
+    case 'new_mention':
+      return n.article?.slug ? `/article/${n.article.slug}` : '#'
+    default:
+      return '#'
+  }
+}
+
+function NotificationItem({ n, onNavigate }: { n: Notification; onNavigate: () => void }) {
   const actorName = n.actor?.displayName ?? n.actor?.username ?? 'Someone'
+  const destUrl = getDestUrl(n)
+
+  const avatar = n.actor?.avatar ? (
+    <img src={n.actor.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5" />
+  ) : (
+    <span className="flex h-7 w-7 items-center justify-center bg-ink-800 text-[10px] font-medium text-surface-raised rounded-full flex-shrink-0 mt-0.5">
+      {(n.actor?.displayName ?? n.actor?.username ?? '?')[0].toUpperCase()}
+    </span>
+  )
+
+  let body: React.ReactNode
 
   if (n.type === 'new_follower') {
-    return (
-      <div className={`px-4 py-3 border-b border-ink-800 last:border-0 ${!n.read ? 'bg-white/5' : ''}`}>
-        <div className="flex items-start gap-2.5">
-          {n.actor?.avatar ? (
-            <img src={n.actor.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5" />
-          ) : (
-            <span className="flex h-7 w-7 items-center justify-center bg-ink-800 text-[10px] font-medium text-surface-raised rounded-full flex-shrink-0 mt-0.5">
-              {(n.actor?.displayName ?? n.actor?.username ?? '?')[0].toUpperCase()}
-            </span>
-          )}
-          <div className="min-w-0">
-            <p className="text-xs text-surface-raised leading-snug">
-              <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:text-white transition-colors">
-                {actorName}
-              </Link>
-              {' '}followed you
-            </p>
-            <p className="text-[11px] text-ink-400 mt-0.5">{timeAgo(n.createdAt)}</p>
-          </div>
-        </div>
-      </div>
+    body = (
+      <>
+        <p className="text-xs text-surface-raised leading-snug">
+          <span className="font-medium">{actorName}</span>{' '}followed you
+        </p>
+        <p className="text-[11px] text-ink-400 mt-0.5">{timeAgo(n.createdAt)}</p>
+      </>
+    )
+  } else if (n.type === 'new_reply') {
+    body = (
+      <>
+        <p className="text-xs text-surface-raised leading-snug">
+          <span className="font-medium">{actorName}</span>
+          {' replied'}
+          {n.article?.title && <>{' to '}<span className="italic">{n.article.title}</span></>}
+        </p>
+        {n.comment?.content && (
+          <p className="text-[11px] text-ink-400 mt-1 line-clamp-2 leading-snug">{n.comment.content}</p>
+        )}
+        <p className="text-[11px] text-ink-400 mt-0.5">{timeAgo(n.createdAt)}</p>
+      </>
+    )
+  } else {
+    const simpleLabels: Partial<Record<Notification['type'], string>> = {
+      new_subscriber: 'subscribed to your content',
+      new_quote: 'quoted you',
+      new_mention: 'mentioned you',
+    }
+    const label = simpleLabels[n.type]
+    if (!label) return null
+    body = (
+      <>
+        <p className="text-xs text-surface-raised leading-snug">
+          <span className="font-medium">{actorName}</span>{' '}{label}
+        </p>
+        <p className="text-[11px] text-ink-400 mt-0.5">{timeAgo(n.createdAt)}</p>
+      </>
     )
   }
 
-  if (n.type === 'new_reply') {
-    const articleHref = n.article?.slug ? `/article/${n.article.slug}` : null
-    return (
-      <div className={`px-4 py-3 border-b border-ink-800 last:border-0 ${!n.read ? 'bg-white/5' : ''}`}>
-        <div className="flex items-start gap-2.5">
-          {n.actor?.avatar ? (
-            <img src={n.actor.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5" />
-          ) : (
-            <span className="flex h-7 w-7 items-center justify-center bg-ink-800 text-[10px] font-medium text-surface-raised rounded-full flex-shrink-0 mt-0.5">
-              {(n.actor?.displayName ?? n.actor?.username ?? '?')[0].toUpperCase()}
-            </span>
-          )}
-          <div className="min-w-0">
-            <p className="text-xs text-surface-raised leading-snug">
-              <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:text-white transition-colors">
-                {actorName}
-              </Link>
-              {' replied'}
-              {n.article?.title ? (
-                <>
-                  {' to '}
-                  {articleHref ? (
-                    <Link href={articleHref} className="hover:text-white transition-colors italic">
-                      {n.article.title}
-                    </Link>
-                  ) : (
-                    <span className="italic">{n.article.title}</span>
-                  )}
-                </>
-              ) : ' to your post'}
-            </p>
-            {n.comment?.content && (
-              <p className="text-[11px] text-ink-400 mt-1 line-clamp-2 leading-snug">
-                {n.comment.content}
-              </p>
-            )}
-            <p className="text-[11px] text-ink-400 mt-0.5">{timeAgo(n.createdAt)}</p>
-          </div>
-        </div>
+  return (
+    <Link
+      href={destUrl}
+      onClick={onNavigate}
+      className={`block px-4 py-3 border-b border-ink-800 last:border-0 hover:bg-white/10 transition-colors ${!n.read ? 'bg-white/5' : ''}`}
+    >
+      <div className="flex items-start gap-2.5">
+        {avatar}
+        <div className="min-w-0">{body}</div>
       </div>
-    )
-  }
-
-  const simpleTypes: Partial<Record<Notification['type'], string>> = {
-    new_subscriber: 'subscribed to your content',
-    new_quote: 'quoted you',
-    new_mention: 'mentioned you',
-  }
-
-  if (n.type in simpleTypes) {
-    return (
-      <div className={`px-4 py-3 border-b border-ink-800 last:border-0 ${!n.read ? 'bg-white/5' : ''}`}>
-        <div className="flex items-start gap-2.5">
-          {n.actor?.avatar ? (
-            <img src={n.actor.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5" />
-          ) : (
-            <span className="flex h-7 w-7 items-center justify-center bg-ink-800 text-[10px] font-medium text-surface-raised rounded-full flex-shrink-0 mt-0.5">
-              {(n.actor?.displayName ?? n.actor?.username ?? '?')[0].toUpperCase()}
-            </span>
-          )}
-          <div className="min-w-0">
-            <p className="text-xs text-surface-raised leading-snug">
-              <Link href={n.actor ? `/${n.actor.username}` : '#'} className="font-medium hover:text-white transition-colors">
-                {actorName}
-              </Link>
-              {' '}{simpleTypes[n.type]}
-            </p>
-            <p className="text-[11px] text-ink-400 mt-0.5">{timeAgo(n.createdAt)}</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return null
+    </Link>
+  )
 }
 
 export function NotificationBell() {
@@ -180,23 +158,18 @@ export function NotificationBell() {
       })
     }
     setOpen(true)
+    // Reset counter immediately — don't wait for the API call
+    setUnreadCount(0)
+    setItems((prev) => prev.map((n) => ({ ...n, read: true })))
     // Refresh the list
     setLoading(true)
     try {
       const data = await notificationsApi.list()
       setItems(data.notifications)
-      setUnreadCount(data.unreadCount)
     } catch {}
     setLoading(false)
-    // Mark as read
-    if (unreadCount > 0) {
-      notificationsApi.readAll()
-        .then(() => {
-          setUnreadCount(0)
-          setItems((prev) => prev.map((n) => ({ ...n, read: true })))
-        })
-        .catch(() => {})
-    }
+    // Mark as read (fire-and-forget)
+    notificationsApi.readAll().catch(() => {})
   }
 
   const panel = open ? (
@@ -216,7 +189,7 @@ export function NotificationBell() {
         {items.length === 0 && !loading ? (
           <p className="px-4 py-8 text-center text-xs text-ink-400">No notifications yet</p>
         ) : (
-          items.map((n) => <NotificationItem key={n.id} n={n} />)
+          items.map((n) => <NotificationItem key={n.id} n={n} onNavigate={() => setOpen(false)} />)
         )}
       </div>
     </div>

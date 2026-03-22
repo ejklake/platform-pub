@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.5.4
+# platform.pub — Deployment Reference v3.6.0
 
 **Date:** 22 March 2026
-**Replaces:** v3.5.3 (see bottom for change log)
+**Replaces:** v3.5.4 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -171,7 +171,7 @@ Verify:
 docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\dt"
 ```
 
-You should see 22+ tables.
+You should see 23+ tables.
 
 ### 5. Build and start all services
 
@@ -201,6 +201,59 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+### From v3.5.4
+
+Schema change: migration `012_notification_note_id.sql` must be applied. Gateway and web both changed. Deploy order is **migration → gateway → web**.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply migration
+DATABASE_URL=postgresql://platformpub:<POSTGRES_PASSWORD>@127.0.0.1:5432/platformpub \
+  npx tsx shared/src/db/migrate.ts
+
+# 2. Rebuild and restart gateway (new /my/reading-history route, enriched notifications query, note_id in reply notifications)
+docker compose build --no-cache gateway
+docker compose up -d gateway
+
+# 3. Rebuild and restart web (dek input, share button, history page, clickable notifications)
+docker compose build --no-cache web
+docker compose up -d web
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+
+# Confirm migration applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "\d notifications" | grep note_id
+# Expected: "note_id | uuid | ..."
+
+# Feature 1 — Article dek/standfirst
+# Open /write — there should be an italic subtitle input between the title and the toolbar
+# Publish an article with a standfirst filled in — it should appear below the <h1> on the reader page
+
+# Feature 2 — Clickable notifications
+# Open the notification bell — every row should be a clickable link
+# The unread counter should drop to 0 immediately when the panel opens (not after API response)
+# Open /notifications — rows should be clickable, readAll fires immediately on load
+
+# Feature 3 — Share button
+# Open any article — a "Share" button should appear next to the Report button
+# On desktop: clicking Share opens a dropdown with Copy link / Share on X / Share via email
+# Copy link should copy the URL and show "Copied!" briefly
+
+# Feature 4 — Reading history
+# Left nav should show "History" between Followers and Dashboard
+# Open /history — should list previously-read articles with writer name and "read X ago"
+# GET /api/v1/my/reading-history should return { items: [...] }
+```
+
+---
 
 ### From v3.5.3
 
