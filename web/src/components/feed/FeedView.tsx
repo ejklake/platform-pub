@@ -10,6 +10,7 @@ import type { FeedItem, NoteEvent } from '../../lib/ndk'
 import { getNdk, parseArticleEvent, parseNoteEvent, KIND_ARTICLE, KIND_NOTE, KIND_DELETION } from '../../lib/ndk'
 import type { QuoteTarget } from '../../lib/publishNote'
 import type { NDKKind } from '@nostr-dev-kit/ndk'
+import type { VoteTally, MyVoteCount } from '../../lib/api'
 
 type FeedTab = 'following' | 'add'
 
@@ -20,6 +21,8 @@ export function FeedView() {
   const [feedItems, setFeedItems] = useState<FeedItem[]>([])
   const [feedLoading, setFeedLoading] = useState(true)
   const [pendingQuote, setPendingQuote] = useState<QuoteTarget | null>(null)
+  const [voteTallies, setVoteTallies] = useState<Record<string, VoteTally>>({})
+  const [myVoteCounts, setMyVoteCounts] = useState<Record<string, MyVoteCount>>({})
   const composerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { if (!loading && !user) router.push('/auth?mode=login') }, [user, loading, router])
@@ -55,7 +58,26 @@ export function FeedView() {
           }
           const articles: FeedItem[] = Array.from(articleEvents).filter(e => !isArticleDeleted(e)).map(e => ({ ...parseArticleEvent(e), type: 'article' as const }))
           const notes: FeedItem[] = Array.from(noteEvents).filter(e => !e.tags.find(t => t[0] === 'e')).filter(e => !deletedIds.has(e.id)).map(e => parseNoteEvent(e))
-          setFeedItems([...articles, ...notes].sort((a, b) => b.publishedAt - a.publishedAt))
+          const allItems = [...articles, ...notes].sort((a, b) => b.publishedAt - a.publishedAt)
+          setFeedItems(allItems)
+
+          // Batch fetch vote tallies and user's vote counts
+          const eventIds = allItems.map(i => i.id)
+          if (eventIds.length > 0) {
+            const idsParam = eventIds.join(',')
+            const [talliesRes, myVotesRes] = await Promise.all([
+              fetch(`/api/v1/votes/tally?eventIds=${idsParam}`)
+                .then(r => r.ok ? r.json() : { tallies: {} })
+                .catch(() => ({ tallies: {} })),
+              user
+                ? fetch(`/api/v1/votes/mine?eventIds=${idsParam}`, { credentials: 'include' })
+                    .then(r => r.ok ? r.json() : { voteCounts: {} })
+                    .catch(() => ({ voteCounts: {} }))
+                : Promise.resolve({ voteCounts: {} }),
+            ])
+            setVoteTallies(talliesRes.tallies ?? {})
+            setMyVoteCounts(myVotesRes.voteCounts ?? {})
+          }
         }
       } catch (err) { console.error('Feed load error:', err) }
       finally { setFeedLoading(false) }
@@ -126,8 +148,8 @@ export function FeedView() {
         ) : (
           <div className="space-y-3 px-6">
             {feedItems.map(item => item.type === 'article'
-              ? <ArticleCard key={item.id} article={item} onQuote={handleQuote} />
-              : <NoteCard key={item.id} note={item} onDeleted={handleNoteDeleted} onQuote={handleQuote} />
+              ? <ArticleCard key={item.id} article={item} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
+              : <NoteCard key={item.id} note={item} onDeleted={handleNoteDeleted} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
             )}
           </div>
         )}

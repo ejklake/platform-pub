@@ -154,7 +154,8 @@ export class PayoutService {
   async runPayoutCycle(): Promise<{ processed: number; totalPaidPence: number }> {
     const config = await loadConfig()
 
-    // Find writers with enough platform_settled balance and completed KYC
+    // Find writers with enough platform_settled balance and completed KYC.
+    // Combines read_events earnings with upvote earnings (vote_charges with recipient_id set).
     // FIX #4: Compute net amounts (after platform fee) for payout eligibility
     const { rows: eligibleWriters } = await pool.query<{
       writer_id: string
@@ -163,18 +164,26 @@ export class PayoutService {
       stripe_connect_id: string
     }>(
       `SELECT
-         r.writer_id,
-         SUM(r.amount_pence) AS gross_pence,
-         SUM(r.amount_pence - FLOOR(r.amount_pence * $2 / 10000)) AS net_pence,
+         earnings.writer_id,
+         SUM(earnings.amount_pence) AS gross_pence,
+         SUM(earnings.amount_pence - FLOOR(earnings.amount_pence * $2 / 10000)) AS net_pence,
          a.stripe_connect_id
-       FROM read_events r
-       JOIN accounts a ON a.id = r.writer_id
-       WHERE r.state = 'platform_settled'
-         AND r.writer_payout_id IS NULL
-         AND a.stripe_connect_kyc_complete = TRUE
+       FROM (
+         SELECT writer_id, amount_pence
+         FROM read_events
+         WHERE state = 'platform_settled' AND writer_payout_id IS NULL
+         UNION ALL
+         SELECT recipient_id AS writer_id, amount_pence
+         FROM vote_charges
+         WHERE state = 'platform_settled'
+           AND recipient_id IS NOT NULL
+           AND writer_payout_id IS NULL
+       ) AS earnings
+       JOIN accounts a ON a.id = earnings.writer_id
+       WHERE a.stripe_connect_kyc_complete = TRUE
          AND a.stripe_connect_id IS NOT NULL
-       GROUP BY r.writer_id, a.stripe_connect_id
-       HAVING SUM(r.amount_pence - FLOOR(r.amount_pence * $2 / 10000)) >= $1`,
+       GROUP BY earnings.writer_id, a.stripe_connect_id
+       HAVING SUM(earnings.amount_pence - FLOOR(earnings.amount_pence * $2 / 10000)) >= $1`,
       [config.writerPayoutThresholdPence, config.platformFeeBps]
     )
 
@@ -212,14 +221,17 @@ export class PayoutService {
         [writerId]
       )
 
-      // Re-check available balance inside the lock
+      // Re-check available balance inside the lock (reads + upvote charges)
       const config = await loadConfig()
       const balanceRow = await client.query<{ net_pence: string }>(
         `SELECT COALESCE(SUM(amount_pence - FLOOR(amount_pence * $2 / 10000)), 0) AS net_pence
-         FROM read_events
-         WHERE writer_id = $1
-           AND state = 'platform_settled'
-           AND writer_payout_id IS NULL`,
+         FROM (
+           SELECT amount_pence FROM read_events
+           WHERE writer_id = $1 AND state = 'platform_settled' AND writer_payout_id IS NULL
+           UNION ALL
+           SELECT amount_pence FROM vote_charges
+           WHERE recipient_id = $1 AND state = 'platform_settled' AND writer_payout_id IS NULL
+         ) AS earnings`,
         [writerId, config.platformFeeBps]
       )
 
@@ -262,6 +274,17 @@ export class PayoutService {
              writer_payout_id = $1,
              state_updated_at = now()
          WHERE writer_id = $2
+           AND state = 'platform_settled'
+           AND writer_payout_id IS NULL`,
+        [payoutId, writerId]
+      )
+
+      // Link vote_charges (upvotes) to payout and advance state to writer_paid
+      await client.query(
+        `UPDATE vote_charges
+         SET state = 'writer_paid',
+             writer_payout_id = $1
+         WHERE recipient_id = $2
            AND state = 'platform_settled'
            AND writer_payout_id IS NULL`,
         [payoutId, writerId]
@@ -321,6 +344,15 @@ export class PayoutService {
          SET state = 'platform_settled',
              writer_payout_id = NULL,
              state_updated_at = now()
+         WHERE writer_payout_id = $1`,
+        [payoutId]
+      )
+
+      // Roll vote_charges back to platform_settled
+      await client.query(
+        `UPDATE vote_charges
+         SET state = 'platform_settled',
+             writer_payout_id = NULL
          WHERE writer_payout_id = $1`,
         [payoutId]
       )

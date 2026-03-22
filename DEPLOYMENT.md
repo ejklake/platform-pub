@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.4.0
+# platform.pub — Deployment Reference v3.5.0
 
 **Date:** 22 March 2026
-**Replaces:** v3.3.0 (see bottom for change log)
+**Replaces:** v3.4.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -171,7 +171,7 @@ Verify:
 docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\dt"
 ```
 
-You should see 19+ tables.
+You should see 22+ tables.
 
 ### 5. Build and start all services
 
@@ -201,6 +201,38 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+### From v3.4.0
+
+Schema change: migration `010_votes.sql` must be applied.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+DATABASE_URL=postgresql://platformpub:<POSTGRES_PASSWORD>@127.0.0.1:5432/platformpub \
+  npx tsx shared/src/db/migrate.ts
+docker compose build --no-cache gateway payment web
+docker compose up -d gateway payment web
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-payment-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+# New tables should be present
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\d votes"
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\d vote_tallies"
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\d vote_charges"
+# Feed cards should show ▲ score ▼ vote controls
+# Clicking ▲ on someone else's note should cast a free first upvote with no modal
+# Clicking ▲ again should show the confirm modal with cost £0.10
+# Confirming should debit the reader's tab and update the tally
+# Your own content should show greyed-out disabled vote arrows
+# Logged-out visitors should see vote arrows that redirect to /auth?mode=login on click
+```
+
+---
 
 ### From v3.3.0
 
@@ -629,6 +661,7 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 | 007_subscription_nostr_event.sql | `nostr_event_id` column on subscriptions |
 | 008_deduplicate_articles.sql | Deduplicate articles rows; add partial unique index on `(writer_id, nostr_d_tag) WHERE deleted_at IS NULL` |
 | 009_notifications.sql | `notifications` table: new_follower and new_reply events, with actor/article/comment FK refs |
+| 010_votes.sql | `votes`, `vote_tallies`, `vote_charges` tables for the upvote/downvote system |
 
 Run all pending migrations:
 ```bash
@@ -704,6 +737,14 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 |--------|------|------|---------|
 | GET | /api/v1/notifications | session | List recent notifications (max 50) with actor info, article title, comment excerpt, and unread count. Types: `new_follower`, `new_reply`, `new_subscriber`, `new_quote`, `new_mention` |
 | POST | /api/v1/notifications/read-all | session | Mark all notifications as read |
+
+### Votes
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | /api/v1/votes | session | Cast an upvote or downvote on any content. Body: `{ targetEventId, targetKind, direction }`. Returns `{ ok, sequenceNumber, costPence, nextCostPence, tally }`. 1st upvote free; subsequent votes double in price. Self-voting returns 400 |
+| GET | /api/v1/votes/tally?eventIds=id1,id2,... | — | Batch fetch tallies for up to 200 event IDs. Returns `{ tallies: { [eventId]: { upvoteCount, downvoteCount, netScore } } }`. Missing IDs return zeroes |
+| GET | /api/v1/votes/mine?eventIds=id1,id2,... | session | Batch fetch the logged-in user's vote counts for up to 200 event IDs. Returns `{ voteCounts: { [eventId]: { upCount, downCount } } }` |
+| GET | /api/v1/votes/price?eventId=&direction= | session | Server-authoritative next-vote price. Returns `{ sequenceNumber, costPence, direction }` |
 
 ### Subscriptions
 | Method | Path | Auth | Purpose |
@@ -930,6 +971,60 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.5.0 — 22 March 2026
+
+**Voting system — upvote/downvote articles, notes, and replies**
+
+Every piece of content (Articles, Notes, Replies) now displays a ▲ score ▼ vote control. Votes are cumulative with exponential pricing: the first upvote is free, subsequent votes double in cost (10p, 20p, 40p, …). Downvotes start at 10p and also double. Charges debit the reader's existing reading tab (same pipeline as article reads). Upvote revenue flows to the content author via Stripe Connect; downvote revenue is retained as platform income.
+
+**Schema — three new tables (`migrations/010_votes.sql`)**
+
+- `votes` — immutable audit log; one row per vote action with `sequence_number`, `cost_pence`, `direction`, and tab linkage.
+- `vote_tallies` — materialised `upvote_count / downvote_count / net_score` per content item; upserted atomically on every vote.
+- `vote_charges` — billing records parallel to `read_events`; `recipient_id IS NULL` for downvotes (platform revenue), set to the author UUID for upvotes. Tracks state through the same `read_state` lifecycle: `provisional → accrued → platform_settled → writer_paid`.
+
+**New backend endpoints (`gateway/src/routes/votes.ts`)**
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/v1/votes` | Cast a vote; resolves author, enforces self-vote ban, computes exponential price, debits tab, atomically inserts vote + charge + upserts tally |
+| `GET /api/v1/votes/tally?eventIds=` | Batch tally fetch for up to 200 event IDs (public) |
+| `GET /api/v1/votes/mine?eventIds=` | Batch per-user vote counts for up to 200 event IDs (auth) |
+| `GET /api/v1/votes/price?eventId=&direction=` | Server-authoritative next-vote price |
+
+**Price computation (`shared/src/lib/voting.ts`, `web/src/lib/voting.ts`)**
+
+`voteCostPence(direction, sequenceNumber)` is shared between the gateway (server-side enforcement) and the frontend (modal preview). The frontend duplicates the helper since the shared package is not directly importable from Next.js.
+
+**Frontend components**
+
+- `VoteControls` (`web/src/components/ui/VoteControls.tsx`) — ▲ score ▼ inline control with hover tooltip showing upvote/downvote breakdown. Accepts optional `initialTally` and `initialMyVotes` props for batch-fetch optimisation; falls back to individual mount-fetch if not supplied. Vote arrows highlighted in accent/red when the user has voted in that direction.
+- `VoteConfirmModal` (`web/src/components/ui/VoteConfirmModal.tsx`) — modal shown before every paid vote with ordinal sequence number ("3rd upvote"), cost in £/p, and cumulative total spend on this content.
+
+**Feed batch fetching (`FeedView.tsx`)**
+
+After loading feed items, two parallel requests fetch tallies and the user's vote counts for all visible event IDs. Results stored in `voteTallies` and `myVoteCounts` state maps and passed as props to each `ArticleCard` and `NoteCard`, avoiding per-card API calls.
+
+**Reply thread batch fetching (`ReplySection.tsx`)**
+
+After loading replies, the full event ID tree (top-level + nested) is flattened and vote data is batch-fetched. Vote counts are passed down to each `ReplyItem`.
+
+**Billing pipeline integration**
+
+- `settlement.ts` — `confirmSettlement` now also advances `vote_charges` from `accrued` to `platform_settled` when a tab settles.
+- `payout.ts` — `runPayoutCycle` eligibility query unions `read_events` and `vote_charges` (upvotes only). `initiateWriterPayout` balance recheck, state advance to `writer_paid`, and failed-payout rollback all include `vote_charges`.
+- `accrual.ts` — `convertProvisionalReads` now also converts provisional `vote_charges` to `accrued` and adds their total to the tab balance when a reader connects their card.
+
+**Self-vote prevention**
+
+Backend rejects votes where `voter_id === target_author_id` (400). Frontend disables and greys vote arrows on the user's own content using the same `isAuthor` / `isOwnContent` pattern as the delete button.
+
+**Files changed:** `migrations/010_votes.sql` *(new)*, `shared/src/lib/voting.ts` *(new)*, `gateway/src/routes/votes.ts` *(new)*, `gateway/src/index.ts`, `web/src/lib/voting.ts` *(new)*, `web/src/components/ui/VoteControls.tsx` *(new)*, `web/src/components/ui/VoteConfirmModal.tsx` *(new)*, `web/src/lib/api.ts`, `web/src/components/feed/ArticleCard.tsx`, `web/src/components/feed/NoteCard.tsx`, `web/src/components/feed/FeedView.tsx`, `web/src/components/replies/ReplyItem.tsx`, `web/src/components/replies/ReplySection.tsx`, `payment-service/src/services/settlement.ts`, `payment-service/src/services/payout.ts`, `payment-service/src/services/accrual.ts`
+
+**Schema change: run `010_votes.sql` before restarting. Rebuild gateway, payment, and web.**
+
+---
 
 ### v3.4.0 — 22 March 2026
 

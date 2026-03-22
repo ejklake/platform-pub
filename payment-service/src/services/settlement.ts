@@ -280,6 +280,16 @@ export class SettlementService {
         [settlement.id, settlement.tab_id]
       )
 
+      // Advance accrued vote_charges to platform_settled
+      await client.query(
+        `UPDATE vote_charges
+         SET state = 'platform_settled'
+         WHERE tab_id = $1
+           AND state = 'accrued'
+           AND created_at <= (SELECT settled_at FROM tab_settlements WHERE id = $2)`,
+        [settlement.tab_id, settlement.id]
+      )
+
       logger.info(
         { settlementId: settlement.id, readEventsUpdated: rowCount, stripeChargeId },
         'Settlement confirmed — reads advanced to platform_settled'

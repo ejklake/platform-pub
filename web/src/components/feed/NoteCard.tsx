@@ -8,16 +8,20 @@ import { useAuth } from '../../stores/auth'
 import { isImageUrl, isEmbeddableUrl, extractUrls } from '../../lib/media'
 import { ReplySection } from '../replies/ReplySection'
 import { QuoteCard } from './QuoteCard'
+import { VoteControls } from '../ui/VoteControls'
 import { replies as repliesApi } from '../../lib/api'
+import type { VoteTally, MyVoteCount } from '../../lib/api'
 import type { QuoteTarget } from '../../lib/publishNote'
 
 interface NoteCardProps {
   note: NoteEvent
   onDeleted?: (id: string) => void
   onQuote?: (target: QuoteTarget) => void
+  voteTally?: VoteTally
+  myVoteCounts?: MyVoteCount
 }
 
-export function NoteCard({ note, onDeleted, onQuote }: NoteCardProps) {
+export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: NoteCardProps) {
   const { user } = useAuth()
   const writerInfo = useWriterName(note.pubkey)
   const [showReplies, setShowReplies] = useState(false)
@@ -171,6 +175,13 @@ export function NoteCard({ note, onDeleted, onQuote }: NoteCardProps) {
                   Quote
                 </button>
               )}
+              <VoteControls
+                targetEventId={note.id}
+                targetKind={1}
+                isOwnContent={isAuthor}
+                initialTally={voteTally}
+                initialMyVotes={myVoteCounts}
+              />
             </div>
           </div>
         </div>

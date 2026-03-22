@@ -182,14 +182,24 @@ export class AccrualService {
         [tabId, readerId]
       )
 
-      // Add total to tab balance
+      // Also convert provisional vote_charges to accrued
+      const { rows: provisionalVoteCharges } = await client.query<{ amount_pence: number }>(
+        `UPDATE vote_charges
+         SET state = 'accrued', tab_id = $1
+         WHERE voter_id = $2 AND state = 'provisional'
+         RETURNING amount_pence`,
+        [tabId, readerId]
+      )
+      const voteChargeTotal = provisionalVoteCharges.reduce((sum, r) => sum + r.amount_pence, 0)
+
+      // Add total to tab balance (reads + vote charges)
       await client.query(
         `UPDATE reading_tabs
          SET balance_pence = balance_pence + $1,
              last_read_at  = now(),
              updated_at    = now()
          WHERE id = $2`,
-        [totalPence, tabId]
+        [totalPence + voteChargeTotal, tabId]
       )
 
       logger.info(

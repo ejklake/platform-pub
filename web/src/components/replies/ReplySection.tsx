@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../stores/auth'
 import { ReplyComposer } from './ReplyComposer'
 import { ReplyItem, type ReplyData } from './ReplyItem'
+import type { VoteTally, MyVoteCount } from '../../lib/api'
 
 // =============================================================================
 // ReplySection
@@ -35,6 +36,8 @@ export function ReplySection({
   const [totalCount, setTotalCount] = useState(0)
   const [repliesEnabled, setRepliesEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [voteTallies, setVoteTallies] = useState<Record<string, VoteTally>>({})
+  const [myVoteCounts, setMyVoteCounts] = useState<Record<string, MyVoteCount>>({})
   const [replyTarget, setReplyTarget] = useState<{
     replyId: string
     replyEventId: string
@@ -51,9 +54,28 @@ export function ReplySection({
         )
         if (res.ok) {
           const data = await res.json()
-          setReplies(data.comments ?? [])
+          const comments: ReplyData[] = data.comments ?? []
+          setReplies(comments)
           setTotalCount(data.totalCount ?? 0)
           setRepliesEnabled(data.repliesEnabled ?? data.commentsEnabled ?? true)
+
+          // Batch fetch vote tallies for all replies (flatten tree)
+          const allEventIds = flattenEventIds(comments)
+          if (allEventIds.length > 0) {
+            const idsParam = allEventIds.join(',')
+            const [talliesRes, myVotesRes] = await Promise.all([
+              fetch(`${API_BASE}/votes/tally?eventIds=${idsParam}`)
+                .then(r => r.ok ? r.json() : { tallies: {} })
+                .catch(() => ({ tallies: {} })),
+              user
+                ? fetch(`${API_BASE}/votes/mine?eventIds=${idsParam}`, { credentials: 'include' })
+                    .then(r => r.ok ? r.json() : { voteCounts: {} })
+                    .catch(() => ({ voteCounts: {} }))
+                : Promise.resolve({ voteCounts: {} }),
+            ])
+            setVoteTallies(talliesRes.tallies ?? {})
+            setMyVoteCounts(myVotesRes.voteCounts ?? {})
+          }
         }
       } catch (err) {
         console.error('Failed to load replies:', err)
@@ -145,6 +167,8 @@ export function ReplySection({
                 compact={compact}
                 onReply={repliesEnabled ? handleReplyTo : undefined}
                 onDelete={handleDelete}
+                voteTally={voteTallies[reply.nostrEventId]}
+                myVoteCounts={myVoteCounts[reply.nostrEventId]}
                 renderComposer={(replyId) => replyTarget?.replyId === replyId ? (
                   <div className="ml-8 pl-4 border-l-2 border-ink-100">
                     <ReplyComposer
@@ -212,4 +236,14 @@ function markDeleted(replies: ReplyData[], id: string): ReplyData[] {
     }
     return { ...r, replies: markDeleted(r.replies, id) }
   })
+}
+
+// Collect all nostrEventIds in a reply tree for batch vote fetching
+function flattenEventIds(replies: ReplyData[]): string[] {
+  const ids: string[] = []
+  for (const r of replies) {
+    if (r.nostrEventId) ids.push(r.nostrEventId)
+    if (r.replies.length > 0) ids.push(...flattenEventIds(r.replies))
+  }
+  return ids
 }

@@ -7,14 +7,18 @@ import type { ArticleEvent } from '../../lib/ndk'
 import { useWriterName } from '../../hooks/useWriterName'
 import { useAuth } from '../../stores/auth'
 import { replies as repliesApi } from '../../lib/api'
+import { VoteControls } from '../ui/VoteControls'
+import type { VoteTally, MyVoteCount } from '../../lib/api'
 import type { QuoteTarget } from '../../lib/publishNote'
 
 interface ArticleCardProps {
   article: ArticleEvent
   onQuote?: (target: QuoteTarget) => void
+  voteTally?: VoteTally
+  myVoteCounts?: MyVoteCount
 }
 
-export function ArticleCard({ article, onQuote }: ArticleCardProps) {
+export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: ArticleCardProps) {
   const { user } = useAuth()
   const router = useRouter()
   const writerInfo = useWriterName(article.pubkey)
@@ -79,6 +83,15 @@ export function ArticleCard({ article, onQuote }: ArticleCardProps) {
               {user && onQuote && (
                 <button onClick={handleQuote} className="btn-soft py-1 px-2 text-ui-xs ml-1">Quote</button>
               )}
+              <span onClick={e => e.stopPropagation()}>
+                <VoteControls
+                  targetEventId={article.id}
+                  targetKind={30023}
+                  isOwnContent={user?.pubkey === article.pubkey}
+                  initialTally={voteTally}
+                  initialMyVotes={myVoteCounts}
+                />
+              </span>
             </div>
           </div>
         </div>
@@ -116,6 +129,15 @@ export function ArticleCard({ article, onQuote }: ArticleCardProps) {
             {user && onQuote && (
               <button onClick={handleQuote} className="btn-soft py-1 px-2 text-ui-xs ml-1">Quote</button>
             )}
+            <span onClick={e => e.stopPropagation()}>
+              <VoteControls
+                targetEventId={article.id}
+                targetKind={30023}
+                isOwnContent={user?.pubkey === article.pubkey}
+                initialTally={voteTally}
+                initialMyVotes={myVoteCounts}
+              />
+            </span>
           </div>
         </div>
       )}

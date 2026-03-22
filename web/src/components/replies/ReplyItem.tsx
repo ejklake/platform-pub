@@ -3,6 +3,8 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ReportButton } from '../ui/ReportButton'
+import { VoteControls } from '../ui/VoteControls'
+import type { VoteTally, MyVoteCount } from '../../lib/api'
 
 // =============================================================================
 // ReplyItem — Conversational inline layout
@@ -36,6 +38,8 @@ interface ReplyItemProps {
   onReply?: (replyId: string, replyEventId: string, authorName: string) => void
   onDelete?: (replyId: string) => void
   renderComposer?: (replyId: string) => ReactNode
+  voteTally?: VoteTally
+  myVoteCounts?: MyVoteCount
 }
 
 export function ReplyItem({
@@ -47,6 +51,8 @@ export function ReplyItem({
   onReply,
   onDelete,
   renderComposer,
+  voteTally,
+  myVoteCounts,
 }: ReplyItemProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -136,6 +142,13 @@ export function ReplyItem({
                   </button>
                 )}
                 <ReportButton targetNostrEventId={reply.nostrEventId} />
+                <VoteControls
+                  targetEventId={reply.nostrEventId}
+                  targetKind={1111}
+                  isOwnContent={reply.author.id === currentUserId}
+                  initialTally={voteTally}
+                  initialMyVotes={myVoteCounts}
+                />
               </div>
             )}
           </div>
