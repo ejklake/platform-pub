@@ -20,6 +20,7 @@ interface VoteControlsProps {
   targetEventId: string
   targetKind: number   // 30023 = article, 1 = note, 1111 = reply
   isOwnContent: boolean
+  dark?: boolean
 
   // Optional: pre-fetched by parent batch call — skip individual fetches when provided
   initialTally?: VoteTally
@@ -30,6 +31,7 @@ export function VoteControls({
   targetEventId,
   targetKind,
   isOwnContent,
+  dark,
   initialTally,
   initialMyVotes,
 }: VoteControlsProps) {
@@ -141,7 +143,9 @@ export function VoteControls({
           className={`rounded px-1.5 py-0.5 text-ui-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed
             ${myVotes.upCount > 0
               ? 'text-accent font-medium'
-              : 'text-content-faint hover:text-content-primary hover:bg-surface-sunken'
+              : dark
+                ? 'text-white/50 hover:text-white/90 hover:bg-white/10'
+                : 'text-content-faint hover:text-content-primary hover:bg-surface-sunken'
             }`}
         >
           ▲
@@ -150,7 +154,7 @@ export function VoteControls({
         {/* Net score with breakdown tooltip */}
         <div className="relative">
           <button
-            className="text-ui-xs text-content-muted min-w-[1.5rem] text-center hover:text-content-primary transition-colors"
+            className={`text-ui-xs min-w-[1.5rem] text-center transition-colors ${dark ? 'text-white/60 hover:text-white/90' : 'text-content-muted hover:text-content-primary'}`}
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
           >
@@ -173,7 +177,9 @@ export function VoteControls({
           className={`rounded px-1.5 py-0.5 text-ui-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed
             ${myVotes.downCount > 0
               ? 'text-red-500 font-medium'
-              : 'text-content-faint hover:text-content-primary hover:bg-surface-sunken'
+              : dark
+                ? 'text-white/50 hover:text-white/90 hover:bg-white/10'
+                : 'text-content-faint hover:text-content-primary hover:bg-surface-sunken'
             }`}
         >
           ▼

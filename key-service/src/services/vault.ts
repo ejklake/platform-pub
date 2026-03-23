@@ -153,11 +153,37 @@ export class VaultService {
       throw new KeyServiceError('ARTICLE_NOT_FOUND', `No article found for event ID: ${params.articleNostrEventId}`)
     }
 
-    // Step 2: verify payment
-    const verification = await verifyPayment(params.readerId, resolved.articleId)
-    if (!verification.isVerified) {
-      const reason = verification.readEventExists ? 'PROVISIONAL_ONLY' : 'NO_PAYMENT_RECORD'
-      throw new KeyServiceError('PAYMENT_NOT_VERIFIED', reason)
+    // Step 2: verify access — own content, permanent unlock, or paid read
+    //
+    // Own content: the writer always has access to their own articles. No
+    // payment record is needed.
+    //
+    // Permanent unlock: set by recordSubscriptionRead (subscription access)
+    // or recordPurchaseUnlock (after a first-time purchase). Checking
+    // article_unlocks here means subscription readers and returning purchasers
+    // are served without needing a fresh read_event.
+    //
+    // Paid read: first-time purchasers — the gateway records a read_event via
+    // the payment service before calling this endpoint, so verifyPayment finds
+    // it and returns isVerified: true.
+    const isOwnContent = params.readerId === resolved.writerId
+    let verificationReadEventId: string | null = null
+
+    if (!isOwnContent) {
+      const { rows: unlockRows } = await pool.query<{ id: string }>(
+        `SELECT id FROM article_unlocks WHERE reader_id = $1 AND article_id = $2 LIMIT 1`,
+        [params.readerId, resolved.articleId]
+      )
+
+      if (unlockRows.length === 0) {
+        // No permanent unlock — must have a valid payment record
+        const verification = await verifyPayment(params.readerId, resolved.articleId)
+        if (!verification.isVerified) {
+          const reason = verification.readEventExists ? 'PROVISIONAL_ONLY' : 'NO_PAYMENT_RECORD'
+          throw new KeyServiceError('PAYMENT_NOT_VERIFIED', reason)
+        }
+        verificationReadEventId = verification.readEventId
+      }
     }
 
     // Step 3: retrieve vault key by article_id (stable across event ID changes)
@@ -182,7 +208,7 @@ export class VaultService {
       vaultKeyId: vaultKey.id,
       readerId: params.readerId,
       articleId: resolved.articleId,
-      readEventId: verification.readEventId,
+      readEventId: verificationReadEventId,
     })
 
     logger.info(

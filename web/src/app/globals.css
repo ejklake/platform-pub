@@ -2,12 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Instrument+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600&display=swap');
 
 @layer base {
   body {
     @apply bg-surface text-content-primary antialiased;
-    font-family: 'Instrument Sans', 'Inter', system-ui, sans-serif;
+    font-family: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
     font-size: 0.9375rem;
     line-height: 1.6;
     padding-top: 0;  /* sidebar is left-only on lg+; mobile offset handled below */
@@ -30,7 +30,7 @@
   textarea,
   select {
     @apply bg-surface-raised text-content-primary rounded-none;
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.9375rem;
     border: none;
     transition: background-color 0.15s ease;
@@ -104,7 +104,7 @@
 
   /* ----- Label styles ----- */
   .label-ui {
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.05em;
@@ -112,7 +112,7 @@
   }
 
   .label-mono {
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.05em;
@@ -122,7 +122,7 @@
 
   /* ----- Tab pills ----- */
   .tab-pill {
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.8125rem;
     font-weight: 500;
     letter-spacing: 0.01em;
@@ -149,7 +149,7 @@
   .btn {
     background: #111111;
     color: #FFFFFF;
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.875rem;
     font-weight: 500;
     letter-spacing: 0.01em;
@@ -166,7 +166,7 @@
   .btn-accent {
     background: #9B1C20;
     color: #FFFFFF;
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.875rem;
     font-weight: 500;
     letter-spacing: 0.01em;
@@ -182,7 +182,7 @@
 
   .btn-soft {
     @apply bg-surface-raised text-content-primary;
-    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.875rem;
     font-weight: 500;
     letter-spacing: 0.01em;
@@ -199,7 +199,7 @@
 
   /* ----- Drop cap ----- */
   .prose-dropcap > p:first-of-type::first-letter {
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: 'Cormorant', Georgia, serif;
     font-size: 3.5em;
     float: left;
     line-height: 0.8;

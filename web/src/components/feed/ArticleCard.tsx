@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ArticleEvent } from '../../lib/ndk'
@@ -19,20 +19,67 @@ interface ArticleCardProps {
   myVoteCounts?: MyVoteCount
 }
 
+function applyZigzag(el: HTMLElement) {
+  const h = el.offsetHeight
+  const w = el.offsetWidth
+  if (h === 0 || w === 0) return
+  const toothDepth = 36
+  let teeth = Math.round(h / 28)
+  if (teeth < 2) teeth = 2
+  if (teeth % 2 !== 0) teeth += 1
+  const toothH = h / teeth
+  const baseRight = ((w - toothDepth) / w) * 100
+  const points: string[] = ['0% 0%', `${baseRight}% 0%`]
+  for (let i = 0; i < teeth; i++) {
+    const yMid = ((i * toothH + toothH / 2) / h) * 100
+    const yBot = (((i + 1) * toothH) / h) * 100
+    points.push(`100% ${yMid}%`)
+    points.push(`${baseRight}% ${yBot}%`)
+  }
+  points.push('0% 100%')
+  el.style.clipPath = `polygon(${points.join(', ')})`
+}
+
+// Ghost pill style for the cream (light) background
+const lightPillStyle: React.CSSProperties = {
+  fontFamily: '"Source Sans 3", system-ui, sans-serif',
+  fontSize: '12px',
+  color: '#7A7774',
+  background: 'rgba(17,17,17,0.03)',
+  border: '1px solid rgba(17,17,17,0.1)',
+  borderRadius: '20px',
+  padding: '4px 14px',
+  cursor: 'pointer',
+  transition: 'background 0.15s ease, color 0.15s ease',
+}
+
 export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: ArticleCardProps) {
   const { user } = useAuth()
   const router = useRouter()
   const writerInfo = useWriterName(article.pubkey)
   const [replyCount, setReplyCount] = useState<number | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
   const wordCount = article.content.split(/\s+/).length
   const readMinutes = Math.max(1, Math.round(wordCount / 200))
   const excerpt = article.summary || truncate(stripMarkdown(article.content), 200)
-
   const heroImage = extractFirstImage(article.content)
 
   useEffect(() => {
     repliesApi.getForTarget(article.id).then(d => setReplyCount(d.totalCount)).catch(() => {})
   }, [article.id])
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    function run() { applyZigzag(el!) }
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(run)
+    } else {
+      run()
+    }
+    window.addEventListener('resize', run)
+    return () => window.removeEventListener('resize', run)
+  }, [excerpt, heroImage])
 
   function handleCardClick() {
     router.push(`/article/${article.dTag}`)
@@ -53,12 +100,29 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
 
   const authorHref = writerInfo?.username ? `/${writerInfo.username}` : null
 
+  const cardStyle: React.CSSProperties = {
+    background: '#F5F0E8',
+    borderRadius: 0,
+    borderLeft: article.isPaywalled ? '6px solid #9B1C20' : 'none',
+    cursor: 'pointer',
+    overflow: 'hidden',
+  }
+
   return (
-    <div onClick={handleCardClick} className="group block overflow-hidden cursor-pointer">
+    <div ref={cardRef} onClick={handleCardClick} style={cardStyle}>
       {heroImage ? (
         <div
-          className="relative p-6 min-h-[220px] flex flex-col justify-end"
-          style={{ backgroundImage: `url(${heroImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+          className="relative flex flex-col justify-end"
+          style={{
+            backgroundImage: `url(${heroImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            minHeight: '220px',
+            paddingLeft: '24px',
+            paddingRight: '58px',
+            paddingTop: '24px',
+            paddingBottom: '24px',
+          }}
         >
           <div className="absolute inset-0 bg-gradient-to-t from-ink-900/80 via-ink-900/40 to-transparent" />
           <div className="relative z-10">
@@ -66,23 +130,25 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
               <Link
                 href={authorHref}
                 onClick={(e) => e.stopPropagation()}
-                className="label-ui text-accent-200 mb-2 hover:text-white transition-colors inline-block"
+                style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(245,240,232,0.7)', marginBottom: '8px', display: 'inline-block' }}
               >
                 {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
               </Link>
             ) : (
-              <p className="label-ui text-accent-200 mb-2">{writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}</p>
+              <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(245,240,232,0.7)', marginBottom: '8px' }}>
+                {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
+              </p>
             )}
-            <h2 className="font-serif text-xl font-normal text-white group-hover:opacity-90 transition-opacity mb-2 leading-snug tracking-tight">
+            <h2 style={{ fontFamily: '"Cormorant", Georgia, serif', fontSize: '28px', fontWeight: 600, color: '#FFFFFF', lineHeight: 1.2, marginBottom: '8px' }}>
               {article.title}
             </h2>
-            <div className="flex items-center gap-3 text-ui-xs text-white/60">
+            <div className="flex items-center gap-3" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
               <time dateTime={new Date(article.publishedAt * 1000).toISOString()}>{formatDate(article.publishedAt)}</time>
-              <span className="opacity-40">/</span>
+              <span style={{ opacity: 0.4 }}>/</span>
               <span>{readMinutes} min</span>
-              {article.isPaywalled && (<><span className="opacity-40">/</span><span className="text-accent-300">&pound;</span></>)}
+              {article.isPaywalled && (<><span style={{ opacity: 0.4 }}>/</span><span style={{ color: 'rgba(245,240,232,0.8)' }}>&pound;</span></>)}
               {user && onQuote && (
-                <button onClick={handleQuote} className="btn-soft py-1 px-2 text-ui-xs ml-1">Quote</button>
+                <button onClick={handleQuote} style={lightPillStyle}>Quote</button>
               )}
               <span onClick={e => e.stopPropagation()}>
                 <VoteControls
@@ -100,38 +166,51 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
           </div>
         </div>
       ) : (
-        <div className={`py-5 border-t border-ink-300 ${article.isPaywalled ? 'pl-4 border-l-[3px] border-l-accent' : ''}`}>
+        <div style={{ padding: '20px 58px 20px 24px' }}>
           {authorHref ? (
             <Link
               href={authorHref}
               onClick={(e) => e.stopPropagation()}
-              className="label-ui text-content-muted mb-3 hover:text-content-primary transition-colors inline-block"
+              style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#7A7774', marginBottom: '10px', display: 'inline-block' }}
             >
               {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
             </Link>
           ) : (
-            <p className="label-ui text-content-muted mb-3">
+            <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#7A7774', marginBottom: '10px' }}>
               {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
             </p>
           )}
-          <h2 className="font-serif text-xl font-medium text-content-primary group-hover:text-accent transition-colors mb-2 leading-snug" style={{ letterSpacing: '-0.015em' }}>
+          <h2 style={{ fontFamily: '"Cormorant", Georgia, serif', fontSize: '28px', fontWeight: 600, color: '#111111', lineHeight: 1.2, marginBottom: '8px' }}>
             {article.title}
           </h2>
-          <p className="font-serif text-sm text-content-secondary leading-relaxed mb-4" style={{ lineHeight: '1.7' }}>
+          <p style={{ fontFamily: '"Cormorant", Georgia, serif', fontSize: '18px', fontWeight: 400, color: '#4A4845', lineHeight: 1.5, marginBottom: '14px' }}>
             {excerpt}
           </p>
-          <div className="flex items-center gap-3 text-ui-xs text-content-muted">
+          <div className="flex items-center gap-3" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '12px', color: '#7A7774' }}>
             <time dateTime={new Date(article.publishedAt * 1000).toISOString()}>{formatDate(article.publishedAt)}</time>
-            <span className="opacity-40">/</span>
+            <span style={{ opacity: 0.4 }}>/</span>
             <span>{readMinutes} min</span>
             {replyCount !== null && replyCount > 0 && (
-              <><span className="opacity-40">/</span><span>{replyCount} {replyCount !== 1 ? 'replies' : 'reply'}</span></>
+              <><span style={{ opacity: 0.4 }}>/</span><span>{replyCount} {replyCount !== 1 ? 'replies' : 'reply'}</span></>
             )}
             {article.isPaywalled && (
-              <><span className="opacity-40">/</span><span className="text-accent">&pound;</span></>
+              <><span style={{ opacity: 0.4 }}>/</span><span style={{ color: '#9B1C20' }}>&pound;</span></>
             )}
             {user && onQuote && (
-              <button onClick={handleQuote} className="btn-soft py-1 px-2 text-ui-xs ml-1">Quote</button>
+              <button
+                onClick={handleQuote}
+                style={lightPillStyle}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(17,17,17,0.07)'
+                  ;(e.currentTarget as HTMLButtonElement).style.color = '#4A4845'
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(17,17,17,0.03)'
+                  ;(e.currentTarget as HTMLButtonElement).style.color = '#7A7774'
+                }}
+              >
+                Quote
+              </button>
             )}
             <span onClick={e => e.stopPropagation()}>
               <VoteControls

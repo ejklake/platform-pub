@@ -39,7 +39,7 @@ function getDestUrl(n: Notification): string {
   }
 }
 
-function NotificationRow({ n }: { n: Notification }) {
+function NotificationRow({ n, onDismiss }: { n: Notification; onDismiss: (id: string) => void }) {
   const actorName = n.actor?.displayName ?? n.actor?.username ?? 'Someone'
   const destUrl = getDestUrl(n)
 
@@ -53,7 +53,8 @@ function NotificationRow({ n }: { n: Notification }) {
   return (
     <Link
       href={destUrl}
-      className={`flex items-start gap-3 py-4 border-b border-surface-strong hover:bg-surface-raised transition-colors ${!n.read ? 'bg-surface/50' : ''}`}
+      onClick={() => onDismiss(n.id)}
+      className="flex items-start gap-3 py-4 border-b border-surface-strong hover:bg-surface-raised transition-colors bg-surface/50"
     >
       {n.actor?.avatar ? (
         <img src={n.actor.avatar} alt="" className="h-10 w-10 rounded-full object-cover flex-shrink-0 mt-0.5" />
@@ -84,9 +85,7 @@ function NotificationRow({ n }: { n: Notification }) {
         <p className="text-xs text-content-muted mt-1">{timeAgo(n.createdAt)}</p>
       </div>
 
-      {!n.read && (
-        <span className="flex-shrink-0 mt-2 h-2 w-2 rounded-full bg-crimson" />
-      )}
+      <span className="flex-shrink-0 mt-2 h-2 w-2 rounded-full bg-crimson" />
     </Link>
   )
 }
@@ -104,13 +103,15 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!user) return
     notificationsApi.list()
-      .then(({ notifications }) => {
-        setItems(notifications)
-        notificationsApi.readAll().catch(() => {})
-      })
+      .then(({ notifications }) => setItems(notifications))
       .catch(() => {})
       .finally(() => setDataLoading(false))
   }, [user])
+
+  function handleDismiss(id: string) {
+    notificationsApi.markRead(id).catch(() => {})
+    setItems((prev) => prev.filter((n) => n.id !== id))
+  }
 
   if (loading || !user) {
     return (
@@ -145,7 +146,7 @@ export default function NotificationsPage() {
       ) : (
         <div>
           {items.map((n) => (
-            <NotificationRow key={n.id} n={n} />
+            <NotificationRow key={n.id} n={n} onDismiss={handleDismiss} />
           ))}
         </div>
       )}

@@ -37,7 +37,7 @@ function getDestUrl(n: Notification): string {
   }
 }
 
-function NotificationItem({ n, onNavigate }: { n: Notification; onNavigate: () => void }) {
+function NotificationItem({ n, onNavigate, onDismiss }: { n: Notification; onNavigate: () => void; onDismiss: (id: string) => void }) {
   const actorName = n.actor?.displayName ?? n.actor?.username ?? 'Someone'
   const destUrl = getDestUrl(n)
 
@@ -95,8 +95,8 @@ function NotificationItem({ n, onNavigate }: { n: Notification; onNavigate: () =
   return (
     <Link
       href={destUrl}
-      onClick={onNavigate}
-      className={`block px-4 py-3 border-b border-ink-800 last:border-0 hover:bg-white/10 transition-colors ${!n.read ? 'bg-white/5' : ''}`}
+      onClick={() => { onDismiss(n.id); onNavigate() }}
+      className="block px-4 py-3 border-b border-ink-800 last:border-0 hover:bg-white/10 transition-colors bg-white/5"
     >
       <div className="flex items-start gap-2.5">
         {avatar}
@@ -158,18 +158,19 @@ export function NotificationBell() {
       })
     }
     setOpen(true)
-    // Reset counter immediately — don't wait for the API call
-    setUnreadCount(0)
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })))
-    // Refresh the list
     setLoading(true)
     try {
       const data = await notificationsApi.list()
       setItems(data.notifications)
+      setUnreadCount(data.unreadCount)
     } catch {}
     setLoading(false)
-    // Mark as read (fire-and-forget)
-    notificationsApi.readAll().catch(() => {})
+  }
+
+  function handleDismiss(id: string) {
+    notificationsApi.markRead(id).catch(() => {})
+    setItems((prev) => prev.filter((n) => n.id !== id))
+    setUnreadCount((prev) => Math.max(0, prev - 1))
   }
 
   const panel = open ? (
@@ -189,7 +190,7 @@ export function NotificationBell() {
         {items.length === 0 && !loading ? (
           <p className="px-4 py-8 text-center text-xs text-ink-400">No notifications yet</p>
         ) : (
-          items.map((n) => <NotificationItem key={n.id} n={n} onNavigate={() => setOpen(false)} />)
+          items.map((n) => <NotificationItem key={n.id} n={n} onNavigate={() => setOpen(false)} onDismiss={handleDismiss} />)
         )}
       </div>
     </div>

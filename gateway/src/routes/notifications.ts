@@ -57,7 +57,7 @@ export async function notificationRoutes(app: FastifyInstance) {
        LEFT JOIN accounts aw  ON aw.id  = ar.writer_id
        LEFT JOIN comments c   ON c.id   = n.comment_id
        LEFT JOIN notes no     ON no.id  = n.note_id
-       WHERE n.recipient_id = $1
+       WHERE n.recipient_id = $1 AND n.read = false
        ORDER BY n.created_at DESC
        LIMIT 50`,
       [recipientId]
@@ -91,6 +91,26 @@ export async function notificationRoutes(app: FastifyInstance) {
 
     return reply.status(200).send({ notifications, unreadCount })
   })
+
+  // ---------------------------------------------------------------------------
+  // POST /notifications/:id/read — mark a single notification as read
+  // ---------------------------------------------------------------------------
+
+  app.post<{ Params: { id: string } }>(
+    '/notifications/:id/read',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const recipientId = req.session!.sub!
+      const { id } = req.params
+
+      await pool.query(
+        `UPDATE notifications SET read = true WHERE id = $1 AND recipient_id = $2`,
+        [id, recipientId]
+      )
+
+      return reply.status(200).send({ ok: true })
+    }
+  )
 
   // ---------------------------------------------------------------------------
   // POST /notifications/read-all — mark all as read

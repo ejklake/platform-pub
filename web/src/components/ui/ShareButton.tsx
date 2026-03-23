@@ -15,9 +15,10 @@ import { useEffect, useRef, useState } from 'react'
 interface ShareButtonProps {
   url: string
   title: string
+  dark?: boolean
 }
 
-export function ShareButton({ url, title }: ShareButtonProps) {
+export function ShareButton({ url, title, dark }: ShareButtonProps) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -84,7 +85,7 @@ export function ShareButton({ url, title }: ShareButtonProps) {
     <div ref={containerRef} className="relative">
       <button
         onClick={handleClick}
-        className="text-ui-xs text-content-muted hover:text-content-primary transition-colors"
+        className={`text-ui-xs transition-colors ${dark ? 'text-white/50 hover:text-white/90' : 'text-content-muted hover:text-content-primary'}`}
         aria-label="Share"
       >
         {copied ? 'Copied!' : 'Share'}

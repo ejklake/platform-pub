@@ -73,11 +73,12 @@ export function Nav() {
           onClick={handleNavClick}
           className="font-serif tracking-tight flex-shrink-0"
           style={{
+            fontFamily: '"Cormorant", Georgia, serif',
             border: '3px solid #FFFFFF',
             padding: '2px 14px 4px',
             lineHeight: '1.1',
-            fontSize: '1.75rem',
-            fontWeight: '500',
+            fontSize: '34px',
+            fontWeight: '600',
             color: '#FFFFFF',
           }}
         >

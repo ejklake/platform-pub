@@ -368,6 +368,9 @@ export const notifications = {
   list: () =>
     request<{ notifications: Notification[]; unreadCount: number }>('/notifications'),
 
+  markRead: (id: string) =>
+    request<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'POST' }),
+
   readAll: () =>
     request<{ ok: boolean }>('/notifications/read-all', { method: 'POST' }),
 }

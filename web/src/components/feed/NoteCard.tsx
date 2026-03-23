@@ -21,6 +21,19 @@ interface NoteCardProps {
   myVoteCounts?: MyVoteCount
 }
 
+// Ghost pill button style for dark stone background
+const darkPillStyle: React.CSSProperties = {
+  fontFamily: '"Source Sans 3", system-ui, sans-serif',
+  fontSize: '12px',
+  color: 'rgba(245, 240, 232, 0.7)',
+  background: 'rgba(245, 240, 232, 0.05)',
+  border: '1px solid rgba(245, 240, 232, 0.13)',
+  borderRadius: '20px',
+  padding: '4px 14px',
+  cursor: 'pointer',
+  transition: 'background 0.15s ease, color 0.15s ease',
+}
+
 export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: NoteCardProps) {
   const { user } = useAuth()
   const writerInfo = useWriterName(note.pubkey)
@@ -73,18 +86,18 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
   }
 
   return (
-    <div className="bg-surface-raised rounded-xl border border-surface-strong/50 hover:border-surface-strong transition-colors">
+    <div style={{ background: '#2A2A2A', borderRadius: '14px', overflow: 'visible' }}>
       <div className="p-4">
         <div className="flex items-start gap-3">
-          {/* Avatar — warm gradient for fallback */}
+          {/* Avatar */}
           {writerInfo?.username ? (
             <Link href={`/${writerInfo.username}`} className="flex-shrink-0">
               {writerInfo.avatar ? (
                 <img src={writerInfo.avatar} alt="" className="h-9 w-9 rounded-full object-cover" />
               ) : (
                 <span
-                  className="flex h-9 w-9 items-center justify-center text-xs font-medium text-accent-700 rounded-full"
-                  style={{ background: 'linear-gradient(135deg, #F5D5D6, #E8A5A7)' }}
+                  className="flex h-9 w-9 items-center justify-center text-xs font-medium rounded-full"
+                  style={{ background: 'linear-gradient(135deg, #3A1515, #5A2020)', color: '#EAE5DC' }}
                 >
                   {(writerInfo.displayName?.[0] ?? note.pubkey[0]).toUpperCase()}
                 </span>
@@ -94,8 +107,8 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
             <img src={writerInfo.avatar} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
           ) : (
             <span
-              className="flex h-9 w-9 items-center justify-center text-xs font-medium text-accent-700 flex-shrink-0 rounded-full"
-              style={{ background: 'linear-gradient(135deg, #F5D5D6, #E8A5A7)' }}
+              className="flex h-9 w-9 items-center justify-center text-xs font-medium flex-shrink-0 rounded-full"
+              style={{ background: 'linear-gradient(135deg, #3A1515, #5A2020)', color: '#EAE5DC' }}
             >
               {(writerInfo?.displayName?.[0] ?? note.pubkey[0]).toUpperCase()}
             </span>
@@ -105,35 +118,44 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
             {/* Name + time */}
             <div className="flex items-center gap-2">
               {writerInfo?.username ? (
-                <Link href={`/${writerInfo.username}`} className="text-ui-sm font-medium text-content-primary hover:text-accent transition-colors">
+                <Link
+                  href={`/${writerInfo.username}`}
+                  style={{ fontSize: '15px', fontWeight: 700, color: '#F5F0E8' }}
+                  className="hover:opacity-80 transition-opacity"
+                >
                   {writerInfo.displayName ?? note.pubkey.slice(0, 12) + '...'}
                 </Link>
               ) : (
-                <span className="text-ui-sm font-medium text-content-primary">
+                <span style={{ fontSize: '15px', fontWeight: 700, color: '#F5F0E8' }}>
                   {writerInfo?.displayName ?? note.pubkey.slice(0, 12) + '...'}
                 </span>
               )}
-              <span className="text-ui-xs text-content-faint">
+              <span style={{ fontSize: '13px', color: '#9E9B97' }}>
                 {formatDate(note.publishedAt)}
               </span>
               {isAuthor && (
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className={`ml-auto text-ui-xs rounded-full px-2.5 py-0.5 transition-colors disabled:opacity-40 ${
-                    confirmDelete
-                      ? 'text-red-500 bg-red-50 font-medium'
-                      : 'text-content-faint hover:text-content-muted hover:bg-surface-sunken'
-                  }`}
+                  className="ml-auto rounded-full px-2.5 py-0.5 disabled:opacity-40 transition-colors"
+                  style={confirmDelete
+                    ? { fontSize: '12px', color: '#ff6b6b', background: 'rgba(255,107,107,0.15)', fontWeight: 500 }
+                    : { fontSize: '12px', color: 'rgba(245,240,232,0.35)' }
+                  }
                 >
                   {deleting ? '...' : confirmDelete ? 'Confirm?' : 'Delete'}
                 </button>
               )}
             </div>
 
-            {/* Content — full size, primary colour for immediacy */}
+            {/* Content */}
             {displayContent && (
-              <p className="text-[0.9375rem] text-content-primary leading-relaxed whitespace-pre-wrap mt-1">{displayContent}</p>
+              <p
+                className="whitespace-pre-wrap mt-1"
+                style={{ fontSize: '16px', color: '#EAE5DC', lineHeight: '1.55' }}
+              >
+                {displayContent}
+              </p>
             )}
 
             {/* Images */}
@@ -155,22 +177,38 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
             {/* Quoted content */}
             {note.quotedEventId && <QuoteCard eventId={note.quotedEventId} />}
 
-            {/* Action pills — invisible at rest, fill on hover */}
-            <div className="mt-2.5 flex items-center gap-1">
+            {/* Action pills */}
+            <div className="mt-3 flex items-center gap-1.5">
               <button
                 onClick={() => setShowReplies(!showReplies)}
-                className="text-ui-xs text-content-faint hover:text-content-primary hover:bg-surface-sunken rounded-full px-2.5 py-1 transition-colors"
+                style={darkPillStyle}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,240,232,0.12)'
+                  ;(e.currentTarget as HTMLButtonElement).style.color = '#F5F0E8'
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,240,232,0.05)'
+                  ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(245,240,232,0.7)'
+                }}
               >
                 {showReplies
                   ? 'Hide replies'
                   : replyCount !== null && replyCount > 0
-                    ? <><span className="font-medium text-content-muted">{replyCount}</span>{' '}{replyCount !== 1 ? 'replies' : 'reply'}</>
+                    ? <><span style={{ fontWeight: 500, color: '#EAE5DC' }}>{replyCount}</span>{' '}{replyCount !== 1 ? 'replies' : 'reply'}</>
                     : 'Reply'}
               </button>
               {user && onQuote && (
                 <button
                   onClick={handleQuote}
-                  className="text-ui-xs text-content-faint hover:text-content-primary hover:bg-surface-sunken rounded-full px-2.5 py-1 transition-colors"
+                  style={darkPillStyle}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,240,232,0.12)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = '#F5F0E8'
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,240,232,0.05)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'rgba(245,240,232,0.7)'
+                  }}
                 >
                   Quote
                 </button>
@@ -179,6 +217,7 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
                 targetEventId={note.id}
                 targetKind={1}
                 isOwnContent={isAuthor}
+                dark={true}
                 initialTally={voteTally}
                 initialMyVotes={myVoteCounts}
               />
@@ -187,9 +226,9 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
         </div>
       </div>
 
-      {/* Replies — inside the card, just a thin rule separating them */}
+      {/* Replies */}
       {showReplies && (
-        <div className="border-t border-surface-strong/50 px-4 pb-3">
+        <div style={{ borderTop: '1px solid rgba(245,240,232,0.08)' }} className="px-4 pb-3">
           <ReplySection targetEventId={note.id} targetKind={1} targetAuthorPubkey={note.pubkey} compact />
         </div>
       )}
@@ -200,7 +239,11 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
 function EmbedPreview({ url }: { url: string }) {
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
   if (yt) return <div className="relative overflow-hidden rounded-lg" style={{ paddingBottom: '56.25%' }}><iframe src={`https://www.youtube.com/embed/${yt[1]}`} className="absolute inset-0 w-full h-full" frameBorder="0" allowFullScreen loading="lazy" /></div>
-  return <a href={url} target="_blank" rel="noopener noreferrer" className="block bg-surface-sunken/60 p-3 rounded-lg hover:bg-surface-sunken transition-colors"><p className="text-ui-xs text-content-muted truncate">{url}</p></a>
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block p-3 rounded-lg hover:opacity-80 transition-opacity" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <p className="text-ui-xs truncate" style={{ color: '#9E9B97' }}>{url}</p>
+    </a>
+  )
 }
 
 function formatDate(ts: number) {
