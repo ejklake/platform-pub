@@ -12,6 +12,7 @@ import logger from '../../shared/src/lib/logger.js'
 // POST   /notes                    — Index a published note
 // DELETE /notes/:nostrEventId      — Delete a note (author only)
 // GET    /content/resolve          — Resolve an event ID to preview metadata
+// GET    /feed/global              — Global "For you" feed (all articles + notes + new users)
 // =============================================================================
 
 const NOTE_CHAR_LIMIT = 1000
@@ -244,4 +245,102 @@ export async function noteRoutes(app: FastifyInstance) {
       }
     }
   )
+
+  // ---------------------------------------------------------------------------
+  // GET /feed/global — global "For you" feed
+  //
+  // Returns the most recent articles, notes (non-replies), and new user signups
+  // interleaved and sorted by timestamp descending. Used for the "For you" tab.
+  // ---------------------------------------------------------------------------
+
+  app.get('/feed/global', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const [articlesRes, notesRes, newUsersRes] = await Promise.all([
+        pool.query(`
+          SELECT
+            a.nostr_event_id, a.nostr_d_tag, a.title, a.summary, a.content_free,
+            a.is_paywalled, a.price_pence, a.gate_position_pct,
+            EXTRACT(EPOCH FROM a.published_at)::bigint AS published_at,
+            acc.nostr_pubkey
+          FROM articles a
+          JOIN accounts acc ON acc.id = a.writer_id
+          WHERE a.deleted_at IS NULL AND a.published_at IS NOT NULL
+          ORDER BY a.published_at DESC
+          LIMIT 30
+        `),
+        pool.query(`
+          SELECT
+            n.nostr_event_id, n.content, n.is_quote_comment,
+            n.quoted_event_id, n.quoted_event_kind,
+            EXTRACT(EPOCH FROM n.published_at)::bigint AS published_at,
+            acc.nostr_pubkey
+          FROM notes n
+          JOIN accounts acc ON acc.id = n.author_id
+          WHERE n.reply_to_event_id IS NULL
+          ORDER BY n.published_at DESC
+          LIMIT 30
+        `),
+        pool.query(`
+          SELECT username, display_name, avatar_blossom_url,
+            EXTRACT(EPOCH FROM created_at)::bigint AS joined_at
+          FROM accounts
+          WHERE status = 'active'
+          ORDER BY created_at DESC
+          LIMIT 20
+        `),
+      ])
+
+      const items: any[] = []
+
+      for (const row of articlesRes.rows) {
+        items.push({
+          type: 'article',
+          nostrEventId: row.nostr_event_id,
+          pubkey: row.nostr_pubkey,
+          dTag: row.nostr_d_tag,
+          title: row.title,
+          summary: row.summary ?? '',
+          contentFree: row.content_free ?? '',
+          isPaywalled: row.is_paywalled,
+          pricePence: row.price_pence ?? undefined,
+          gatePositionPct: row.gate_position_pct ?? undefined,
+          publishedAt: Number(row.published_at),
+        })
+      }
+
+      for (const row of notesRes.rows) {
+        items.push({
+          type: 'note',
+          nostrEventId: row.nostr_event_id,
+          pubkey: row.nostr_pubkey,
+          content: row.content,
+          isQuoteComment: row.is_quote_comment,
+          quotedEventId: row.quoted_event_id ?? undefined,
+          quotedEventKind: row.quoted_event_kind ?? undefined,
+          publishedAt: Number(row.published_at),
+        })
+      }
+
+      for (const row of newUsersRes.rows) {
+        items.push({
+          type: 'new_user',
+          username: row.username,
+          displayName: row.display_name,
+          avatar: row.avatar_blossom_url,
+          joinedAt: Number(row.joined_at),
+        })
+      }
+
+      items.sort((a, b) => {
+        const ta = a.type === 'new_user' ? a.joinedAt : a.publishedAt
+        const tb = b.type === 'new_user' ? b.joinedAt : b.publishedAt
+        return tb - ta
+      })
+
+      return reply.send({ items })
+    } catch (err) {
+      logger.error({ err }, 'Global feed fetch failed')
+      return reply.status(500).send({ error: 'Feed fetch failed' })
+    }
+  })
 }

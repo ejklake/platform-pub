@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.9.0
+# platform.pub — Deployment Reference v3.10.0
 
-**Date:** 23 March 2026
-**Replaces:** v3.8.0 (see bottom for change log)
+**Date:** 24 March 2026
+**Replaces:** v3.9.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -201,6 +201,41 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+### From v3.9.0
+
+No schema changes. Services changed: **gateway** and **web**. Deploy order: **gateway → web**.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+
+# Change 1 — Dark left-hand navigation
+# Desktop sidebar (lg+) background should now be dark grey (#2A2A2A), matching note cards
+# Inactive nav links should appear in muted grey (#9E9B97) against the dark background
+# Hovering a nav link should turn the row near-black (#141414) with white text
+# Active link keeps the crimson left-border indicator with white text
+# The "Platform" logotype should switch from dark border/text to white border/text at lg+
+# Mobile top bar (below lg) is unchanged — white background, dark text
+
+# Change 2 — "For you" global feed tab
+# Feed page should open on a new "For you" tab (left of "Following"), active by default
+# GET /api/v1/feed/global should return { items: [...] } mixing articles, notes, and new users
+# Feed should show all published articles and notes from all platform users, newest first
+# New user signups should appear as small inline cards: avatar + "X joined the platform" + time
+# "For you" tab should persist vote tallies and quote/delete actions like the Following tab
+```
+
+---
 
 ### From v3.8.0
 

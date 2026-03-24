@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { useAuth } from '../../stores/auth'
 import { useRouter } from 'next/navigation'
 import { ArticleCard } from '../feed/ArticleCard'
@@ -12,14 +13,36 @@ import type { QuoteTarget } from '../../lib/publishNote'
 import type { NDKKind } from '@nostr-dev-kit/ndk'
 import type { VoteTally, MyVoteCount } from '../../lib/api'
 
-type FeedTab = 'following' | 'add'
+type FeedTab = 'for-you' | 'following' | 'add'
+
+interface NewUserItem {
+  type: 'new_user'
+  username: string
+  displayName: string | null
+  avatar: string | null
+  joinedAt: number
+}
+
+type GlobalFeedItem = FeedItem | NewUserItem
+
+function timeAgo(unixSeconds: number): string {
+  const diff = Date.now() - unixSeconds * 1000
+  const mins = Math.floor(diff / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
 
 export function FeedView() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<FeedTab>('following')
+  const [activeTab, setActiveTab] = useState<FeedTab>('for-you')
   const [feedItems, setFeedItems] = useState<FeedItem[]>([])
   const [feedLoading, setFeedLoading] = useState(true)
+  const [globalItems, setGlobalItems] = useState<GlobalFeedItem[]>([])
+  const [globalLoading, setGlobalLoading] = useState(true)
   const [pendingQuote, setPendingQuote] = useState<QuoteTarget | null>(null)
   const [voteTallies, setVoteTallies] = useState<Record<string, VoteTally>>({})
   const [myVoteCounts, setMyVoteCounts] = useState<Record<string, MyVoteCount>>({})
@@ -27,8 +50,71 @@ export function FeedView() {
 
   useEffect(() => { if (!loading && !user) router.push('/auth?mode=login') }, [user, loading, router])
 
+  // Load the global "For you" feed from the DB
   useEffect(() => {
-    if (!user || activeTab === 'add') return
+    if (!user || activeTab !== 'for-you') return
+    async function loadGlobalFeed() {
+      setGlobalLoading(true)
+      try {
+        const res = await fetch('/api/v1/feed/global', { credentials: 'include' })
+        if (!res.ok) return
+        const data = await res.json()
+        const items: GlobalFeedItem[] = (data.items ?? []).map((item: any) => {
+          if (item.type === 'article') {
+            return {
+              type: 'article' as const,
+              id: item.nostrEventId,
+              pubkey: item.pubkey,
+              dTag: item.dTag,
+              title: item.title,
+              summary: item.summary,
+              content: item.contentFree,
+              isPaywalled: item.isPaywalled,
+              pricePence: item.pricePence,
+              gatePositionPct: item.gatePositionPct,
+              publishedAt: item.publishedAt,
+              tags: [],
+            }
+          } else if (item.type === 'note') {
+            return {
+              type: 'note' as const,
+              id: item.nostrEventId,
+              pubkey: item.pubkey,
+              content: item.content,
+              publishedAt: item.publishedAt,
+              quotedEventId: item.quotedEventId,
+              quotedEventKind: item.quotedEventKind,
+            }
+          } else {
+            return item as NewUserItem
+          }
+        })
+        setGlobalItems(items)
+
+        const feedOnlyIds = items
+          .filter((i): i is FeedItem => i.type !== 'new_user')
+          .map(i => i.id)
+        if (feedOnlyIds.length > 0) {
+          const idsParam = feedOnlyIds.join(',')
+          const [talliesRes, myVotesRes] = await Promise.all([
+            fetch(`/api/v1/votes/tally?eventIds=${idsParam}`)
+              .then(r => r.ok ? r.json() : { tallies: {} })
+              .catch(() => ({ tallies: {} })),
+            fetch(`/api/v1/votes/mine?eventIds=${idsParam}`, { credentials: 'include' })
+              .then(r => r.ok ? r.json() : { voteCounts: {} })
+              .catch(() => ({ voteCounts: {} })),
+          ])
+          setVoteTallies(talliesRes.tallies ?? {})
+          setMyVoteCounts(myVotesRes.voteCounts ?? {})
+        }
+      } catch (err) { console.error('Global feed load error:', err) }
+      finally { setGlobalLoading(false) }
+    }
+    loadGlobalFeed()
+  }, [user, activeTab])
+
+  useEffect(() => {
+    if (!user || activeTab !== 'following') return
     async function loadFeed() {
       setFeedLoading(true)
       try {
@@ -88,10 +174,12 @@ export function FeedView() {
   const handleNotePublished = useCallback((note: NoteEvent) => {
     setPendingQuote(null)
     setFeedItems(prev => [note, ...prev])
+    setGlobalItems(prev => [note, ...prev])
   }, [])
 
   const handleNoteDeleted = useCallback((id: string) => {
     setFeedItems(prev => prev.filter(i => i.id !== id))
+    setGlobalItems(prev => prev.filter(i => i.type === 'new_user' || i.id !== id))
   }, [])
 
   const handleQuote = useCallback((target: QuoteTarget) => {
@@ -119,6 +207,12 @@ export function FeedView() {
         </div>
         <div className="flex px-6 pt-1 border-b border-surface-strong">
           <button
+            onClick={() => setActiveTab('for-you')}
+            className={`tab-pill ${activeTab === 'for-you' ? 'tab-pill-active' : 'tab-pill-inactive'}`}
+          >
+            For you
+          </button>
+          <button
             onClick={() => setActiveTab('following')}
             className={`tab-pill ${activeTab === 'following' ? 'tab-pill-active' : 'tab-pill-inactive'}`}
           >
@@ -137,6 +231,24 @@ export function FeedView() {
       <div className="pb-10 pt-3">
         {activeTab === 'add' ? (
           <AddPanel onFollowed={() => setActiveTab('following')} />
+        ) : activeTab === 'for-you' ? (
+          globalLoading ? <InlineSkeleton /> : globalItems.length === 0 ? (
+            <div className="py-20 text-center px-6">
+              <p className="text-ui-sm text-content-muted">Nothing here yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3 px-6" style={{ background: 'rgb(234,229,220)' }}>
+              {globalItems.map(item => {
+                if (item.type === 'new_user') {
+                  return <NewUserCard key={`new-user-${item.username}-${item.joinedAt}`} item={item} />
+                } else if (item.type === 'article') {
+                  return <ArticleCard key={item.id} article={item} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
+                } else {
+                  return <NoteCard key={item.id} note={item} onDeleted={handleNoteDeleted} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
+                }
+              })}
+            </div>
+          )
         ) : feedLoading ? (
           <InlineSkeleton />
         ) : feedItems.length === 0 ? (
@@ -154,6 +266,37 @@ export function FeedView() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// New user card — compact "X joined the platform" feed item
+// =============================================================================
+
+function NewUserCard({ item }: { item: NewUserItem }) {
+  const name = item.displayName ?? item.username ?? 'Someone'
+  const initial = name[0].toUpperCase()
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 bg-surface-raised">
+      {item.avatar ? (
+        <img src={item.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+      ) : (
+        <span className="flex h-7 w-7 items-center justify-center bg-surface-sunken text-[10px] font-medium text-content-muted rounded-full flex-shrink-0">
+          {initial}
+        </span>
+      )}
+      <p className="text-ui-xs text-content-muted flex-1 min-w-0">
+        {item.username ? (
+          <Link href={`/${item.username}`} className="font-medium text-content-primary hover:underline">
+            {name}
+          </Link>
+        ) : (
+          <span className="font-medium text-content-primary">{name}</span>
+        )}
+        {' '}joined the platform
+      </p>
+      <span className="text-ui-xs text-content-faint flex-shrink-0">{timeAgo(item.joinedAt)}</span>
     </div>
   )
 }

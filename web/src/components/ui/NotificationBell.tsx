@@ -210,7 +210,7 @@ export function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={handleOpen}
-        className="flex items-center gap-2 pl-4 py-2.5 text-ink-400 hover:bg-white/5 hover:text-white transition-colors w-full"
+        className="flex items-center gap-2 pl-4 py-2.5 text-[#9E9B97] hover:bg-[#141414] hover:text-white transition-colors w-full"
         title="Notifications"
       >
         <span className="font-serif text-sm">Notifications</span>

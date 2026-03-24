@@ -39,8 +39,8 @@ export function Nav() {
   function sidebarLinkClass(path: string) {
     return `block font-serif text-sm py-2.5 pr-4 transition-colors w-full ${
       isActive(path)
-        ? 'pl-[13px] border-l-[3px] border-crimson text-ink-900 font-medium'
-        : 'pl-4 text-ink-400 hover:text-ink-900'
+        ? 'pl-[13px] border-l-[3px] border-crimson text-white font-medium hover:bg-[#141414]'
+        : 'pl-4 text-[#9E9B97] hover:text-white hover:bg-[#141414]'
     }`
   }
 
@@ -61,25 +61,23 @@ export function Nav() {
   const logoHref = user ? '/feed' : '/'
 
   return (
-    <header className="fixed z-50 bg-surface-raised top-0 left-0 right-0 lg:right-auto lg:bottom-0 lg:w-[200px] lg:flex lg:flex-col lg:border-r lg:border-ink-200">
+    <header className="fixed z-50 bg-surface-raised lg:bg-[#2A2A2A] top-0 left-0 right-0 lg:right-auto lg:bottom-0 lg:w-[200px] lg:flex lg:flex-col lg:border-r lg:border-[#3a3a3a]">
 
       {/* ================================================================
           TOP BAR — visible below lg breakpoint
           ================================================================ */}
-      <div className="flex items-center justify-between px-6 py-3 lg:px-5 lg:pt-7 lg:pb-5 lg:justify-center lg:border-b lg:border-ink-200">
+      <div className="flex items-center justify-between px-6 py-3 lg:px-5 lg:pt-7 lg:pb-5 lg:justify-center lg:border-b lg:border-[#3a3a3a]">
         {/* Logo */}
         <Link
           href={logoHref}
           onClick={handleNavClick}
-          className="font-serif tracking-tight flex-shrink-0"
+          className="font-serif tracking-tight flex-shrink-0 border-[3px] border-[#111111] text-[#111111] lg:border-white lg:text-white"
           style={{
             fontFamily: '"Newsreader", Georgia, serif',
-            border: '3px solid #111111',
             padding: '2px 14px 4px',
             lineHeight: '1.1',
             fontSize: '34px',
             fontWeight: '600',
-            color: '#111111',
           }}
         >
           Platform
@@ -196,7 +194,7 @@ export function Nav() {
           ================================================================ */}
       <nav className="hidden lg:flex flex-col flex-1 overflow-y-auto py-2">
         {loading ? (
-          <div className="px-4 py-3 h-4 w-24 animate-pulse bg-ink-200 rounded" />
+          <div className="px-4 py-3 h-4 w-24 animate-pulse bg-[#3a3a3a] rounded" />
         ) : user ? (
           <>
             <Link href="/write" onClick={handleNavClick} className={sidebarLinkClass('/write')}>Write</Link>
@@ -210,7 +208,7 @@ export function Nav() {
 
             {/* Search */}
             {searchOpen ? (
-              <form onSubmit={handleSearch} className="mx-3 mt-1 flex items-center gap-2 bg-ink-100 px-3 py-2">
+              <form onSubmit={handleSearch} className="mx-3 mt-1 flex items-center gap-2 bg-[#333] px-3 py-2">
                 <input
                   type="text"
                   value={searchQuery}
@@ -218,15 +216,15 @@ export function Nav() {
                   placeholder="Search..."
                   autoFocus
                   onBlur={() => { if (!searchQuery) setSearchOpen(false) }}
-                  className="flex-1 bg-transparent text-xs text-ink-900 placeholder-ink-400 focus:outline-none"
+                  className="flex-1 bg-transparent text-xs text-white placeholder-[#9E9B97] focus:outline-none"
                 />
-                <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery('') }} className="text-ink-400 hover:text-ink-900 text-xs">×</button>
+                <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery('') }} className="text-[#9E9B97] hover:text-white text-xs">×</button>
               </form>
             ) : (
               <button
                 onClick={() => setSearchOpen(true)}
                 className={`block font-serif text-sm py-2.5 pl-4 pr-4 transition-colors w-full text-left ${
-                  isActive('/search') ? 'pl-[13px] border-l-[3px] border-crimson text-ink-900 font-medium' : 'text-ink-400 hover:text-ink-900'
+                  isActive('/search') ? 'pl-[13px] border-l-[3px] border-crimson text-white font-medium hover:bg-[#141414]' : 'text-[#9E9B97] hover:text-white hover:bg-[#141414]'
                 }`}
               >
                 Search
@@ -244,27 +242,27 @@ export function Nav() {
 
       {/* Sidebar bottom — user info */}
       {user && (
-        <div className="hidden lg:block border-t border-ink-200 px-4 py-4 space-y-3">
+        <div className="hidden lg:block border-t border-[#3a3a3a] px-4 py-4 space-y-3">
           {/* User */}
           <Link href="/profile" className="flex items-center gap-2 group">
             {user.avatar ? (
               <img src={user.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
             ) : (
-              <span className="flex h-7 w-7 items-center justify-center bg-ink-200 text-[10px] font-medium text-ink-600 rounded-full flex-shrink-0">
+              <span className="flex h-7 w-7 items-center justify-center bg-[#3a3a3a] text-[10px] font-medium text-[#9E9B97] rounded-full flex-shrink-0">
                 {(user.displayName ?? user.username ?? '?')[0].toUpperCase()}
               </span>
             )}
             <div className="min-w-0">
-              <p className="font-serif text-xs text-ink-400 leading-tight truncate group-hover:text-ink-900 transition-colors">
+              <p className="font-serif text-xs text-[#9E9B97] leading-tight truncate group-hover:text-white transition-colors">
                 {user.displayName ?? user.username}
               </p>
-              <p className="text-[11px] text-ink-400 tabular-nums">
+              <p className="text-[11px] text-[#9E9B97] tabular-nums">
                 £{(user.freeAllowanceRemainingPence / 100).toFixed(2)}
               </p>
             </div>
           </Link>
 
-          <button onClick={logout} className="text-xs text-ink-400 hover:text-ink-900 transition-colors">
+          <button onClick={logout} className="text-xs text-[#9E9B97] hover:text-white transition-colors">
             Log out
           </button>
         </div>
