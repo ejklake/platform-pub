@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.14.0
+# platform.pub — Deployment Reference v3.15.0
 
 **Date:** 24 March 2026
-**Replaces:** v3.13.0 (see bottom for change log)
+**Replaces:** v3.14.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -171,7 +171,7 @@ Verify:
 docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\dt"
 ```
 
-You should see 23+ tables.
+You should see 24+ tables.
 
 ### 5. Build and start all services
 
@@ -203,6 +203,56 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.14.0
+
+Schema change: one new migration. Services changed: **gateway** and **web**. Deploy order: **migration → gateway → web**.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# Apply migration
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/013_note_excerpt_fields.sql
+
+docker compose build --no-cache gateway web
+docker compose up -d gateway web
+docker compose restart nginx
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+
+# Fix 1 — Notification bell: mark-read request no longer cancelled on navigation
+# Clicking a notification now fires a keepalive fetch (credentials: include, keepalive: true)
+# before calling router.push(). The keepalive flag instructs the browser to complete the
+# POST /notifications/:id/read request even after the page unloads, so the row is reliably
+# flipped to read=true in Postgres. Previously the in-flight fetch was cancelled by the
+# Next.js navigation, leaving read=false and causing the notification to reappear on
+# the next page load.
+# Files: web/src/components/ui/NotificationBell.tsx
+# Also: gateway/src/routes/notifications.ts — simplified unreadCount to rows.length
+# (the SQL query already filters WHERE read = false, so the filter was redundant).
+
+# Fix 2 — Quoted article excerpts now render correctly in the For You feed
+# Notes loaded via GET /feed/global that contain a quoted article excerpt now show the
+# correct swallowtail pennant design (ExcerptPennant) with the highlighted text, a
+# clickable link to the article, and the author name at the bottom.
+# Previously these notes fell through to the QuoteCard note-style renderer (dark rounded
+# box) because the excerpt, title, and author fields were never stored in the notes table
+# or returned by the feed endpoint, leaving quotedExcerpt undefined in the frontend.
+# The fix stores the three fields at publish time and returns them from the feed API.
+# Schema: migrations/013_note_excerpt_fields.sql adds quoted_excerpt, quoted_title,
+# quoted_author columns to the notes table.
+# Files: gateway/src/routes/notes.ts (schema, INSERT, feed SELECT + response),
+#        web/src/lib/publishNote.ts (pass excerpt fields to indexNote),
+#        web/src/components/feed/FeedView.tsx (map fields onto NoteEvent)
+```
+
+---
 
 ### From v3.13.0
 

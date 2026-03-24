@@ -84,6 +84,9 @@ export function FeedView() {
               publishedAt: item.publishedAt,
               quotedEventId: item.quotedEventId,
               quotedEventKind: item.quotedEventKind,
+              quotedExcerpt: item.quotedExcerpt,
+              quotedTitle: item.quotedTitle,
+              quotedAuthor: item.quotedAuthor,
             }
           } else {
             return item as NewUserItem

@@ -177,12 +177,20 @@ export function NotificationBell() {
     setLoading(false)
   }
 
-  async function handleDismiss(id: string, href: string) {
+  function handleDismiss(id: string, href: string) {
     dismissedIds.current.add(id)
     setItems((prev) => prev.filter((n) => n.id !== id))
     setUnreadCount((prev) => Math.max(0, prev - 1))
     setOpen(false)
-    await notificationsApi.markRead(id).catch(() => {})
+
+    // Use keepalive so the request completes even if the page unloads
+    const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL ?? ''
+    fetch(`${gateway}/api/v1/notifications/${id}/read`, {
+      method: 'POST',
+      credentials: 'include',
+      keepalive: true,
+    })
+
     router.push(href)
   }
 

@@ -86,6 +86,9 @@ export async function publishNote(
       isQuoteComment: true,
       quotedEventId: quoteTarget.eventId,
       quotedEventKind: quoteTarget.eventKind,
+      quotedExcerpt: quoteTarget.highlightedText,
+      quotedTitle: quoteTarget.previewTitle,
+      quotedAuthor: quoteTarget.previewAuthorName,
     }),
   })
 
@@ -102,6 +105,9 @@ async function indexNote(params: {
   isQuoteComment?: boolean
   quotedEventId?: string
   quotedEventKind?: number
+  quotedExcerpt?: string
+  quotedTitle?: string
+  quotedAuthor?: string
 }): Promise<void> {
   const res = await fetch(`${GATEWAY_URL}/api/v1/notes`, {
     method: 'POST',

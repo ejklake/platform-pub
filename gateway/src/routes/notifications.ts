@@ -63,7 +63,7 @@ export async function notificationRoutes(app: FastifyInstance) {
       [recipientId]
     )
 
-    const unreadCount = rows.filter((r) => !r.read).length
+    const unreadCount = rows.length
 
     const notifications = rows.map((r) => ({
       id: r.id,

@@ -23,6 +23,9 @@ const IndexNoteSchema = z.object({
   isQuoteComment: z.boolean().optional(),
   quotedEventId: z.string().optional(),
   quotedEventKind: z.number().int().optional(),
+  quotedExcerpt: z.string().optional(),
+  quotedTitle: z.string().optional(),
+  quotedAuthor: z.string().optional(),
 })
 
 export async function noteRoutes(app: FastifyInstance) {
@@ -44,8 +47,9 @@ export async function noteRoutes(app: FastifyInstance) {
       const result = await pool.query<{ id: string }>(
         `INSERT INTO notes (
            author_id, nostr_event_id, content, char_count, tier, published_at,
-           is_quote_comment, quoted_event_id, quoted_event_kind
-         ) VALUES ($1, $2, $3, $4, 'tier1', now(), $5, $6, $7)
+           is_quote_comment, quoted_event_id, quoted_event_kind,
+           quoted_excerpt, quoted_title, quoted_author
+         ) VALUES ($1, $2, $3, $4, 'tier1', now(), $5, $6, $7, $8, $9, $10)
          ON CONFLICT (nostr_event_id) DO NOTHING
          RETURNING id`,
         [
@@ -56,6 +60,9 @@ export async function noteRoutes(app: FastifyInstance) {
           data.isQuoteComment ?? false,
           data.quotedEventId ?? null,
           data.quotedEventKind ?? null,
+          data.quotedExcerpt ?? null,
+          data.quotedTitle ?? null,
+          data.quotedAuthor ?? null,
         ]
       )
 
@@ -272,6 +279,7 @@ export async function noteRoutes(app: FastifyInstance) {
           SELECT
             n.nostr_event_id, n.content, n.is_quote_comment,
             n.quoted_event_id, n.quoted_event_kind,
+            n.quoted_excerpt, n.quoted_title, n.quoted_author,
             EXTRACT(EPOCH FROM n.published_at)::bigint AS published_at,
             acc.nostr_pubkey
           FROM notes n
@@ -317,6 +325,9 @@ export async function noteRoutes(app: FastifyInstance) {
           isQuoteComment: row.is_quote_comment,
           quotedEventId: row.quoted_event_id ?? undefined,
           quotedEventKind: row.quoted_event_kind ?? undefined,
+          quotedExcerpt: row.quoted_excerpt ?? undefined,
+          quotedTitle: row.quoted_title ?? undefined,
+          quotedAuthor: row.quoted_author ?? undefined,
           publishedAt: Number(row.published_at),
         })
       }
