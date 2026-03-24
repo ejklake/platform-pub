@@ -108,7 +108,7 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
 export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: NoteCardProps) {
   const { user } = useAuth()
   const writerInfo = useWriterName(note.pubkey)
-  const [showReplies, setShowReplies] = useState(false)
+  const [showReplies, setShowReplies] = useState(true)
   const [replyCount, setReplyCount] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -304,7 +304,7 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
       {/* Replies */}
       {showReplies && (
         <div style={{ borderTop: '1px solid rgba(250,250,240,0.08)' }} className="px-4 pb-3">
-          <ReplySection targetEventId={note.id} targetKind={1} targetAuthorPubkey={note.pubkey} compact dark />
+          <ReplySection targetEventId={note.id} targetKind={1} targetAuthorPubkey={note.pubkey} compact dark previewLimit={3} />
         </div>
       )}
     </div>

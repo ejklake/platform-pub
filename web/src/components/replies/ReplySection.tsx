@@ -21,8 +21,9 @@ interface ReplySectionProps {
   targetKind: number
   targetAuthorPubkey: string
   contentAuthorId?: string
-  compact?: boolean // For notes: single-level, no threading
-  dark?: boolean    // For notes: dark background context
+  compact?: boolean    // For notes: single-level, no threading
+  dark?: boolean       // For notes: dark background context
+  previewLimit?: number // Max top-level replies before "show older" truncation
 }
 
 export function ReplySection({
@@ -32,12 +33,14 @@ export function ReplySection({
   contentAuthorId,
   compact = false,
   dark = false,
+  previewLimit,
 }: ReplySectionProps) {
   const { user } = useAuth()
   const [replies, setReplies] = useState<ReplyData[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [repliesEnabled, setRepliesEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [showAll, setShowAll] = useState(false)
   const [voteTallies, setVoteTallies] = useState<Record<string, VoteTally>>({})
   const [myVoteCounts, setMyVoteCounts] = useState<Record<string, MyVoteCount>>({})
   const [replyTarget, setReplyTarget] = useState<{
@@ -160,7 +163,17 @@ export function ReplySection({
       {/* Reply list */}
       {replies.length > 0 && (
         <div className={`divide-y divide-ink-100 ${compact ? '' : 'mb-4'}`}>
-          {replies.map((reply) => (
+          {/* "Show older" button when truncated */}
+          {previewLimit && !showAll && replies.length > previewLimit && (
+            <button
+              onClick={() => setShowAll(true)}
+              className="w-full py-1.5 text-left text-ui-xs transition-colors"
+              style={{ color: dark ? 'rgba(250,250,240,0.45)' : '#9E9B97' }}
+            >
+              {replies.length - previewLimit} older {replies.length - previewLimit === 1 ? 'reply' : 'replies'} — show all
+            </button>
+          )}
+          {(showAll || !previewLimit ? replies : replies.slice(-previewLimit)).map((reply) => (
             <div key={reply.id}>
               <ReplyItem
                 reply={reply}

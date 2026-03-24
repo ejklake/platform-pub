@@ -12,8 +12,8 @@ module.exports = {
       },
       colors: {
         surface: {
-          DEFAULT: '#FAFAF0',
-          raised: '#FFFFFF',
+          DEFAULT: '#E0D9CC',
+          raised: '#FAFAF0',
           card: '#FAFAF0',
           sunken: 'rgb(234 229 220 / <alpha-value>)',
           strong: 'rgb(212 209 204 / <alpha-value>)',

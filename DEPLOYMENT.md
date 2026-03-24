@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.13.0
+# platform.pub — Deployment Reference v3.14.0
 
 **Date:** 24 March 2026
-**Replaces:** v3.12.0 (see bottom for change log)
+**Replaces:** v3.13.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -201,6 +201,45 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ---
 
 ## Upgrading from a previous version
+
+> **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.13.0
+
+No schema changes. Web only. Rebuild and restart `web`.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache web
+docker compose up -d web
+```
+
+Verify:
+```bash
+docker logs platform-pub-web-1 --tail 5
+
+# Change 1 — Page background is now a distinct sand colour
+# The page background (body bg-surface) is now #E0D9CC — a warm sand that sits visibly
+# darker than the ivory article cards (#FAFAF0), creating clear visual layering.
+# Previously the background and cards were both #FAFAF0 (indistinguishable).
+
+# Change 2 — Input backgrounds unified to ivory
+# Text inputs, selects, and textareas now use #FAFAF0 (ivory) for both their default and
+# focused state, matching article cards and quoted-content pennants.
+# Previously the default state was #FFFFFF (pure white) and focus was also #FFFFFF —
+# inconsistent with the rest of the surface palette.
+
+# Change 3 — Note tile replies expanded by default on the feed
+# Note tiles in the feed now show replies in expanded form without requiring a click.
+# Up to the 3 most recent top-level replies are shown by default; if there are more,
+# an "X older replies — show all" link appears above them to expand the full thread.
+# Full sub-reply threading is preserved at all depths. The "Hide replies" button still
+# collapses everything.
+```
+
+---
 
 ### From v3.12.0
 
@@ -1112,11 +1151,12 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 | 009_notifications.sql | `notifications` table: new_follower and new_reply events, with actor/article/comment FK refs |
 | 010_votes.sql | `votes`, `vote_tallies`, `vote_charges` tables for the upvote/downvote system |
 
-Run all pending migrations:
+Run all pending migrations (requires Node on the host — substitute your `POSTGRES_PASSWORD`):
 ```bash
-npx tsx shared/src/db/migrate.ts
+DATABASE_URL=postgresql://platformpub:<POSTGRES_PASSWORD>@127.0.0.1:5432/platformpub \
+  npx tsx shared/src/db/migrate.ts
 ```
-Or manually per file:
+Or apply a single migration directly via Docker (no Node required on the host):
 ```bash
 docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub < migrations/NNN_name.sql
 ```
