@@ -39,19 +39,29 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
   const [articleDTag, setArticleDTag] = useState<string | null>(null)
   const [isPaywalled, setIsPaywalled] = useState(false)
 
-  function applySwallowtail() {
+  function applyZigzag() {
     const el = ref.current
     if (!el) return
     const w = el.offsetWidth
     const h = el.offsetHeight
     if (w === 0 || h === 0) return
-    const forkDepth = 28
-    const vX = ((w - forkDepth) / w) * 100
-    el.style.clipPath = `polygon(0% 0%, 100% 0%, ${vX}% 50%, 100% 100%, 0% 100%)`
+    const depth = 12
+    const toothPx = 22
+    const n = Math.max(4, Math.round(h / toothPx))
+    const xInner = (((w - depth) / w) * 100).toFixed(2)
+    const pts: string[] = ['0% 0%', '100% 0%']
+    for (let i = 0; i < n; i++) {
+      const yMid = (((i + 0.5) / n) * 100).toFixed(2)
+      const yBot = (((i + 1) / n) * 100).toFixed(2)
+      pts.push(`${xInner}% ${yMid}%`)
+      pts.push(`100% ${yBot}%`)
+    }
+    pts.push('0% 100%')
+    el.style.clipPath = `polygon(${pts.join(', ')})`
   }
 
   useEffect(() => {
-    function run() { applySwallowtail() }
+    function run() { applyZigzag() }
     if (typeof document !== 'undefined' && document.fonts) {
       document.fonts.ready.then(run)
     } else {
@@ -81,7 +91,7 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
         paddingTop: '10px',
         paddingBottom: '10px',
         paddingLeft: isPaywalled ? '11px' : '14px',
-        paddingRight: '48px',
+        paddingRight: '28px',
       }}
     >
       <p style={{ fontFamily: '"Newsreader", Georgia, serif', fontStyle: 'italic', fontSize: '14px', color: '#4A4845', lineHeight: 1.5, marginBottom: note.quotedTitle || note.quotedAuthor ? '5px' : 0 }}>
@@ -97,18 +107,18 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
 
   if (articleDTag) {
     return (
-      <Link href={`/article/${articleDTag}`} onClick={e => e.stopPropagation()} className="block mt-2.5" style={{ marginRight: '-16px' }}>
+      <Link href={`/article/${articleDTag}`} onClick={e => e.stopPropagation()} className="block mt-2.5">
         {inner}
       </Link>
     )
   }
-  return <div className="mt-2.5" style={{ marginRight: '-16px' }}>{inner}</div>
+  return <div className="mt-2.5">{inner}</div>
 }
 
 export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: NoteCardProps) {
   const { user } = useAuth()
   const writerInfo = useWriterName(note.pubkey)
-  const [showReplies, setShowReplies] = useState(true)
+  const [showReplies, setShowReplies] = useState(false)
   const [replyCount, setReplyCount] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)

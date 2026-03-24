@@ -156,7 +156,6 @@ export function Nav() {
               <Link href="/notifications" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-[#3a3a3a] ${pathname === '/notifications' ? 'text-white font-medium' : 'text-[#9E9B97] hover:text-white'}`}>Notifications</Link>
               <Link href="/following" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-[#3a3a3a] ${isActive('/following') ? 'text-white font-medium' : 'text-[#9E9B97] hover:text-white'}`}>Following</Link>
               <Link href="/followers" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-[#3a3a3a] ${isActive('/followers') ? 'text-white font-medium' : 'text-[#9E9B97] hover:text-white'}`}>Followers</Link>
-              <Link href="/history" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-[#3a3a3a] ${isActive('/history') ? 'text-white font-medium' : 'text-[#9E9B97] hover:text-white'}`}>History</Link>
               <Link href="/dashboard" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-[#3a3a3a] ${isActive('/dashboard') ? 'text-white font-medium' : 'text-[#9E9B97] hover:text-white'}`}>Dashboard</Link>
               <Link href="/about" onClick={handleNavClick} className={`block font-serif text-sm py-3 border-b border-[#3a3a3a] ${isActive('/about') ? 'text-white font-medium' : 'text-[#9E9B97] hover:text-white'}`}>About</Link>
 
@@ -202,7 +201,6 @@ export function Nav() {
             <NotificationBell />
             <Link href="/following" onClick={handleNavClick} className={sidebarLinkClass('/following')}>Following</Link>
             <Link href="/followers" onClick={handleNavClick} className={sidebarLinkClass('/followers')}>Followers</Link>
-            <Link href="/history" onClick={handleNavClick} className={sidebarLinkClass('/history')}>History</Link>
             <Link href="/dashboard" onClick={handleNavClick} className={sidebarLinkClass('/dashboard')}>Dashboard</Link>
             <Link href="/about" onClick={handleNavClick} className={sidebarLinkClass('/about')}>About</Link>
 

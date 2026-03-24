@@ -26,19 +26,29 @@ interface QuoteCardProps {
 function ArticlePennant({ data }: { data: ResolvedContent }) {
   const ref = useRef<HTMLDivElement>(null)
 
-  function applySwallowtail() {
+  function applyZigzag() {
     const el = ref.current
     if (!el) return
     const w = el.offsetWidth
     const h = el.offsetHeight
     if (w === 0 || h === 0) return
-    const forkDepth = 28
-    const vX = ((w - forkDepth) / w) * 100
-    el.style.clipPath = `polygon(0% 0%, 100% 0%, ${vX}% 50%, 100% 100%, 0% 100%)`
+    const depth = 12
+    const toothPx = 22
+    const n = Math.max(4, Math.round(h / toothPx))
+    const xInner = (((w - depth) / w) * 100).toFixed(2)
+    const pts: string[] = ['0% 0%', '100% 0%']
+    for (let i = 0; i < n; i++) {
+      const yMid = (((i + 0.5) / n) * 100).toFixed(2)
+      const yBot = (((i + 1) / n) * 100).toFixed(2)
+      pts.push(`${xInner}% ${yMid}%`)
+      pts.push(`100% ${yBot}%`)
+    }
+    pts.push('0% 100%')
+    el.style.clipPath = `polygon(${pts.join(', ')})`
   }
 
   useEffect(() => {
-    function run() { applySwallowtail() }
+    function run() { applyZigzag() }
     if (typeof document !== 'undefined' && document.fonts) {
       document.fonts.ready.then(run)
     } else {
@@ -53,7 +63,6 @@ function ArticlePennant({ data }: { data: ResolvedContent }) {
       href={`/article/${data.dTag}`}
       onClick={e => e.stopPropagation()}
       className="block mt-2.5"
-      style={{ marginRight: '-24px' }}
     >
       <div
         ref={ref}
@@ -64,7 +73,7 @@ function ArticlePennant({ data }: { data: ResolvedContent }) {
           paddingTop: '10px',
           paddingBottom: '10px',
           paddingLeft: data.isPaywalled ? '11px' : '14px',
-          paddingRight: '48px',
+          paddingRight: '28px',
         }}
       >
         <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#7A7774', marginBottom: '3px' }}>

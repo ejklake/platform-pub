@@ -173,8 +173,15 @@ export async function writerRoutes(app: FastifyInstance) {
         nostr_event_id: string
         content: string
         published_at: Date
+        quoted_event_id: string | null
+        quoted_event_kind: number | null
+        quoted_excerpt: string | null
+        quoted_title: string | null
+        quoted_author: string | null
       }>(
-        `SELECT id, nostr_event_id, content, published_at
+        `SELECT id, nostr_event_id, content, published_at,
+                quoted_event_id, quoted_event_kind,
+                quoted_excerpt, quoted_title, quoted_author
          FROM notes
          WHERE author_id = $1
          ORDER BY published_at DESC
@@ -187,6 +194,11 @@ export async function writerRoutes(app: FastifyInstance) {
         nostrEventId: r.nostr_event_id,
         content: r.content,
         publishedAt: r.published_at.toISOString(),
+        quotedEventId: r.quoted_event_id ?? undefined,
+        quotedEventKind: r.quoted_event_kind ?? undefined,
+        quotedExcerpt: r.quoted_excerpt ?? undefined,
+        quotedTitle: r.quoted_title ?? undefined,
+        quotedAuthor: r.quoted_author ?? undefined,
       }))
 
       return reply.status(200).send({ notes, limit, offset })

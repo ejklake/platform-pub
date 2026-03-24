@@ -28,6 +28,11 @@ interface DbNote {
   nostrEventId: string
   content: string
   publishedAt: string
+  quotedEventId?: string
+  quotedEventKind?: number
+  quotedExcerpt?: string
+  quotedTitle?: string
+  quotedAuthor?: string
 }
 
 interface DbReply {
@@ -329,6 +334,11 @@ export default function WriterProfilePage() {
                 pubkey: writer!.pubkey,
                 content: n.content,
                 publishedAt: Math.floor(new Date(n.publishedAt).getTime() / 1000),
+                quotedEventId: n.quotedEventId,
+                quotedEventKind: n.quotedEventKind,
+                quotedExcerpt: n.quotedExcerpt,
+                quotedTitle: n.quotedTitle,
+                quotedAuthor: n.quotedAuthor,
               }
               return <NoteCard key={n.id} note={noteEvent} onDeleted={handleNoteDeleted} onQuote={handleQuote} />
             }

@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.15.0
+# platform.pub — Deployment Reference v3.16.0
 
 **Date:** 24 March 2026
-**Replaces:** v3.14.0 (see bottom for change log)
+**Replaces:** v3.15.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -203,6 +203,59 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.15.0
+
+No schema changes. Services changed: **gateway** and **web**. Deploy order: **gateway → web**.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+docker logs platform-pub-web-1 --tail 5
+
+# Change 1 — Note tile replies collapsed by default
+# Note tiles in the feed no longer open with the reply section expanded.
+# The reply section is now hidden on initial render. Clicking the "Reply" / "N replies"
+# pill reveals it; "Hide replies" collapses it again.
+# Previously the showReplies state defaulted to true, expanding every reply section on
+# every note tile in the feed without any user action.
+# File: web/src/components/feed/NoteCard.tsx
+
+# Change 2 — Article quotes in note tiles: zigzag right edge instead of swallowtail
+# Quoted article content shown inside note tiles (both the full-tile QuoteCard and the
+# text-excerpt ExcerptPennant) now uses the same repeating zigzag right edge as the main
+# article feed tiles. The single V-notch swallowtail has been removed from both quote
+# types. The zigzag is contained within the dark-grey note tile (negative marginRight
+# overhangs removed from both wrappers); paddingRight reduced from 48px to 28px to match
+# the shallower 12px zigzag depth.
+# Files: web/src/components/feed/NoteCard.tsx, web/src/components/feed/QuoteCard.tsx
+
+# Change 3 — History removed from navigation
+# The "History" link has been removed from both the mobile hamburger drawer and the
+# desktop left sidebar. The /history page and its backend remain intact.
+# File: web/src/components/layout/Nav.tsx
+
+# Fix 4 — Quote fields returned for notes on writer profile pages
+# GET /writers/:username/notes now returns quoted_event_id, quoted_event_kind,
+# quoted_excerpt, quoted_title, and quoted_author alongside each note. Previously the
+# endpoint selected only id, nostr_event_id, content, published_at — all quote data
+# was silently dropped. As a result, notes with quoted articles on a writer's profile
+# page rendered with no quote UI at all (no pennant, no tile, no paywall indicator).
+# The frontend DbNote interface and NoteEvent construction on the profile page are
+# updated accordingly so all quote rendering — including the red paywall left border —
+# now works on profile pages as it does on the global feed.
+# Files: gateway/src/routes/writers.ts, web/src/app/[username]/page.tsx
+```
+
+---
 
 ### From v3.14.0
 
@@ -1510,6 +1563,32 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.16.0 — 24 March 2026
+
+**UI polish: collapsed replies, zigzag quote edges, nav cleanup, profile page quote fix**
+
+**Change 1 — Note tile replies collapsed by default**
+
+Note tiles in the feed previously rendered with the reply section expanded on load (`showReplies` defaulted to `true`). This caused every note on the feed to show an open reply composer and existing replies on first paint, making the feed visually heavy. The default is now `false`; the reply section is hidden until the user clicks the reply pill.
+
+**Change 2 — Article quotes in note tiles: zigzag right edge replaces swallowtail**
+
+Both types of article quote that appear inside dark-grey note tiles — the full `QuoteCard` article tile (`ArticlePennant`) and the text-excerpt `ExcerptPennant` — previously used the single V-notch swallowtail `clip-path` and extended past the right edge of the note tile via a negative `marginRight`. Both now use the same repeating zigzag (`applyZigzag`) as the main article feed tiles, fully contained within the note tile (negative margin overhangs removed, `paddingRight` reduced from 48px to 28px to suit the 12px zigzag depth).
+
+**Change 3 — History link removed from navigation**
+
+The "History" link was present in both the mobile hamburger drawer and the desktop left sidebar without having been intentionally added. It has been removed from both nav surfaces. The `/history` route and its backend are unaffected.
+
+**Fix 4 — Quote fields missing from writer profile page notes**
+
+`GET /writers/:username/notes` selected only `id`, `nostr_event_id`, `content`, `published_at` — the five quote columns (`quoted_event_id`, `quoted_event_kind`, `quoted_excerpt`, `quoted_title`, `quoted_author`) were never fetched or returned. On writer profile pages, any note containing a quoted article rendered with no quote UI (no pennant, no paywall border, no article tile). The endpoint now returns all quote fields; the `DbNote` interface and `NoteEvent` construction on the profile page pass them through to `NoteCard`, so full quote rendering including the red paywall left border now works on profile pages.
+
+**Files changed:** `gateway/src/routes/writers.ts`, `web/src/app/[username]/page.tsx`, `web/src/components/feed/NoteCard.tsx`, `web/src/components/feed/QuoteCard.tsx`, `web/src/components/layout/Nav.tsx`
+
+**No schema changes. Services changed: gateway and web. Deploy order: gateway → web.**
+
+---
 
 ### v3.12.0 — 24 March 2026
 
