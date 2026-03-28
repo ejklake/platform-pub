@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.17.0
+# platform.pub — Deployment Reference v3.18.0
 
-**Date:** 24 March 2026
-**Replaces:** v3.16.0 (see bottom for change log)
+**Date:** 28 March 2026
+**Replaces:** v3.17.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -203,6 +203,79 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.17.0
+
+No schema changes. Services changed: **all five application services** (web, gateway, payment, keyservice, key-custody). The visual redesign touches only the web frontend, but all services are rebuilt for image consistency.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache web gateway payment keyservice key-custody
+docker compose up -d web gateway payment keyservice key-custody
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep platform-pub
+docker logs platform-pub-web-1 --tail 5
+
+# Full visual redesign — mint/parchment two-surface system
+#
+# The entire frontend colour palette, typography, and component styling has been
+# replaced. This is a comprehensive design system change affecting 41 files.
+#
+# Colour system
+# - Page background changed from warm beige/cream to fresh mint (#EDF5F0)
+# - Card/content surfaces changed to bright parchment (#FFFAEF)
+# - Accent changed from crimson (#9B1C20) to ink red (#B5242A)
+# - Ink/text colour changed to deep forest (#0F1F18)
+# - New semantic tokens: surface, card, surface-deep (#DDEEE4), rule (#B8D2C1),
+#   avatar-bg (#C2DBC9), and a 5-level content hierarchy (primary/secondary/muted/faint/card-muted)
+#
+# Typography
+# - Serif font changed from Newsreader to Literata (Google Fonts)
+# - All article titles, headings, and card headlines now render in italic Literata
+# - Sans-serif body text uses Source Sans 3 (was Inter/system-ui)
+# - Monospace uses IBM Plex Mono
+#
+# Component changes
+# - Nav sidebar: dark #2A2A2A background removed, now uses mint bg-surface with ink text;
+#   width reduced from 200px to 180px; active links use accent left border
+# - Feed article cards: zigzag clip-path removed, parchment background with no border,
+#   headlines in italic Literata 21px, writer name in uppercase card-muted
+# - Note cards: dark #2A2A2A background removed, notes render on mint surface with py-4;
+#   crimson gradient avatars replaced with #C2DBC9 mint avatars
+# - Quote cards: all zigzag clip-path code removed; article pennants and quoted notes
+#   use parchment background with 2.5px accent left border
+# - Article reader: content wrapped in parchment card with 40px/48px padding;
+#   "← Back to feed" link on mint surface; title in italic Literata 36px
+# - Paywall gate: surface-deep (#DDEEE4) background, gradient fades from transparent;
+#   bleeds to card edges with negative horizontal margins
+# - All pill buttons removed; buttons now use 2px border-radius
+# - All 0.5px borders replaced with 1px
+# - NotificationBell, VoteControls, ShareButton, ReportButton, AllowanceExhaustedModal,
+#   VoteConfirmModal all updated from old ink-*/brand-* tokens to new semantic tokens
+# - CommentSection, CommentItem, CommentComposer, ReplySection, ReplyItem, ReplyComposer
+#   all updated to new tokens
+# - CardSetup (Stripe Elements) updated to new palette and 2px radius
+# - Editor toolbar and article editor updated to new tokens
+# - EmbedNode uses border-rule bg-surface-deep
+# - All 15 page files under web/src/app/ updated
+#
+# Accessibility
+# - WCAG 2.4.7 focus indicators added via focus-visible:
+#   - Buttons/links: outline 2px solid #B5242A (accent)
+#   - Accent buttons: outline 2px solid #0F1F18 (ink)
+#   - Form inputs: box-shadow 0 0 0 2px #B8D2C1 (rule)
+#
+# Old tokens fully removed from tailwind.config.js:
+# crimson, slate, old ink scale (ink-50 through ink-900), old surface variants
+# (surface-raised, surface-sunken, surface-strong, surface-card), brand-*, accent-*
+```
+
+---
 
 ### From v3.16.0
 
@@ -1638,6 +1711,95 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.18.0 — 28 March 2026
+
+**Full visual redesign — mint/parchment two-surface system, Literata typography, WCAG focus states**
+
+Complete replacement of the frontend design system across 41 files (785 insertions, 1,150 deletions). No schema or API changes — this is a purely visual update.
+
+**Colour system overhaul**
+
+The warm beige/cream palette has been replaced with a fresh two-surface system:
+- **Surface (page background):** mint `#EDF5F0` — replaces all previous beige/sand/cream backgrounds
+- **Card (content surfaces):** bright parchment `#FFFAEF` — article cards, note composers, dropdowns, modals
+- **Surface-deep:** `#DDEEE4` — loading skeletons, paywall gate background, hover states
+- **Accent:** ink red `#B5242A` — replaces crimson `#9B1C20`; used for active states, paywall indicators, delete confirmations
+- **Ink:** deep forest `#0F1F18` — replaces warm stone `#292524`; primary text and dark UI elements
+- **Rule (borders):** sage `#B8D2C1` — replaces all old border tokens
+- **Avatar backgrounds:** `#C2DBC9` — replaces crimson gradients and dark fills
+- **Content hierarchy:** five semantic levels (primary, secondary, muted, faint, card-muted) replace the old `ink-50` through `ink-900` scale
+
+Old Tailwind tokens removed entirely: `crimson`, `slate`, `ink-50`–`ink-900`, `surface-raised`, `surface-sunken`, `surface-strong`, `surface-card`, `brand-*`, `accent-*`.
+
+**Typography**
+
+- Serif: Literata (Google Fonts) replaces Newsreader. All article titles and card headlines render in **italic** Literata
+- Sans-serif: Source Sans 3 replaces Inter/system-ui for body text
+- Monospace: IBM Plex Mono for code blocks
+- Article reader titles: italic Literata 36px; feed card headlines: italic Literata 21px weight 500
+
+**Component-level changes**
+
+- **Nav sidebar:** dark `#2A2A2A` background removed → mint `bg-surface` with ink text. Width reduced from 200px to 180px. Active links use accent left border instead of crimson
+- **ArticleCard:** zigzag `clip-path` removed (along with `applyZigzag` function). Parchment background, no border, italic headlines, uppercase writer name in `card-muted`, price as `£X.XX` in accent
+- **NoteCard:** dark `#2A2A2A` background removed → notes render on mint with `py-4`. Avatar uses `#C2DBC9`. ExcerptPennant uses parchment with `2.5px solid #B5242A` left border
+- **QuoteCard:** all zigzag clip-path code removed. Parchment backgrounds with accent left border for both article pennants and quoted notes
+- **ArticleReader:** content wrapped in parchment card (`40px 48px` padding). Back link on mint surface. Quote popup and modal overlay use `bg-ink`
+- **PaywallGate:** `surface-deep` background with gradient fade. Negative horizontal margins to bleed to card edges. Heading in Literata roman 20px, price in Literata 28px
+- **NoteComposer:** mint avatar, `bg-card` surface, `btn` class post button
+- **NotificationBell:** `bg-card border-rule` panel, `bg-surface-deep` hover states
+- **VoteControls / VoteConfirmModal:** mint surface colours, `bg-ink` tooltip with 2px radius
+- **ShareButton / ReportButton / AllowanceExhaustedModal:** updated to `bg-card border-rule` tokens
+- **CommentSection / CommentItem / CommentComposer:** all `ink-*` and `brand-*` tokens replaced
+- **ReplySection / ReplyItem / ReplyComposer:** updated to `border-rule`, `bg-surface-deep`, `text-accent` tokens
+- **ArticleEditor:** italic Literata title input, updated toolbar tokens, `text-rule` separator
+- **EmbedNode:** `border-rule bg-surface-deep`, `text-accent` links
+- **CardSetup (Stripe):** `border-rule`, `btn` class, Stripe Elements theme updated to match new palette
+- **All 15 page files** under `web/src/app/` updated to new tokens
+
+**Accessibility (WCAG 2.4.7)**
+
+- All interactive elements now have `focus-visible` indicators:
+  - Buttons and links: `outline: 2px solid #B5242A` (accent)
+  - Accent-background buttons: `outline: 2px solid #0F1F18` (ink, for contrast)
+  - Form inputs: `box-shadow: 0 0 0 2px #B8D2C1` (rule colour ring)
+
+**Styling rules**
+
+- All borders: 1px (no sub-pixel 0.5px)
+- All button border-radius: 2px (no rounded-md/xl/full on buttons)
+- Pill buttons removed entirely from the design
+
+**No schema changes. No API changes. Services rebuilt: all five (web, gateway, payment, keyservice, key-custody).**
+
+---
+
+### v3.17.0 — 24 March 2026
+
+**UI changes: quote links, profile replies, feed threading, tab spacing**
+
+**Change 1 — Quote flags: clickable body and linked author**
+
+The pale quote pennant on note tiles is now interactive. The quoted excerpt text is a Link to `/article/[dTag]` (dTag resolved lazily via `/api/v1/content/resolve`). The attribution line has separate links: author name links to `/{authorUsername}`, article title links to the article. For full-tile QuoteCard article pennants, the author attribution uses `router.push()` with `stopPropagation` to avoid triggering the outer article Link.
+
+**Change 2 — Profile page reply cards: "Replying to", delete, votes, deep links**
+
+Reply cards on writer profile pages now show: "Replying to @username" badge with profile link; reply content wrapped in a Link to `/article/[slug]#reply-[id]`; Delete button with 3-second confirm (calls `DELETE /api/v1/replies/:id`); VoteControls on the reply's `nostrEventId`; Quote button wired to NoteComposer modal. Backend: `GET /writers/:username/replies` now LEFT JOINs parent comment and account rows to surface `parentEventId`, `parentAuthorUsername`, `parentAuthorDisplayName`, and returns deleted replies with `isDeleted: true`.
+
+**Change 3 — Feed replies expanded by default; compose input on demand**
+
+Note tiles now mount ReplySection immediately (up to 3 most recent replies visible). The reply compose box is hidden by default, shown on "Reply" click. New `composerOpen` / `onComposerClose` prop pair on ReplySection controls this; default (`undefined`) preserves always-visible behaviour on article pages.
+
+**Change 4 — Feed tab spacing**
+
+Tab pills now have 6px right margin between them via `.tab-pill` CSS update.
+
+**Files changed:** `gateway/src/routes/writers.ts`, `web/src/app/[username]/page.tsx`, `web/src/app/globals.css`, `web/src/components/feed/NoteCard.tsx`, `web/src/components/feed/QuoteCard.tsx`, `web/src/components/replies/ReplySection.tsx`
+
+**No schema changes. Services changed: gateway and web.**
+
+---
 
 ### v3.16.0 — 24 March 2026
 
