@@ -20,8 +20,8 @@
 
   hr {
     border: none;
-    height: 3px;
-    background: #0F1F18;
+    height: 1px;
+    background: #B8D2C1;
   }
 
   input[type="text"],
@@ -57,7 +57,7 @@
   }
   input[type="checkbox"] {
     @apply rounded;
-    border-color: #0F1F18;
+    border-color: #7A9A8A;
     width: 1rem;
     height: 1rem;
   }
@@ -66,7 +66,7 @@
     border-color: #B5242A;
   }
   input[type="checkbox"]:focus {
-    box-shadow: 0 0 0 2px #0F1F18;
+    box-shadow: 0 0 0 2px #B5242A;
   }
 
   /* Range slider */
@@ -97,18 +97,18 @@
   /* ----- Rules ----- */
   .rule {
     border: none;
-    height: 3px;
-    background: #0F1F18;
+    height: 1px;
+    background: #B8D2C1;
   }
   .rule-inset {
     border: none;
-    height: 3px;
-    background: #0F1F18;
+    height: 1px;
+    background: #B8D2C1;
     margin-left: 1.5rem;
     margin-right: 1.5rem;
   }
   .rule-accent {
-    border-top: 3px solid #B5242A;
+    border-top: 1px solid #B8D2C1;
   }
 
   /* ----- Label styles ----- */
@@ -129,7 +129,7 @@
     color: #4A6B5A;
   }
 
-  /* ----- Feed tabs ----- */
+  /* ----- Feed tabs (on dark green background) ----- */
   .tab-feed {
     font-family: 'Source Sans 3', system-ui, sans-serif;
     font-size: 0.8125rem;
@@ -137,20 +137,20 @@
     padding: 0.5rem 0;
     margin-right: 1.25rem;
     border: none;
-    border-bottom: 3px solid transparent;
+    border-bottom: 2px solid transparent;
     background: transparent;
     cursor: pointer;
     transition: color 0.15s ease;
     color: #7A9A8A;
-    margin-bottom: -3px;
+    margin-bottom: -2px;
   }
   .tab-feed-active {
-    color: #0F1F18;
+    color: #FFFAEF;
     font-weight: 600;
-    border-bottom-color: #0F1F18;
+    border-bottom-color: #FFFAEF;
   }
   .tab-feed:hover:not(.tab-feed-active) {
-    color: #4A6B5A;
+    color: #DDEEE4;
   }
 
   /* ----- Dashboard tab pills ----- */
@@ -168,15 +168,15 @@
     transition: background-color 0.15s ease, color 0.15s ease;
   }
   .tab-pill-active {
-    background: #0F1F18;
+    background: #263D32;
     color: #FFFFFF;
   }
   .tab-pill-inactive {
     background: #DDEEE4;
-    color: #263D32;
+    color: #4A6B5A;
   }
   .tab-pill-inactive:hover {
-    color: #0F1F18;
+    color: #263D32;
     background: #C2DBC9;
   }
 
@@ -189,13 +189,13 @@
     font-weight: 500;
     letter-spacing: 0.01em;
     text-transform: none;
-    border: 1px solid #1A3028;
+    border: none;
     border-radius: 2px;
     padding: 0.75rem 2rem;
     transition: background-color 0.15s ease;
     cursor: pointer;
   }
-  .btn:hover { background: #1A3028; }
+  .btn:hover { background: #263D32; }
   .btn:focus-visible {
     outline: 2px solid #B5242A;
     outline-offset: 2px;
@@ -210,7 +210,7 @@
     font-weight: 500;
     letter-spacing: 0.01em;
     text-transform: none;
-    border: 1px solid #921D22;
+    border: none;
     border-radius: 2px;
     padding: 0.75rem 2rem;
     transition: background-color 0.15s ease;
@@ -231,10 +231,10 @@
     font-weight: 500;
     letter-spacing: 0.01em;
     text-transform: none;
-    border: 2px solid transparent;
+    border: none;
     border-radius: 2px;
     padding: 0.75rem 2rem;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    transition: background-color 0.15s ease;
     cursor: pointer;
   }
   .btn-soft:hover {

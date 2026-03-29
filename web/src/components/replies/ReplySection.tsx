@@ -137,7 +137,7 @@ export function ReplySection({
 
   if (loading) {
     return (
-      <div className={compact ? '' : 'mt-8 pt-6 border-t-[3px] border-ink'}>
+      <div className={compact ? '' : 'mt-8 pt-6 border-t border-rule'}>
         <div className="space-y-2 py-2">
           {[1, 2].map(i => (
             <div key={i} className="h-10 animate-pulse bg-surface-deep" />
@@ -148,7 +148,7 @@ export function ReplySection({
   }
 
   return (
-    <div className={compact ? '' : 'mt-8 pt-6 border-t-[3px] border-ink'}>
+    <div className={compact ? '' : 'mt-8 pt-6 border-t border-rule'}>
       {!compact && (
         <h3 className="text-sm font-medium text-content-secondary mb-4">
           {totalCount > 0
@@ -171,7 +171,7 @@ export function ReplySection({
                 voteTally={voteTallies[reply.nostrEventId]}
                 myVoteCounts={myVoteCounts[reply.nostrEventId]}
                 renderComposer={(replyId) => replyTarget?.replyId === replyId ? (
-                  <div className="ml-8 pl-4 border-l-2 border-ink">
+                  <div className="ml-8 pl-4 border-l border-rule">
                     <ReplyComposer
                       targetEventId={targetEventId}
                       targetKind={targetKind}
@@ -186,7 +186,7 @@ export function ReplySection({
                 ) : null}
               />
               {replyTarget?.replyId === reply.id && (
-                <div className="ml-8 pl-4 border-l-2 border-ink">
+                <div className="ml-8 pl-4 border-l border-rule">
                   <ReplyComposer
                     targetEventId={targetEventId}
                     targetKind={targetKind}
@@ -204,7 +204,7 @@ export function ReplySection({
           {previewLimit && !showAll && replies.length > previewLimit && (
             <button
               onClick={() => setShowAll(true)}
-              className="mt-2 px-3 py-1.5 text-ui-xs text-content-muted hover:text-white hover:bg-ink transition-colors border border-transparent hover:border-ink"
+              className="mt-2 px-3 py-1.5 text-ui-xs text-content-muted hover:text-white hover:bg-content-secondary transition-colors"
             >
               Read more replies
             </button>

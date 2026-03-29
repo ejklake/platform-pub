@@ -187,73 +187,78 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
 
       {/* Parchment card containing the article */}
       <div className="mx-auto max-w-article-frame px-6">
-        <div className="bg-card border-[3px] border-ink" style={{ padding: '40px 48px' }}>
+        <div className="bg-card px-5 py-6 sm:px-10 sm:py-8 md:px-[72px] md:py-10">
           {/* Hero image inside the card if present */}
           {heroImage && (
-            <div className="-mx-[48px] -mt-[40px] mb-8">
+            <div className="-mx-5 -mt-6 sm:-mx-10 sm:-mt-8 md:-mx-[72px] md:-mt-10 mb-8">
               <img src={heroImage} alt="" className="w-full max-h-[400px] object-cover" />
             </div>
           )}
 
-          {/* Byline */}
-          <div className="mb-8 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {writerAvatar ? (
-                <img src={writerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
-              ) : (
-                <span className="flex h-9 w-9 items-center justify-center text-xs font-medium bg-avatar-bg text-content-muted rounded-full">
-                  {writerName[0].toUpperCase()}
-                </span>
-              )}
-              <div>
-                <a href={`/${writerUsername}`} className="text-sm font-semibold text-ink hover:opacity-70 transition-opacity">{writerName}</a>
-                <p className="text-ui-xs text-content-card-faint">{publishDate}</p>
+          {/* Content column — fixed 640px, centred within the wide parchment */}
+          <div className="max-w-article mx-auto">
+
+            {/* Byline */}
+            <div className="mb-8 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {writerAvatar ? (
+                  <img src={writerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center text-xs font-medium bg-avatar-bg text-content-muted rounded-full">
+                    {writerName[0].toUpperCase()}
+                  </span>
+                )}
+                <div>
+                  <a href={`/${writerUsername}`} className="text-sm font-semibold text-ink hover:opacity-70 transition-opacity">{writerName}</a>
+                  <p className="text-ui-xs text-content-card-faint">{publishDate}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <ShareButton url={articleUrl} title={article.title} />
+                <ReportButton targetNostrEventId={article.id} />
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <ShareButton url={articleUrl} title={article.title} />
-              <ReportButton targetNostrEventId={article.id} />
-            </div>
-          </div>
 
-          {/* Title — italic Literata */}
-          <h1
-            className="mb-4"
-            style={{
-              fontFamily: '"Literata", Georgia, serif',
-              fontSize: 'clamp(2.25rem, 4vw, 3rem)',
-              fontWeight: 500,
-              fontStyle: 'italic',
-              color: '#0F1F18',
-              lineHeight: 1.1,
-              letterSpacing: '-0.025em',
-            }}
-          >
-            {article.title}
-          </h1>
+            {/* Title — italic Literata */}
+            <h1
+              className="mb-4"
+              style={{
+                fontFamily: '"Literata", Georgia, serif',
+                fontSize: 'clamp(2.25rem, 4vw, 3rem)',
+                fontWeight: 500,
+                fontStyle: 'italic',
+                color: '#0F1F18',
+                lineHeight: 1.1,
+                letterSpacing: '-0.025em',
+              }}
+            >
+              {article.title}
+            </h1>
 
-          {article.summary && (
-            <p className="font-serif text-xl text-content-secondary italic leading-relaxed mt-4 mb-2">
-              {article.summary}
-            </p>
-          )}
-
-          {/* Accent rule */}
-          <div className="rule-accent mb-10 mt-6" />
-
-          {/* Article body */}
-          <article>
-            <div ref={articleBodyRef} className="prose prose-lg prose-dropcap max-w-none" dangerouslySetInnerHTML={{ __html: freeHtml }} />
-
-            {article.isPaywalled && !isUnlocked && (
-              <PaywallGate pricePounds={pricePounds} freeAllowanceRemaining={user?.freeAllowanceRemainingPence ?? 0} hasPaymentMethod={user?.hasPaymentMethod ?? false} isLoggedIn={!!user} onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
+            {article.summary && (
+              <p className="font-serif text-xl text-content-secondary italic leading-relaxed mt-4 mb-2">
+                {article.summary}
+              </p>
             )}
 
-            {paywallBody && <div className="prose prose-lg max-w-none mt-10" dangerouslySetInnerHTML={{ __html: paywallHtml }} />}
+            {/* Accent rule */}
+            <div className="rule-accent mb-10 mt-6" />
 
-            <div className="ornament mt-16 mb-12" />
-            <ReplySection targetEventId={article.id} targetKind={30023} targetAuthorPubkey={article.pubkey} contentAuthorId={undefined} />
-          </article>
+            {/* Article body */}
+            <article>
+              <div ref={articleBodyRef} className="prose prose-lg prose-dropcap" dangerouslySetInnerHTML={{ __html: freeHtml }} />
+
+              {article.isPaywalled && !isUnlocked && (
+                <PaywallGate pricePounds={pricePounds} freeAllowanceRemaining={user?.freeAllowanceRemainingPence ?? 0} hasPaymentMethod={user?.hasPaymentMethod ?? false} isLoggedIn={!!user} onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
+              )}
+
+              {paywallBody && <div className="prose prose-lg mt-10" dangerouslySetInnerHTML={{ __html: paywallHtml }} />}
+
+              <div className="ornament mt-16 mb-12" />
+              <ReplySection targetEventId={article.id} targetKind={30023} targetAuthorPubkey={article.pubkey} contentAuthorId={undefined} />
+            </article>
+
+          </div>
         </div>
       </div>
     </div>

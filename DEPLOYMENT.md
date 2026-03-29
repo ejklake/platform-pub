@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.21.0
+# platform.pub — Deployment Reference v3.22.0
 
-**Date:** 28 March 2026
-**Replaces:** v3.20.0 (see bottom for change log)
+**Date:** 29 March 2026
+**Replaces:** v3.21.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -202,6 +202,109 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.21.0
+
+No schema changes. Services changed: **web, gateway**. New backend endpoint `GET /my/account-statement` in gateway; full visual refresh across frontend.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache web gateway
+docker compose up -d web gateway
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E 'web|gateway'
+docker logs platform-pub-web-1 --tail 5
+docker logs platform-pub-gateway-1 --tail 5
+
+# v3.22.0 — Account statement, mobile article fix, Feed nav, visual refresh
+#
+# ── Account statement endpoint (gateway) ──
+# New GET /api/v1/my/account-statement returns a unified paginated
+# statement of all credits and debits. Credits: £5 free allowance,
+# article earnings (net of platform fee), subscription earnings,
+# upvote earnings. Debits: paywall reads, subscription charges, vote
+# charges. Includes settlement events. Summary totals reset on each
+# Stripe settlement. Supports ?filter=all|credits|debits, ?limit,
+# ?offset for pagination.
+# File: gateway/src/routes/v1_6.ts
+#
+# ── Accounts tab rewrite (frontend) ──
+# AccountsTab now fetches from /my/account-statement instead of
+# assembling data client-side from multiple endpoints. Three clickable
+# summary tiles (Credits, Debits, Balance) filter the statement below.
+# Credits tile filters to income only, Debits to outgoings only,
+# Balance shows everything. Default 30 rows with "Show more" pagination.
+# Type column shows human-readable category labels.
+# File: web/src/app/dashboard/page.tsx
+#
+# ── Mobile article reader fix ──
+# Article card had hardcoded padding: 40px 72px inline style, leaving
+# ~183px for text on a 375px phone. Replaced with responsive Tailwind:
+# px-5 py-6 (mobile) → px-10 py-8 (sm) → px-[72px] py-10 (md).
+# Hero image negative margins updated to match at each breakpoint.
+# File: web/src/components/article/ArticleReader.tsx
+#
+# ── Feed link added to nav ──
+# Explicit "Feed" link added to all three nav layouts (sidebar, tablet
+# inline, mobile drawer). Positioned first, highlighted when on /feed
+# or /. Both the brand logo and Feed link navigate to /feed.
+# File: web/src/components/layout/Nav.tsx
+#
+# ── Visual refresh: dark nav, soft borders, parchment brand ──
+# Nav background: bg-surface (#EDF5F0) → bg-ink (#0F1F18). All nav
+# text flipped to light colours (text-card for active, text-content-faint
+# for inactive). Hover uses bg-content-secondary (#263D32).
+#
+# Brand logo: black border removed, now parchment box (bg-card #FFFAEF)
+# with surface-green text (#EDF5F0).
+#
+# Feed sticky area + NoteComposer: background → bg-ink. Feed tabs
+# restyled for dark background (active: parchment, inactive: muted green).
+# NoteComposer border-2 border-ink removed (borderless on dark bg).
+#
+# All border-ink references removed site-wide (~40 occurrences across
+# 20+ files). Heavy black borders replaced with border-rule (#B8D2C1,
+# soft sage). 3px rules thinned to 1px. Applies to: layout divider,
+# reply threading, comment sections, modals, dropdowns, card setup,
+# notification panel, dashboard tables, profile inputs, editor embeds.
+#
+# globals.css: hr and .rule/.rule-inset → 1px #B8D2C1. .rule-accent
+# → 1px #B8D2C1. .btn border removed, hover → #263D32. .btn-accent
+# border removed. .btn-soft border removed. .tab-pill-active bg →
+# #263D32. .tab-feed colours inverted for dark bg. Checkbox border
+# and focus → #7A9A8A / #B5242A.
+#
+# Files changed:
+#   gateway/src/routes/v1_6.ts,
+#   web/src/app/globals.css, web/src/app/layout.tsx,
+#   web/src/app/dashboard/page.tsx,
+#   web/src/app/[username]/page.tsx, web/src/app/profile/page.tsx,
+#   web/src/app/auth/verify/page.tsx,
+#   web/src/components/layout/Nav.tsx,
+#   web/src/components/article/ArticleReader.tsx,
+#   web/src/components/feed/FeedView.tsx,
+#   web/src/components/feed/NoteComposer.tsx,
+#   web/src/components/replies/ReplyItem.tsx,
+#   web/src/components/replies/ReplySection.tsx,
+#   web/src/components/replies/ReplyComposer.tsx,
+#   web/src/components/comments/CommentItem.tsx,
+#   web/src/components/comments/CommentComposer.tsx,
+#   web/src/components/comments/CommentSection.tsx,
+#   web/src/components/ui/AllowanceExhaustedModal.tsx,
+#   web/src/components/ui/VoteConfirmModal.tsx,
+#   web/src/components/ui/ShareButton.tsx,
+#   web/src/components/ui/ReportButton.tsx,
+#   web/src/components/ui/NotificationBell.tsx,
+#   web/src/components/payment/CardSetup.tsx,
+#   web/src/components/editor/EmbedNode.ts
+```
+
+---
 
 ### From v3.20.0
 
@@ -1742,6 +1845,12 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | GET | /api/v1/subscribers | session | List my subscribers (writer) |
 | PATCH | /api/v1/settings/subscription-price | session | Set subscription price |
 
+### Reader account
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | /api/v1/my/tab | session | Reader's tab balance, free allowance, and read history |
+| GET | /api/v1/my/account-statement | session | Unified account statement: all credits (free allowance, article earnings, subscription earnings, upvote earnings) and debits (paywall reads, subscription charges, vote charges). Query params: `filter=all\|credits\|debits`, `limit` (default 30, max 200), `offset`. Returns `{ summary: { creditsTotalPence, debitsTotalPence, balancePence, lastSettledAt }, entries, totalEntries, hasMore }`. Summary totals reset on each Stripe settlement |
+
 ### Portability & federation
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
@@ -1958,7 +2067,50 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 
 ## Change log
 
-### v3.19.0 — 28 March 2026
+### v3.22.0 — 29 March 2026
+
+**Account statement API, mobile article fix, Feed nav link, dark nav visual refresh**
+
+No schema changes. Services rebuilt: **web, gateway**.
+
+**New endpoint: `GET /api/v1/my/account-statement`** (gateway)
+
+Unified paginated account statement combining all credits and debits into a single feed. Credits include: £5 free allowance, article earnings (net of 8% platform fee), subscription earnings, and upvote earnings. Debits include: paywall reads, subscription charges, and vote charges. Settlement events appear as line items. Summary totals (credits, debits, balance) reset to zero on each Stripe settlement. Supports `?filter=all|credits|debits`, `?limit` (default 30, max 200), and `?offset` for pagination.
+
+**Accounts tab rewrite** (frontend)
+
+The Accounts dashboard tab now fetches from the new `/my/account-statement` endpoint instead of assembling data client-side. Three clickable summary tiles filter the itemised statement: Credits shows income only, Debits shows outgoings only, Balance shows everything. Default 30 rows with a "Show more" button for pagination. Each row shows date, category label, linked description, and signed amount.
+
+**Mobile article reader fix**
+
+The article card had hardcoded `padding: 40px 72px`, leaving ~183px for text on a 375px phone. Replaced with responsive Tailwind classes: `px-5 py-6` on mobile, `px-10 py-8` at sm, `px-[72px] py-10` at md. Hero image negative margins updated to match at each breakpoint.
+
+**Feed link added to nav**
+
+Explicit "Feed" link added to all three nav layouts (desktop sidebar, tablet inline bar, mobile drawer), positioned first below the brand. Highlighted when on `/feed` or `/`. Both the brand logo and Feed link navigate to `/feed`.
+
+**Visual refresh: dark nav, soft borders, parchment brand**
+
+- Nav and feed sticky area background changed from `bg-surface` (#EDF5F0) to `bg-ink` (#0F1F18). All nav text inverted for dark background.
+- Brand logo: black border removed. Now parchment box (`bg-card` #FFFAEF) with surface-green text (#EDF5F0).
+- Hover state across nav items, buttons, and tab pills uses intermediate green `#263D32` (`content-secondary`).
+- All `border-ink` references removed site-wide (~40 occurrences across 20+ files). Heavy black borders replaced with `border-rule` (#B8D2C1, soft sage green). 3px rules thinned to 1px.
+- `.btn` and `.btn-accent` borders removed. `.btn:hover` changed to `#263D32`.
+- `.tab-pill-active` background softened from `#0F1F18` to `#263D32`.
+- Feed tabs restyled for dark background (active: parchment text + underline).
+- NoteComposer border removed (borderless on dark background).
+- globals.css: `hr`, `.rule`, `.rule-inset`, `.rule-accent` all softened to 1px #B8D2C1.
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose build --no-cache web gateway && docker compose up -d web gateway`
+
+No migrations required.
+
+---
+
+### v3.21.0 — 28 March 2026
 
 **Security hardening, consistency fixes, notification dedup, dead code cleanup**
 

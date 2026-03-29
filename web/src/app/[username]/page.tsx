@@ -408,7 +408,7 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
 
   if (isDeleted) {
     return (
-      <div className="bg-card p-5 border-l-[3px] border-ink">
+      <div className="bg-card p-5 border-l-[3px] border-rule">
         <p className="label-ui text-content-muted mb-2">{writerName} · Reply</p>
         <p className="text-ui-xs text-content-faint italic">[Deleted]</p>
       </div>
@@ -416,7 +416,7 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
   }
 
   return (
-    <div className="bg-card p-5 border-l-[3px] border-ink">
+    <div className="bg-card p-5 border-l-[3px] border-rule">
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
         <span className="label-ui text-content-muted">{writerName} · Reply</span>

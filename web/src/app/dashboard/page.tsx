@@ -117,9 +117,9 @@ function ArticlesTab({ userId, pubkey }: { userId: string; pubkey: string }) {
   return (
     <div className="overflow-x-auto bg-card">
       <table className="w-full text-ui-xs">
-        <thead><tr className="border-b-2 border-ink/20"><th className="px-4 py-3 text-left label-ui text-content-muted">Title</th><th className="px-4 py-3 text-left label-ui text-content-muted">Status</th><th className="px-4 py-3 text-right label-ui text-content-muted">Reads</th><th className="px-4 py-3 text-right label-ui text-content-muted">Earned</th><th className="px-4 py-3 text-center label-ui text-content-muted">Replies</th><th className="px-4 py-3 text-right label-ui text-content-muted">Actions</th></tr></thead>
+        <thead><tr className="border-b-2 border-rule/50"><th className="px-4 py-3 text-left label-ui text-content-muted">Title</th><th className="px-4 py-3 text-left label-ui text-content-muted">Status</th><th className="px-4 py-3 text-right label-ui text-content-muted">Reads</th><th className="px-4 py-3 text-right label-ui text-content-muted">Earned</th><th className="px-4 py-3 text-center label-ui text-content-muted">Replies</th><th className="px-4 py-3 text-right label-ui text-content-muted">Actions</th></tr></thead>
         <tbody>{articles.map(a => (
-          <tr key={a.id} className="border-b-2 border-ink/20 last:border-b-0">
+          <tr key={a.id} className="border-b-2 border-rule/50 last:border-b-0">
             <td className="px-4 py-3"><Link href={`/article/${a.dTag}`} className="text-ink hover:opacity-70">{a.title}</Link></td>
             <td className="px-4 py-3">{a.isPaywalled ? <span className="text-content-primary">£{((a.pricePence??0)/100).toFixed(2)}</span> : <span className="text-content-muted">Free</span>}</td>
             <td className="px-4 py-3 text-right tabular-nums">{a.readCount}</td>
@@ -232,7 +232,7 @@ function CreditsTab({ userId, stripeReady }: { userId: string; stripeReady: bool
           <p className="label-ui text-content-muted mb-4">Subscribers</p>
           <div className="overflow-x-auto bg-card">
             <table className="w-full text-ui-xs">
-              <thead><tr className="border-b-2 border-ink/20">
+              <thead><tr className="border-b-2 border-rule/50">
                 <th className="px-4 py-3 text-left label-ui text-content-muted">Reader</th>
                 <th className="px-4 py-3 text-right label-ui text-content-muted">Pays</th>
                 <th className="px-4 py-3 text-right label-ui text-content-muted">Articles read</th>
@@ -241,7 +241,7 @@ function CreditsTab({ userId, stripeReady }: { userId: string; stripeReady: bool
                 <th className="px-4 py-3 text-left label-ui text-content-muted">Status</th>
               </tr></thead>
               <tbody>{subscribers.map(s => (
-                <tr key={s.subscriptionId} className="border-b-2 border-ink/20 last:border-b-0">
+                <tr key={s.subscriptionId} className="border-b-2 border-rule/50 last:border-b-0">
                   <td className="px-4 py-3">
                     <Link href={`/${s.readerUsername}`} className="text-ink hover:opacity-70">{s.readerDisplayName ?? s.readerUsername}</Link>
                   </td>
@@ -280,7 +280,7 @@ function CreditsTab({ userId, stripeReady }: { userId: string; stripeReady: bool
       <p className="label-ui text-content-muted mb-4">Per-article revenue</p>
       {loading ? <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-8 animate-pulse bg-card"/>)}</div>
       : articleEarnings.length === 0 ? <p className="text-ui-xs text-content-faint">No settled revenue yet.</p>
-      : <div className="overflow-x-auto bg-card"><table className="w-full text-ui-xs"><thead><tr className="border-b-2 border-ink/20"><th className="px-4 py-3 text-left label-ui text-content-muted">Article</th><th className="px-4 py-3 text-right label-ui text-content-muted">Reads</th><th className="px-4 py-3 text-right label-ui text-content-muted">Earned</th><th className="px-4 py-3 text-right label-ui text-content-muted">Pending</th><th className="px-4 py-3 text-right label-ui text-content-muted">Paid</th></tr></thead><tbody>{articleEarnings.map(a => <tr key={a.articleId} className="border-b-2 border-ink/20 last:border-b-0"><td className="px-4 py-3"><a href={`/article/${a.dTag}`} className="text-ink hover:opacity-70">{a.title}</a></td><td className="px-4 py-3 text-right tabular-nums">{a.readCount}</td><td className="px-4 py-3 text-right text-ink tabular-nums">£{(a.netEarningsPence/100).toFixed(2)}</td><td className="px-4 py-3 text-right text-content-faint tabular-nums">£{(a.pendingPence/100).toFixed(2)}</td><td className="px-4 py-3 text-right text-content-faint tabular-nums">£{(a.paidPence/100).toFixed(2)}</td></tr>)}</tbody></table></div>}
+      : <div className="overflow-x-auto bg-card"><table className="w-full text-ui-xs"><thead><tr className="border-b-2 border-rule/50"><th className="px-4 py-3 text-left label-ui text-content-muted">Article</th><th className="px-4 py-3 text-right label-ui text-content-muted">Reads</th><th className="px-4 py-3 text-right label-ui text-content-muted">Earned</th><th className="px-4 py-3 text-right label-ui text-content-muted">Pending</th><th className="px-4 py-3 text-right label-ui text-content-muted">Paid</th></tr></thead><tbody>{articleEarnings.map(a => <tr key={a.articleId} className="border-b-2 border-rule/50 last:border-b-0"><td className="px-4 py-3"><a href={`/article/${a.dTag}`} className="text-ink hover:opacity-70">{a.title}</a></td><td className="px-4 py-3 text-right tabular-nums">{a.readCount}</td><td className="px-4 py-3 text-right text-ink tabular-nums">£{(a.netEarningsPence/100).toFixed(2)}</td><td className="px-4 py-3 text-right text-content-faint tabular-nums">£{(a.pendingPence/100).toFixed(2)}</td><td className="px-4 py-3 text-right text-content-faint tabular-nums">£{(a.paidPence/100).toFixed(2)}</td></tr>)}</tbody></table></div>}
     </div>
   )
 }
@@ -289,116 +289,115 @@ function CreditsTab({ userId, stripeReady }: { userId: string; stripeReady: bool
 // Accounts Tab — unified incomings & outgoings with running balance
 // =============================================================================
 
-interface TabData {
-  tabBalancePence: number
-  freeAllowanceRemainingPence: number
-  lastSettledAt: string | null
-  reads: {
-    readId: string; articleTitle: string; articleDTag: string
-    writerDisplayName: string | null; writerUsername: string
-    chargePence: number; readAt: string; settledAt: string | null
-    isSubscriptionRead?: boolean
-  }[]
-}
+type StatementFilter = 'all' | 'credits' | 'debits'
 
-interface MySubscription {
-  id: string; writerId: string; writerUsername: string
-  writerDisplayName: string | null; pricePence: number
-  status: string; currentPeriodEnd: string
-}
-
-interface LedgerEntry {
+interface StatementEntry {
   id: string
   date: string
+  type: 'credit' | 'debit' | 'settlement'
+  category: string
   description: string
-  link?: string
-  amountPence: number  // positive = credit, negative = debit
-  type: 'credit' | 'debit'
+  amount_pence: number
+  link: string | null
+}
+
+interface StatementSummary {
+  creditsTotalPence: number
+  debitsTotalPence: number
+  balancePence: number
+  lastSettledAt: string | null
+}
+
+const PAGE_SIZE = 30
+
+const CATEGORY_LABELS: Record<string, string> = {
+  free_allowance: 'Free credit',
+  article_read: 'Paywall',
+  article_earning: 'Article read',
+  subscription_charge: 'Subscription',
+  subscription_earning: 'Subscriber',
+  vote_charge: 'Vote',
+  vote_earning: 'Vote income',
+  settlement: 'Settlement',
 }
 
 function AccountsTab({ userId, freeAllowancePence, hasCard }: { userId: string; freeAllowancePence: number; hasCard: boolean }) {
-  const [tabData, setTabData] = useState<TabData | null>(null)
-  const [subscriptions, setSubscriptions] = useState<MySubscription[]>([])
-  const [earnings, setEarnings] = useState<WriterEarnings | null>(null)
+  const [summary, setSummary] = useState<StatementSummary | null>(null)
+  const [entries, setEntries] = useState<StatementEntry[]>([])
+  const [totalEntries, setTotalEntries] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [filter, setFilter] = useState<StatementFilter>('all')
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      try {
-        const [tabRes, subRes, earningsRes] = await Promise.all([
-          fetch('/api/v1/my/tab', { credentials: 'include' }).catch(() => null),
-          fetch('/api/v1/subscriptions/mine', { credentials: 'include' }).catch(() => null),
-          payment.getEarnings(userId).catch(() => null),
-        ])
-        if (tabRes?.ok) setTabData(await tabRes.json())
-        if (subRes?.ok) {
-          const subData = await subRes.json()
-          setSubscriptions(subData.subscriptions ?? [])
-        }
-        if (earningsRes) setEarnings(earningsRes)
-      } catch { setError('Failed to load account data.') }
-      finally { setLoading(false) }
-    })()
-  }, [userId])
-
-  // Build unified ledger
-  const ledger: LedgerEntry[] = []
-
-  // Debits: reads
-  if (tabData) {
-    for (const r of tabData.reads) {
-      if (r.isSubscriptionRead || r.chargePence === 0) continue
-      ledger.push({
-        id: `read-${r.readId}`,
-        date: r.readAt,
-        description: r.articleTitle,
-        link: `/article/${r.articleDTag}`,
-        amountPence: -r.chargePence,
-        type: 'debit',
-      })
-    }
+  async function fetchStatement(f: StatementFilter, offset: number, append: boolean) {
+    const isInitial = offset === 0 && !append
+    if (isInitial) setLoading(true)
+    else setLoadingMore(true)
+    try {
+      const res = await fetch(
+        `/api/v1/my/account-statement?filter=${f}&limit=${PAGE_SIZE}&offset=${offset}`,
+        { credentials: 'include' }
+      )
+      if (!res.ok) throw new Error('Failed to load')
+      const data = await res.json()
+      setSummary(data.summary)
+      setEntries(prev => append ? [...prev, ...data.entries] : data.entries)
+      setTotalEntries(data.totalEntries)
+      setHasMore(data.hasMore)
+    } catch { setError('Failed to load account data.') }
+    finally { setLoading(false); setLoadingMore(false) }
   }
 
-  // Credits: earnings (we show net earnings as a single line if present)
-  if (earnings && earnings.earningsTotalPence > 0) {
-    ledger.push({
-      id: 'earnings-total',
-      date: new Date().toISOString(),
-      description: `Writer earnings (${earnings.readCount} paid reads)`,
-      amountPence: earnings.earningsTotalPence,
-      type: 'credit',
-    })
+  useEffect(() => { fetchStatement(filter, 0, false) }, [userId, filter])
+
+  function handleFilterChange(f: StatementFilter) {
+    if (f === filter) return
+    setFilter(f)
   }
 
-  // Sort by date, most recent first
-  ledger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-
-  // Compute balance
-  const totalCredits = ledger.filter(e => e.type === 'credit').reduce((s, e) => s + e.amountPence, 0)
-  const totalDebits = ledger.filter(e => e.type === 'debit').reduce((s, e) => s + Math.abs(e.amountPence), 0)
-  const netBalancePence = totalCredits - totalDebits + freeAllowancePence
+  function handleLoadMore() {
+    fetchStatement(filter, entries.length, true)
+  }
 
   if (loading) {
     return <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-10 animate-pulse bg-card" />)}</div>
   }
 
+  const creditsPence = summary?.creditsTotalPence ?? 0
+  const debitsPence = summary?.debitsTotalPence ?? 0
+  const balancePence = summary?.balancePence ?? 0
+
   return (
     <div>
-      {/* Balance summary */}
+      {/* Summary tiles — clickable to filter */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-10">
-        <Card label="Credits" pence={totalCredits + freeAllowancePence} sub={earnings ? `${earnings.readCount} paid reads + free allowance` : 'Free allowance'} primary />
-        <Card label="Debits" pence={totalDebits} sub={`${tabData?.reads.filter(r => !r.isSubscriptionRead && r.chargePence > 0).length ?? 0} paid reads`} accent />
-        <div className="p-6 bg-card border-t-[3px] border-ink">
-          <p className="label-ui mb-2 text-content-muted">Balance</p>
-          <p className={`font-serif text-2xl font-light ${netBalancePence >= 0 ? 'text-ink' : 'text-accent'}`}>
-            {netBalancePence < 0 ? '−' : ''}£{(Math.abs(netBalancePence)/100).toFixed(2)}
-          </p>
-          <p className="mt-1 text-ui-xs text-content-faint">
-            {netBalancePence >= 0 ? 'In credit' : 'Outstanding'}
-          </p>
-        </div>
+        <button onClick={() => handleFilterChange('credits')} className="text-left">
+          <div className={`p-6 transition-shadow ${filter === 'credits' ? 'bg-ink ring-2 ring-content-secondary' : 'bg-ink'}`}>
+            <p className="label-ui mb-2 text-content-faint">Credits</p>
+            <p className="font-serif text-2xl font-light text-surface">£{(creditsPence/100).toFixed(2)}</p>
+            <p className="mt-1 text-ui-xs text-content-faint">All income{summary?.lastSettledAt ? ' since last settlement' : ''}</p>
+          </div>
+        </button>
+        <button onClick={() => handleFilterChange('debits')} className="text-left">
+          <div className={`p-6 bg-surface-deep transition-shadow ${filter === 'debits' ? 'ring-2 ring-accent' : ''}`}>
+            <p className="label-ui mb-2 text-accent-dark">Debits</p>
+            <p className="font-serif text-2xl font-light text-accent-dark">£{(debitsPence/100).toFixed(2)}</p>
+            <p className="mt-1 text-ui-xs text-accent">All outgoings{summary?.lastSettledAt ? ' since last settlement' : ''}</p>
+          </div>
+        </button>
+        <button onClick={() => handleFilterChange('all')} className="text-left">
+          <div className={`p-6 bg-card transition-shadow ${filter === 'all' ? 'ring-2 ring-content-secondary' : ''}`}>
+            <p className="label-ui mb-2 text-content-muted">Balance</p>
+            <p className={`font-serif text-2xl font-light ${balancePence >= 0 ? 'text-ink' : 'text-accent'}`}>
+              {balancePence < 0 ? '−' : ''}£{(Math.abs(balancePence)/100).toFixed(2)}
+            </p>
+            <p className="mt-1 text-ui-xs text-content-faint">
+              {balancePence >= 0 ? 'In credit' : 'Outstanding'}
+            </p>
+          </div>
+        </button>
       </div>
 
       {error && <div className="bg-card px-4 py-3 text-ui-xs text-content-primary mb-8">{error}</div>}
@@ -409,39 +408,39 @@ function AccountsTab({ userId, freeAllowancePence, hasCard }: { userId: string; 
         </div>
       )}
 
-      {/* Active subscriptions */}
-      {subscriptions.filter(s => s.status === 'active').length > 0 && (
-        <div className="mb-10">
-          <p className="label-ui text-content-muted mb-4">Active subscriptions</p>
-          <div className="space-y-2">
-            {subscriptions.filter(s => s.status === 'active').map(sub => (
-              <div key={sub.id} className="flex items-center justify-between bg-card px-4 py-3">
-                <Link href={`/${sub.writerUsername}`} className="text-ui-sm text-ink hover:opacity-70">{sub.writerDisplayName ?? sub.writerUsername}</Link>
-                <span className="text-ui-xs text-accent font-medium tabular-nums">£{(sub.pricePence/100).toFixed(2)}/mo</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Unified ledger */}
-      {ledger.length > 0 ? (
+      {/* Account statement */}
+      {entries.length > 0 ? (
         <>
-          <p className="label-ui text-content-muted mb-4">Transaction history</p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="label-ui text-content-muted">
+              {filter === 'credits' ? 'Income' : filter === 'debits' ? 'Outgoings' : 'Account statement'}
+            </p>
+            {filter !== 'all' && (
+              <button onClick={() => handleFilterChange('all')} className="text-ui-xs text-content-faint hover:text-ink underline underline-offset-4">
+                Show all
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto bg-card">
             <table className="w-full text-ui-xs">
               <thead>
-                <tr className="border-b-2 border-ink/20">
+                <tr className="border-b-2 border-rule/50">
                   <th className="px-4 py-3 text-left label-ui text-content-muted">Date</th>
+                  <th className="px-4 py-3 text-left label-ui text-content-muted">Type</th>
                   <th className="px-4 py-3 text-left label-ui text-content-muted">Description</th>
                   <th className="px-4 py-3 text-right label-ui text-content-muted">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {ledger.map(entry => (
-                  <tr key={entry.id} className="border-b-2 border-ink/20 last:border-b-0">
+                {entries.map(entry => (
+                  <tr key={entry.id} className="border-b-2 border-rule/50 last:border-b-0">
                     <td className="px-4 py-3 text-content-faint whitespace-nowrap">
-                      {new Date(entry.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {new Date(entry.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`text-ui-xs ${entry.type === 'credit' ? 'text-ink' : entry.type === 'settlement' ? 'text-content-muted' : 'text-accent-dark'}`}>
+                        {CATEGORY_LABELS[entry.category] ?? entry.category}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {entry.link ? (
@@ -450,14 +449,29 @@ function AccountsTab({ userId, freeAllowancePence, hasCard }: { userId: string; 
                         <span className="text-ink">{entry.description}</span>
                       )}
                     </td>
-                    <td className={`px-4 py-3 text-right tabular-nums font-medium ${entry.type === 'credit' ? 'text-ink' : 'text-accent'}`}>
-                      {entry.type === 'credit' ? '+' : '−'}£{(Math.abs(entry.amountPence)/100).toFixed(2)}
+                    <td className={`px-4 py-3 text-right tabular-nums font-medium ${
+                      entry.type === 'credit' ? 'text-ink'
+                      : entry.type === 'settlement' ? 'text-content-muted'
+                      : 'text-accent'
+                    }`}>
+                      {entry.type === 'credit' ? '+' : entry.type === 'settlement' ? '−' : '−'}£{(Math.abs(entry.amount_pence)/100).toFixed(2)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {hasMore && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="text-ui-xs text-ink underline underline-offset-4 hover:opacity-70 disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : `Show more (${totalEntries - entries.length} remaining)`}
+              </button>
+            </div>
+          )}
         </>
       ) : !error && (
         <div className="py-20 text-center">
@@ -488,7 +502,7 @@ function SettingsTab() {
 // =============================================================================
 
 function Card({ label, pence, sub, primary=false, accent=false }: { label: string; pence: number; sub: string; primary?: boolean; accent?: boolean }) {
-  const bg = primary ? 'bg-ink' : accent ? 'bg-surface-deep border-l-[3px] border-accent' : 'bg-card'
+  const bg = primary ? 'bg-ink' : accent ? 'bg-surface-deep' : 'bg-card'
   const labelColor = primary ? 'text-content-faint' : accent ? 'text-accent-dark' : 'text-content-muted'
   const valueColor = primary ? 'text-surface' : accent ? 'text-accent-dark' : 'text-ink'
   const subColor = primary ? 'text-content-faint' : accent ? 'text-accent' : 'text-content-faint'

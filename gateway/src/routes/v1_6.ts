@@ -41,4 +41,266 @@ export async function v1_6Routes(app: FastifyInstance) {
       return reply.status(500).send({ error: 'Failed to fetch tab data' })
     }
   })
+
+  // =========================================================================
+  // GET /my/account-statement — unified credits, debits & paginated statement
+  // =========================================================================
+  app.get<{ Querystring: { filter?: string; limit?: string; offset?: string } }>(
+    '/my/account-statement',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const userId = req.session!.sub!
+      const filter = req.query.filter ?? 'all' // 'all' | 'credits' | 'debits'
+      const limit = Math.min(parseInt(req.query.limit ?? '30', 10) || 30, 200)
+      const offset = parseInt(req.query.offset ?? '0', 10) || 0
+
+      try {
+        // 1. Account info + last settlement date
+        const accountRow = await pool.query<{
+          created_at: string
+          free_allowance_remaining_pence: number
+        }>(
+          `SELECT created_at, free_allowance_remaining_pence FROM accounts WHERE id = $1`,
+          [userId]
+        )
+        if (accountRow.rowCount === 0) {
+          return reply.status(404).send({ error: 'Account not found' })
+        }
+        const account = accountRow.rows[0]
+
+        const settlementRow = await pool.query<{ settled_at: string }>(
+          `SELECT settled_at FROM tab_settlements WHERE reader_id = $1 ORDER BY settled_at DESC LIMIT 1`,
+          [userId]
+        )
+        const lastSettledAt = settlementRow.rows[0]?.settled_at ?? null
+
+        // Platform fee rate
+        const configRow = await pool.query<{ value: string }>(
+          `SELECT value FROM platform_config WHERE key = 'platform_fee_bps'`
+        )
+        const feeBps = parseInt(configRow.rows[0]?.value ?? '800', 10)
+
+        // 2. Build the unified statement via UNION ALL
+        //    Each sub-query produces: id, date, type, category, description, amount_pence, link
+        const sinceClause = lastSettledAt ? `AND $3::timestamptz IS NOT NULL` : `AND ($3::timestamptz IS NULL OR TRUE)`
+        // We pass lastSettledAt as $3 but use it conditionally in the summary query
+
+        const statementSQL = `
+          WITH statement AS (
+            -- Free allowance credit (initial £5)
+            SELECT
+              'free-allowance' AS id,
+              a.created_at AS date,
+              'credit' AS type,
+              'free_allowance' AS category,
+              'Starting credit' AS description,
+              500 AS amount_pence,
+              NULL AS link
+            FROM accounts a
+            WHERE a.id = $1
+
+            UNION ALL
+
+            -- Article read debits (reader pays to read)
+            SELECT
+              'read-' || re.id AS id,
+              re.read_at AS date,
+              'debit' AS type,
+              'article_read' AS category,
+              art.title AS description,
+              re.amount_pence,
+              '/article/' || art.nostr_d_tag AS link
+            FROM read_events re
+            JOIN articles art ON art.id = re.article_id
+            WHERE re.reader_id = $1
+              AND re.amount_pence > 0
+              AND re.is_subscription_read = FALSE
+
+            UNION ALL
+
+            -- Article earning credits (writer earns from readers, after platform fee)
+            SELECT
+              'earning-' || re.id AS id,
+              re.read_at AS date,
+              'credit' AS type,
+              'article_earning' AS category,
+              COALESCE(reader.display_name, reader.username, 'Reader') || ' read ' || art.title AS description,
+              (re.amount_pence - FLOOR(re.amount_pence * ${feeBps} / 10000))::int AS amount_pence,
+              '/article/' || art.nostr_d_tag AS link
+            FROM read_events re
+            JOIN articles art ON art.id = re.article_id
+            JOIN accounts reader ON reader.id = re.reader_id
+            WHERE re.writer_id = $1
+              AND re.reader_id != $1
+              AND re.amount_pence > 0
+              AND re.state IN ('platform_settled', 'writer_paid')
+
+            UNION ALL
+
+            -- Subscription charge debits (reader pays for subscription)
+            SELECT
+              'subcharge-' || se.id AS id,
+              se.created_at AS date,
+              'debit' AS type,
+              'subscription_charge' AS category,
+              'Subscription to ' || COALESCE(w.display_name, w.username) AS description,
+              se.amount_pence,
+              '/' || w.username AS link
+            FROM subscription_events se
+            JOIN accounts w ON w.id = se.writer_id
+            WHERE se.reader_id = $1
+              AND se.event_type = 'subscription_charge'
+
+            UNION ALL
+
+            -- Subscription earning credits (writer earns from subscriber)
+            SELECT
+              'subearning-' || se.id AS id,
+              se.created_at AS date,
+              'credit' AS type,
+              'subscription_earning' AS category,
+              'Subscriber: ' || COALESCE(r.display_name, r.username) AS description,
+              se.amount_pence,
+              '/' || r.username AS link
+            FROM subscription_events se
+            JOIN accounts r ON r.id = se.reader_id
+            WHERE se.writer_id = $1
+              AND se.event_type = 'subscription_earning'
+
+            UNION ALL
+
+            -- Vote charge debits (voter pays)
+            SELECT
+              'votecharge-' || vc.id AS id,
+              vc.created_at AS date,
+              'debit' AS type,
+              'vote_charge' AS category,
+              CASE v.direction WHEN 'up' THEN 'Upvote' ELSE 'Downvote' END
+                || COALESCE(': ' || art.title, '') AS description,
+              vc.amount_pence::int AS amount_pence,
+              CASE WHEN art.nostr_d_tag IS NOT NULL THEN '/article/' || art.nostr_d_tag ELSE NULL END AS link
+            FROM vote_charges vc
+            JOIN votes v ON v.id = vc.vote_id
+            LEFT JOIN articles art ON art.nostr_event_id = v.target_nostr_event_id
+            WHERE vc.voter_id = $1
+
+            UNION ALL
+
+            -- Vote earning credits (author receives upvote money)
+            SELECT
+              'voteearning-' || vc.id AS id,
+              vc.created_at AS date,
+              'credit' AS type,
+              'vote_earning' AS category,
+              'Upvote from ' || COALESCE(voter.display_name, voter.username, 'Someone')
+                || COALESCE(' on ' || art.title, '') AS description,
+              vc.amount_pence::int AS amount_pence,
+              CASE WHEN art.nostr_d_tag IS NOT NULL THEN '/article/' || art.nostr_d_tag ELSE NULL END AS link
+            FROM vote_charges vc
+            JOIN votes v ON v.id = vc.vote_id
+            JOIN accounts voter ON voter.id = vc.voter_id
+            LEFT JOIN articles art ON art.nostr_event_id = v.target_nostr_event_id
+            WHERE vc.recipient_id = $1
+
+            UNION ALL
+
+            -- Settlements (balance cleared via Stripe)
+            SELECT
+              'settlement-' || ts.id AS id,
+              ts.settled_at AS date,
+              'settlement' AS type,
+              'settlement' AS category,
+              'Balance settled' AS description,
+              ts.amount_pence,
+              NULL AS link
+            FROM tab_settlements ts
+            WHERE ts.reader_id = $1
+          )
+          SELECT * FROM statement
+          ${filter === 'credits' ? "WHERE type = 'credit'" : filter === 'debits' ? "WHERE type = 'debit'" : ''}
+          ORDER BY date DESC
+        `
+
+        // Get total count for pagination
+        const countSQL = `SELECT COUNT(*) AS total FROM (${statementSQL}) AS counted`
+        const countResult = await pool.query<{ total: string }>(countSQL, [userId])
+        const totalEntries = parseInt(countResult.rows[0].total, 10)
+
+        // Get paginated entries
+        const entriesResult = await pool.query(
+          `${statementSQL} LIMIT $2 OFFSET $3`,
+          [userId, limit, offset]
+        )
+
+        // 3. Compute summary totals (since last settlement, unfiltered)
+        const summarySQL = `
+          WITH statement AS (
+            SELECT 'credit' AS type, 500 AS amount_pence, a.created_at AS date
+            FROM accounts a WHERE a.id = $1
+
+            UNION ALL
+
+            SELECT 'debit', re.amount_pence, re.read_at
+            FROM read_events re
+            WHERE re.reader_id = $1 AND re.amount_pence > 0 AND re.is_subscription_read = FALSE
+
+            UNION ALL
+
+            SELECT 'credit', (re.amount_pence - FLOOR(re.amount_pence * ${feeBps} / 10000))::int, re.read_at
+            FROM read_events re
+            WHERE re.writer_id = $1 AND re.reader_id != $1 AND re.amount_pence > 0
+              AND re.state IN ('platform_settled', 'writer_paid')
+
+            UNION ALL
+
+            SELECT 'debit', se.amount_pence, se.created_at
+            FROM subscription_events se
+            WHERE se.reader_id = $1 AND se.event_type = 'subscription_charge'
+
+            UNION ALL
+
+            SELECT 'credit', se.amount_pence, se.created_at
+            FROM subscription_events se
+            WHERE se.writer_id = $1 AND se.event_type = 'subscription_earning'
+
+            UNION ALL
+
+            SELECT 'debit', vc.amount_pence::int, vc.created_at
+            FROM vote_charges vc WHERE vc.voter_id = $1
+
+            UNION ALL
+
+            SELECT 'credit', vc.amount_pence::int, vc.created_at
+            FROM vote_charges vc WHERE vc.recipient_id = $1
+          )
+          SELECT
+            COALESCE(SUM(CASE WHEN type = 'credit' THEN amount_pence ELSE 0 END), 0) AS credits_total,
+            COALESCE(SUM(CASE WHEN type = 'debit' THEN amount_pence ELSE 0 END), 0) AS debits_total
+          FROM statement
+          WHERE date > COALESCE($2::timestamptz, '1970-01-01'::timestamptz)
+        `
+        const summaryResult = await pool.query<{ credits_total: string; debits_total: string }>(
+          summarySQL,
+          [userId, lastSettledAt]
+        )
+        const creditsTotalPence = parseInt(summaryResult.rows[0].credits_total, 10)
+        const debitsTotalPence = parseInt(summaryResult.rows[0].debits_total, 10)
+
+        return reply.send({
+          summary: {
+            creditsTotalPence,
+            debitsTotalPence,
+            balancePence: creditsTotalPence - debitsTotalPence,
+            lastSettledAt,
+          },
+          entries: entriesResult.rows,
+          totalEntries,
+          hasMore: offset + limit < totalEntries,
+        })
+      } catch (err) {
+        req.log.error({ err }, 'Failed to fetch account statement')
+        return reply.status(500).send({ error: 'Failed to fetch account statement' })
+      }
+    }
+  )
 }

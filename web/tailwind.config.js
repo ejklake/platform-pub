@@ -60,7 +60,7 @@ module.exports = {
       },
       maxWidth: {
         article: '640px',
-        'article-frame': '740px',
+        'article-frame': '960px',
         feed: '780px',
         'editor-frame': '780px',
         content: '960px',
