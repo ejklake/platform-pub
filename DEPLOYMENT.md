@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.23.0
+# platform.pub — Deployment Reference v3.24.0
 
-**Date:** 29 March 2026
-**Replaces:** v3.22.0 (see bottom for change log)
+**Date:** 30 March 2026
+**Replaces:** v3.23.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -202,6 +202,52 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.23.0
+
+No schema changes. Services changed: **web** and **gateway**. Feed composer UI fixes, crimson brand nav, Postmark magic-link email configured.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache web
+docker compose up -d web
+docker compose restart gateway
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "web|gateway"
+docker logs platform-pub-web-1 --tail 5
+docker logs platform-pub-gateway-1 --tail 5
+
+# v3.24.0 — NoteComposer cleanup, mobile sticky fix, crimson brand, magic link email
+#
+# ── NoteComposer keyline removed ──
+# Removed bg-card background and mb-4 margin from NoteComposer wrapper.
+# The composer now blends into the nav background (bg-nav) with no
+# visible card edge or gap underneath.
+# File: web/src/components/feed/NoteComposer.tsx
+#
+# ── Mobile sticky fix ──
+# Feed container top padding changed from pt-16 (64px) to pt-[53px]
+# to match the sticky offset (top-[53px]). Eliminates the 11px shift
+# where the composer would start lower and jump up before locking.
+# File: web/src/components/feed/FeedView.tsx
+#
+# ── Brand nav: parchment → crimson ──
+# "Platform" logo text and border changed from parchment (#FFFAEF) to
+# crimson (#B5242A). Sits against the pale green nav background.
+# File: web/src/components/layout/Nav.tsx
+#
+# ── Magic link email (gateway .env) ──
+# EMAIL_PROVIDER set to postmark, POSTMARK_API_KEY configured,
+# EMAIL_FROM set to login@platform.pub. Gateway restart required
+# to pick up .env changes (not in git).
+```
+
+---
 
 ### From v3.22.0
 
