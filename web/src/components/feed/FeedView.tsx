@@ -195,7 +195,7 @@ export function FeedView() {
   if (loading || !user) return <FeedSkeleton />
 
   return (
-    <div className="mx-auto max-w-feed pt-16 lg:pt-0">
+    <div className="mx-auto max-w-feed pt-[53px] lg:pt-0">
 
       {/* Sticky zone: composer + tabs */}
       <div className="sticky top-[53px] lg:top-0 z-10 bg-nav">

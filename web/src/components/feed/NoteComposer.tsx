@@ -77,7 +77,7 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
   }
 
   return (
-    <div className="bg-card p-4 mb-4">
+    <div className="p-4">
       <div className="flex gap-3">
         {user.avatar
           ? <img src={user.avatar} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />

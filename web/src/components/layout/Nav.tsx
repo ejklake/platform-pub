@@ -71,8 +71,8 @@ export function Nav() {
             fontSize: '28px',
             fontWeight: '600',
             letterSpacing: '-0.02em',
-            color: '#FFFAEF',
-            border: '1.5px solid #FFFAEF',
+            color: '#B5242A',
+            border: '1.5px solid #B5242A',
           }}
         >
           Platform
