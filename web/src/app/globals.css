@@ -20,7 +20,7 @@
 
   hr {
     border: none;
-    height: 1px;
+    height: 2px;
     background: #B8D2C1;
   }
 
@@ -87,7 +87,7 @@
     @apply text-center select-none;
     font-family: 'IBM Plex Mono', monospace;
     letter-spacing: 0.5em;
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     color: #B5242A;
   }
   .ornament::before {
@@ -97,18 +97,18 @@
   /* ----- Rules ----- */
   .rule {
     border: none;
-    height: 1px;
+    height: 2px;
     background: #B8D2C1;
   }
   .rule-inset {
     border: none;
-    height: 1px;
+    height: 1.5px;
     background: #B8D2C1;
     margin-left: 1.5rem;
     margin-right: 1.5rem;
   }
   .rule-accent {
-    border-top: 1px solid #B8D2C1;
+    border-top: 2.5px solid #B8D2C1;
   }
 
   /* ----- Label styles ----- */
@@ -122,35 +122,35 @@
 
   .label-muted {
     font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: #4A6B5A;
+    color: #3D5E4D;
   }
 
   /* ----- Feed tabs (on nav green background) ----- */
   .tab-feed {
     font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.8125rem;
-    font-weight: 400;
-    padding: 0.5rem 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    padding: 0.625rem 1.25rem;
     margin-right: 1.25rem;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
     background: transparent;
     cursor: pointer;
     transition: color 0.15s ease;
-    color: #7A9A8A;
-    margin-bottom: -2px;
+    color: #6B8E7A;
+    margin-bottom: -3px;
   }
   .tab-feed-active {
     color: #0F1F18;
-    font-weight: 600;
+    font-weight: 700;
     border-bottom-color: #0F1F18;
   }
   .tab-feed:hover:not(.tab-feed-active) {
-    color: #4A6B5A;
+    color: #3D5E4D;
   }
 
   /* ----- Dashboard tab pills ----- */
@@ -185,17 +185,22 @@
     background: #0F1F18;
     color: #FFFFFF;
     font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 1rem;
+    font-weight: 600;
     letter-spacing: 0.01em;
     text-transform: none;
     border: none;
+    border-bottom: 3px solid #060e0a;
     border-radius: 2px;
-    padding: 0.75rem 2rem;
-    transition: background-color 0.15s ease;
+    padding: 1rem 2.5rem;
+    transition: background-color 0.15s ease, transform 0.08s ease;
     cursor: pointer;
   }
   .btn:hover { background: #263D32; }
+  .btn:active {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+  }
   .btn:focus-visible {
     outline: 2px solid #B5242A;
     outline-offset: 2px;
@@ -206,17 +211,22 @@
     background: #B5242A;
     color: #FFFFFF;
     font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 1rem;
+    font-weight: 600;
     letter-spacing: 0.01em;
     text-transform: none;
     border: none;
+    border-bottom: 3px solid #8A1B20;
     border-radius: 2px;
-    padding: 0.75rem 2rem;
-    transition: background-color 0.15s ease;
+    padding: 1rem 2.5rem;
+    transition: background-color 0.15s ease, transform 0.08s ease;
     cursor: pointer;
   }
   .btn-accent:hover { background: #921D22; }
+  .btn-accent:active {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+  }
   .btn-accent:focus-visible {
     outline: 2px solid #0F1F18;
     outline-offset: 2px;
@@ -227,23 +237,30 @@
     background: transparent;
     color: #0F1F18;
     font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 1rem;
+    font-weight: 600;
     letter-spacing: 0.01em;
     text-transform: none;
-    border: none;
+    border: 1.5px solid #B8D2C1;
     border-radius: 2px;
-    padding: 0.75rem 2rem;
-    transition: background-color 0.15s ease;
+    padding: 1rem 2.5rem;
+    transition: background-color 0.15s ease, transform 0.08s ease;
     cursor: pointer;
   }
   .btn-soft:hover {
     background: #263D32;
     color: #FFFFFF;
+    border-color: #263D32;
   }
   .btn-soft:focus-visible {
     outline: 2px solid #B5242A;
     outline-offset: 2px;
+  }
+
+  /* Small button variant */
+  .btn-sm {
+    font-size: 0.875rem;
+    padding: 0.625rem 1.5rem;
   }
 
   /* ----- Focus ring utility ----- */

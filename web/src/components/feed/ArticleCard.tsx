@@ -54,36 +54,38 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
   return (
     <div
       onClick={handleCardClick}
-      style={{ background: '#FFFAEF', cursor: 'pointer' }}
-      className="p-[22px_28px]"
+      style={{ background: '#FFFAEF', cursor: 'pointer', borderLeft: '4px solid transparent', borderBottom: '2.5px solid #B8D2C1', transition: 'border-left-color 0.12s ease' }}
+      className="p-[1.5rem_1.75rem] hover:!border-l-accent"
+      onMouseEnter={e => (e.currentTarget.style.borderLeftColor = '#B5242A')}
+      onMouseLeave={e => (e.currentTarget.style.borderLeftColor = 'transparent')}
     >
       {/* Writer name label */}
       {authorHref ? (
         <Link
           href={authorHref}
           onClick={(e) => e.stopPropagation()}
-          style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8A8578', marginBottom: '10px', display: 'inline-block' }}
+          style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8A8578', marginBottom: '10px', display: 'inline-block' }}
         >
           {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
         </Link>
       ) : (
-        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8A8578', marginBottom: '10px' }}>
+        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8A8578', marginBottom: '10px' }}>
           {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
         </p>
       )}
 
       {/* Headline — italic Literata */}
-      <h2 style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '26px', fontWeight: 500, fontStyle: 'italic', color: '#0F1F18', lineHeight: 1.2, letterSpacing: '-0.02em', marginBottom: '10px' }}>
+      <h2 style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '28px', fontWeight: 500, fontStyle: 'italic', color: '#0F1F18', lineHeight: 1.2, letterSpacing: '-0.02em', marginBottom: '10px' }}>
         {article.title}
       </h2>
 
       {/* Excerpt — sans-serif */}
-      <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '14.5px', fontWeight: 400, color: '#263D32', lineHeight: 1.6, marginBottom: '14px' }}>
+      <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '16px', fontWeight: 400, color: '#263D32', lineHeight: 1.6, marginBottom: '14px' }}>
         {excerpt}
       </p>
 
       {/* Metadata line */}
-      <div className="flex items-center gap-3" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', color: '#ACA69C' }}>
+      <div className="flex items-center gap-3" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', color: '#ACA69C' }}>
         <time dateTime={new Date(article.publishedAt * 1000).toISOString()}>{formatDate(article.publishedAt)}</time>
         <span style={{ opacity: 0.4 }}>/</span>
         <span>{readMinutes} min</span>

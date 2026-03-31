@@ -29,10 +29,10 @@ export function Nav() {
 
   // Desktop sidebar link style (on nav green background)
   function sidebarLinkClass(path: string) {
-    return `block font-sans text-[15px] py-3 pr-5 transition-colors w-full ${
+    return `block font-sans text-[17px] py-[14px] pr-5 transition-colors w-full ${
       isActive(path)
-        ? 'pl-[14px] border-l-2 border-accent text-ink font-semibold'
-        : 'pl-4 text-content-faint hover:text-content-secondary hover:bg-nav-hover'
+        ? 'pl-[calc(1.25rem-4px)] border-l-4 border-accent text-ink font-bold'
+        : 'pl-5 border-l-4 border-transparent font-medium text-content-faint hover:text-content-secondary hover:bg-nav-hover'
     }`
   }
 
@@ -53,7 +53,7 @@ export function Nav() {
   const logoHref = user ? '/feed' : '/'
 
   return (
-    <header className="fixed z-50 bg-nav top-0 left-0 right-0 lg:right-auto lg:bottom-0 lg:w-[240px] lg:flex lg:flex-col">
+    <header className="fixed z-50 bg-nav top-0 left-0 right-0 lg:right-auto lg:bottom-0 lg:w-[240px] lg:flex lg:flex-col lg:border-r-2 lg:border-rule">
 
       {/* ================================================================
           TOP BAR — visible below lg breakpoint
@@ -66,13 +66,13 @@ export function Nav() {
           className="flex-shrink-0"
           style={{
             fontFamily: '"Literata", Georgia, serif',
-            padding: '5px 14px 7px',
+            padding: '5px 15px 8px',
             lineHeight: '1.1',
-            fontSize: '28px',
-            fontWeight: '600',
+            fontSize: '30px',
+            fontWeight: '700',
             letterSpacing: '-0.02em',
             color: '#B5242A',
-            border: '1.5px solid #B5242A',
+            border: '3.5px solid #B5242A',
           }}
         >
           Platform
@@ -114,7 +114,7 @@ export function Nav() {
                 {user.avatar ? (
                   <img src={user.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-6 w-6 items-center justify-center bg-surface-deep text-[10px] font-medium text-content-secondary rounded-full">
+                  <span className="flex h-6 w-6 items-center justify-center bg-surface-deep text-[12px] font-medium text-content-secondary rounded-full">
                     {(user.displayName ?? user.username ?? '?')[0].toUpperCase()}
                   </span>
                 )}
@@ -165,7 +165,7 @@ export function Nav() {
                 {user.avatar ? (
                   <img src={user.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-6 w-6 items-center justify-center bg-surface-deep text-[10px] font-medium text-content-secondary rounded-full">
+                  <span className="flex h-6 w-6 items-center justify-center bg-surface-deep text-[12px] font-medium text-content-secondary rounded-full">
                     {(user.displayName ?? user.username ?? '?')[0].toUpperCase()}
                   </span>
                 )}
@@ -221,8 +221,8 @@ export function Nav() {
             ) : (
               <button
                 onClick={() => setSearchOpen(true)}
-                className={`block font-sans text-[15px] py-3 pl-4 pr-5 transition-colors w-full text-left ${
-                  isActive('/search') ? 'pl-[14px] border-l-2 border-accent text-ink font-semibold' : 'text-content-faint hover:text-content-secondary hover:bg-nav-hover'
+                className={`block font-sans text-[17px] py-[14px] pl-5 pr-5 transition-colors w-full text-left border-l-4 ${
+                  isActive('/search') ? 'pl-[calc(1.25rem-4px)] border-accent text-ink font-bold' : 'border-transparent font-medium text-content-faint hover:text-content-secondary hover:bg-nav-hover'
                 }`}
               >
                 Search
@@ -241,26 +241,26 @@ export function Nav() {
 
       {/* Sidebar bottom — user info */}
       {user && (
-        <div className="hidden lg:block px-5 py-4 space-y-3">
+        <div className="hidden lg:block px-5 py-4 space-y-3 border-t-2 border-rule">
           <Link href="/profile" className="flex items-center gap-2 group">
             {user.avatar ? (
               <img src={user.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
             ) : (
-              <span className="flex h-7 w-7 items-center justify-center bg-surface-deep text-[10px] font-medium text-content-faint rounded-full flex-shrink-0">
+              <span className="flex h-7 w-7 items-center justify-center bg-surface-deep text-[12px] font-medium text-content-faint rounded-full flex-shrink-0">
                 {(user.displayName ?? user.username ?? '?')[0].toUpperCase()}
               </span>
             )}
             <div className="min-w-0">
-              <p className="font-sans text-xs text-content-faint leading-tight truncate group-hover:text-content-secondary transition-colors">
+              <p className="font-sans text-[14px] text-content-faint leading-tight truncate group-hover:text-content-secondary transition-colors">
                 {user.displayName ?? user.username}
               </p>
-              <p className="text-[11px] text-content-muted tabular-nums">
+              <p className="text-[13px] text-content-muted tabular-nums">
                 £{(user.freeAllowanceRemainingPence / 100).toFixed(2)}
               </p>
             </div>
           </Link>
 
-          <button onClick={logout} className="text-xs text-content-faint hover:text-content-secondary transition-colors">
+          <button onClick={logout} className="text-[13px] text-content-faint hover:text-content-secondary transition-colors">
             Log out
           </button>
         </div>

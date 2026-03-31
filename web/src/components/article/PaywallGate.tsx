@@ -38,18 +38,21 @@ export function PaywallGate({ pricePounds, freeAllowanceRemaining, hasPaymentMet
 
   return (
     <div className="my-16 -mx-[48px]">
-      {/* Gradient fade from parchment to surface-deep */}
-      <div className="relative h-20 -mt-20 pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent, #DDEEE4)' }} />
+      {/* Gradient fade — 100px tall */}
+      <div className="relative h-[100px] -mt-[100px] pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent, #DDEEE4)' }} />
 
-      <div className="px-8 py-12 text-center" style={{ background: '#DDEEE4' }}>
+      <div
+        className="px-8 py-12 text-center"
+        style={{ background: '#DDEEE4', borderTop: '3px solid #B5242A', borderBottom: '3px solid #B5242A' }}
+      >
         {/* Ornament */}
-        <div className="text-center mb-6" style={{ fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.5em', fontSize: '0.6875rem', color: '#B5242A', userSelect: 'none' }}>· · ·</div>
+        <div className="text-center mb-6" style={{ fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.5em', fontSize: '0.75rem', color: '#B5242A', userSelect: 'none' }}>· · ·</div>
 
-        <h2 style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '20px', fontWeight: 400, color: '#0F1F18', marginBottom: '12px' }}>{heading}</h2>
-        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', color: '#4A6B5A', maxWidth: '24rem', margin: '0 auto 2rem', lineHeight: 1.6 }}>{subtext}</p>
+        <h2 style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '26px', fontWeight: 400, color: '#0F1F18', marginBottom: '12px' }}>{heading}</h2>
+        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '15px', color: '#3D5E4D', maxWidth: '24rem', margin: '0 auto 2rem', lineHeight: 1.6 }}>{subtext}</p>
 
         {showPrice && pricePounds && (
-          <p style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '28px', fontWeight: 400, color: '#0F1F18', marginBottom: '1.5rem' }}>£{pricePounds}</p>
+          <p style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '40px', fontWeight: 400, color: '#0F1F18', marginBottom: '1.5rem' }}>£{pricePounds}</p>
         )}
 
         {error && (
@@ -65,7 +68,7 @@ export function PaywallGate({ pricePounds, freeAllowanceRemaining, hasPaymentMet
           {unlocking ? 'Unlocking...' : buttonLabel}
         </button>
 
-        <div className="mt-8 flex items-center justify-center gap-4" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '12px', color: '#7A9A8A' }}>
+        <div className="mt-8 flex items-center justify-center gap-4" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', fontWeight: 500, color: '#6B8E7A' }}>
           <span>No subscription</span>
           <span style={{ opacity: 0.4 }}>/</span>
           <span>Pay per read</span>

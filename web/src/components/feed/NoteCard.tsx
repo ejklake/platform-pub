@@ -50,7 +50,7 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
     >
       <p style={{ fontFamily: '"Literata", Georgia, serif', fontStyle: 'italic', fontSize: '13.5px', color: '#263D32', lineHeight: 1.5 }}>{note.quotedExcerpt}</p>
       {(note.quotedTitle || note.quotedAuthor) && (
-        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 400, color: '#ACA69C', marginTop: '4px' }}>
+        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', fontWeight: 400, color: '#ACA69C', marginTop: '4px' }}>
           {note.quotedTitle ?? ''}
           {note.quotedTitle && note.quotedAuthor ? ' · ' : ''}
           {note.quotedAuthor && authorUsername ? (
@@ -158,7 +158,7 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
                 {writerInfo?.displayName ?? note.pubkey.slice(0, 12) + '...'}
               </span>
             )}
-            <span style={{ fontSize: '12px', color: '#7A9A8A' }}>
+            <span style={{ fontSize: '13px', color: '#6B8E7A' }}>
               {formatDate(note.publishedAt)}
             </span>
             {isAuthor && (
@@ -167,8 +167,8 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
                 disabled={deleting}
                 className="ml-auto px-2.5 py-0.5 disabled:opacity-40 transition-colors"
                 style={confirmDelete
-                  ? { fontSize: '12px', color: '#B5242A', fontWeight: 500 }
-                  : { fontSize: '12px', color: '#7A9A8A' }
+                  ? { fontSize: '13px', color: '#B5242A', fontWeight: 500 }
+                  : { fontSize: '13px', color: '#6B8E7A' }
                 }
               >
                 {deleting ? '...' : confirmDelete ? 'Confirm?' : 'Delete'}
@@ -180,7 +180,7 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
           {displayContent && (
             <p
               className="whitespace-pre-wrap mt-1"
-              style={{ fontSize: '15px', color: '#0F1F18', lineHeight: '1.55' }}
+              style={{ fontSize: '16px', color: '#0F1F18', lineHeight: '1.55' }}
             >
               {displayContent}
             </p>
@@ -210,7 +210,7 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
           ) : null}
 
           {/* Action labels — plain text */}
-          <div className="mt-3 flex items-center gap-4" style={{ fontSize: '12px', color: '#7A9A8A' }}>
+          <div className="mt-3 flex items-center gap-4" style={{ fontSize: '13px', color: '#6B8E7A' }}>
             <button
               onClick={() => setShowComposer(c => !c)}
               className="hover:text-ink transition-colors"

@@ -81,7 +81,7 @@ export default function AuthPage() {
 
   return (
     <div className="mx-auto max-w-sm px-6 py-28">
-      <h1 className="font-serif text-2xl font-medium text-ink mb-2 tracking-tight">
+      <h1 className="font-serif font-medium text-ink mb-2 tracking-tight" style={{ fontSize: '28px' }}>
         {mode === 'signup' ? 'Create your account' : 'Welcome back'}
       </h1>
       <p className="text-mono-xs text-content-secondary mb-10">
@@ -98,7 +98,8 @@ export default function AuthPage() {
 
       <a
         href="/api/v1/auth/google"
-        className="flex w-full items-center justify-center gap-3 bg-card px-4 py-2.5 text-mono-xs text-content-primary hover:bg-surface-deep transition-colors"
+        className="flex w-full items-center justify-center gap-3 bg-card px-4 py-[14px] text-mono-xs text-content-primary hover:bg-surface-deep transition-colors"
+        style={{ border: '1.5px solid #B8D2C1' }}
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -120,19 +121,19 @@ export default function AuthPage() {
 
       <form onSubmit={mode === 'signup' ? handleSignup : handleLogin} className="space-y-5">
         <div>
-          <label htmlFor="email" className="label-muted block mb-2">Email</label>
-          <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-card px-3 py-2.5 text-mono-sm text-content-primary focus:outline-none" placeholder="you@example.com" />
+          <label htmlFor="email" className="label-muted block mb-2" style={{ fontSize: '13px' }}>Email</label>
+          <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-card px-4 py-[14px] text-content-primary focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #B8D2C1' }} placeholder="you@example.com" />
         </div>
 
         {mode === 'signup' && (
           <>
             <div>
-              <label htmlFor="displayName" className="label-muted block mb-2">Display name</label>
-              <input id="displayName" type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-card px-3 py-2.5 text-mono-sm text-content-primary focus:outline-none" placeholder="Your Name" />
+              <label htmlFor="displayName" className="label-muted block mb-2" style={{ fontSize: '13px' }}>Display name</label>
+              <input id="displayName" type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-card px-4 py-[14px] text-content-primary focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #B8D2C1' }} placeholder="Your Name" />
             </div>
             <div>
-              <label htmlFor="username" className="label-muted block mb-2">Username</label>
-              <input id="username" type="text" required pattern="^[a-z0-9_-]+$" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} className="w-full bg-card px-3 py-2.5 text-mono-sm text-content-primary focus:outline-none" placeholder="yourname" />
+              <label htmlFor="username" className="label-muted block mb-2" style={{ fontSize: '13px' }}>Username</label>
+              <input id="username" type="text" required pattern="^[a-z0-9_-]+$" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} className="w-full bg-card px-4 py-[14px] text-content-primary focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #B8D2C1' }} placeholder="yourname" />
               <p className="mt-2 text-mono-xs text-content-muted">yourname.platform.pub</p>
             </div>
           </>

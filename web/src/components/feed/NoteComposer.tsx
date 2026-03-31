@@ -77,7 +77,7 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
   }
 
   return (
-    <div className="bg-card p-4">
+    <div className="bg-card" style={{ border: '1.5px solid #B8D2C1', padding: '0.875rem 1.25rem' }}>
       <div className="flex gap-3">
         {user.avatar
           ? <img src={user.avatar} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
@@ -96,7 +96,7 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost() } }}
             placeholder={activeQuote ? 'Add your thoughts...' : "What's on your mind?"}
             rows={2}
-            className="w-full resize-none bg-transparent text-[0.9375rem] text-content-primary placeholder:text-content-faint focus:outline-none leading-relaxed"
+            className="w-full resize-none bg-transparent text-[15px] text-content-primary placeholder:text-content-faint focus:outline-none leading-relaxed"
           />
 
           {/* Quote preview */}

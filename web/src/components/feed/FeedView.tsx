@@ -206,7 +206,7 @@ export function FeedView() {
             onClearQuote={() => setPendingQuote(null)}
           />
         </div>
-        <div className="flex px-6 pt-1 border-b border-content-muted">
+        <div className="flex px-6 pt-1 border-b-2 border-rule">
           <button
             onClick={() => setActiveTab('for-you')}
             className={`tab-feed ${activeTab === 'for-you' ? 'tab-feed-active' : ''}`}
@@ -244,7 +244,7 @@ export function FeedView() {
                   return <NewUserCard key={`new-user-${item.username}-${item.joinedAt}`} item={item} />
                 } else if (item.type === 'article') {
                   return (
-                    <div key={item.id} className={idx > 0 ? 'mt-[10px]' : ''}>
+                    <div key={item.id} className="">
                       <ArticleCard article={item} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
                     </div>
                   )
@@ -266,7 +266,7 @@ export function FeedView() {
           <div className="px-6">
             {feedItems.map((item, idx) => item.type === 'article'
               ? (
-                <div key={item.id} className={idx > 0 ? 'mt-[10px]' : ''}>
+                <div key={item.id} className="">
                   <ArticleCard article={item} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
                 </div>
               )
@@ -291,7 +291,7 @@ function NewUserCard({ item }: { item: NewUserItem }) {
       {item.avatar ? (
         <img src={item.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
       ) : (
-        <span className="flex h-7 w-7 items-center justify-center bg-avatar-bg text-[10px] font-medium text-content-muted rounded-full flex-shrink-0">
+        <span className="flex h-7 w-7 items-center justify-center bg-avatar-bg text-[12px] font-medium text-content-muted rounded-full flex-shrink-0">
           {initial}
         </span>
       )}

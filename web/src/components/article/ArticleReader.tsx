@@ -209,8 +209,8 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
                   </span>
                 )}
                 <div>
-                  <a href={`/${writerUsername}`} className="text-sm font-semibold text-ink hover:opacity-70 transition-opacity">{writerName}</a>
-                  <p className="text-ui-xs text-content-card-faint">{publishDate}</p>
+                  <a href={`/${writerUsername}`} className="text-[14px] font-semibold text-ink hover:opacity-70 transition-opacity">{writerName}</a>
+                  <p className="text-[13px] text-content-card-faint">{publishDate}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
