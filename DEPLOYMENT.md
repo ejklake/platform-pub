@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.25.0
+# platform.pub — Deployment Reference v3.26.0
 
 **Date:** 31 March 2026
-**Replaces:** v3.24.0 (see bottom for change log)
+**Replaces:** v3.25.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -202,6 +202,148 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.25.0
+
+No schema changes. No new migrations. Services changed: **web only** (frontend-only visual refresh). Deploy order: **web**.
+
+This release implements Design Spec v2 — a comprehensive visual refresh ("chunky, robust, spirited") across the entire frontend. No backend changes.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache web
+docker compose up -d web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep web
+docker logs platform-pub-web-1 --tail 5
+
+# v3.26.0 — Design Spec v2: chunky, robust, spirited visual refresh
+#
+# ── Colour tokens updated ──
+# content-muted darkened/warmed: #4A6B5A → #3D5E4D
+# content-faint darkened/warmed: #7A9A8A → #6B8E7A
+# File: web/tailwind.config.js
+#
+# ── Rules & dividers thickened ──
+# .rule: 1px → 2px. .rule-inset: 1px → 1.5px. .rule-accent: 1px → 2.5px.
+# hr base style: 1px → 2px. Sidebar right border: 1px → 2px.
+# Feed tab underline border: 1px → 2px (border-rule).
+# Article cards gain 2.5px bottom border (#B8D2C1).
+# Paywall gate gains 3px top/bottom borders (#B5242A).
+# Sidebar user section gains 2px top border (#B8D2C1).
+# File: web/src/app/globals.css
+#
+# ── Buttons overhauled — typewriter-key depress effect ──
+# All three button variants (.btn, .btn-accent, .btn-soft) upgraded:
+# font-size 0.875rem → 1rem, font-weight 500 → 600,
+# padding 0.75rem 2rem → 1rem 2.5rem.
+# .btn gains border-bottom: 3px solid #060e0a (shadow ledge).
+# .btn-accent gains border-bottom: 3px solid #8A1B20.
+# .btn-soft gains border: 1.5px solid #B8D2C1 (visible outline).
+# All gain :active { transform: translateY(2px); border-bottom-width: 1px }
+# for physical keypress feel.
+# New .btn-sm modifier: font-size 0.875rem, padding 0.625rem 1.5rem.
+# File: web/src/app/globals.css
+#
+# ── Feed tabs resized ──
+# Font size: 0.8125rem → 0.9375rem (15px).
+# Inactive weight: 400 → 500. Active weight: 600 → 700.
+# Active underline: 2px → 3px. Padding: 0.5rem 0 → 0.625rem 1.25rem.
+# Updated colour refs to new content-faint/content-muted values.
+# File: web/src/app/globals.css
+#
+# ── Ornament size bumped ──
+# · · · ornament: 0.6875rem → 0.75rem.
+# File: web/src/app/globals.css
+#
+# ── Wordmark / logo heavier ──
+# Font size: 28px → 30px. Font weight: 600 → 700.
+# Border: 1.5px → 3.5px. Padding: 5px 14px 7px → 5px 15px 8px.
+# File: web/src/components/layout/Nav.tsx
+#
+# ── Sidebar navigation updated ──
+# Link font size: 15px → 17px. Link padding: py-3 → py-[14px].
+# Active border: 2px → 4px. Inactive links gain invisible 4px left
+# border for alignment. Active weight: semibold → bold.
+# Inactive weight: default → medium (500).
+# User name: text-xs → 14px. Balance: 11px → 13px. Logout: 13px.
+# Avatar initials minimum: 10px → 12px (all nav sections).
+# Sidebar right border: added 2px border-rule on lg+.
+# File: web/src/components/layout/Nav.tsx
+#
+# ── Article cards restyled ──
+# Left border: 4px solid transparent, → accent (#B5242A) on hover.
+# Bottom border: 2.5px solid #B8D2C1 (cards stack with gap:0).
+# Author label: 11px/600 → 13px/700, letter-spacing 0.04em → 0.05em.
+# Headline: 26px → 28px. Excerpt: 14.5px → 16px.
+# Metadata line: 11px → 13px.
+# Feed card spacing: mt-[10px] gap removed (bottom borders separate).
+# Files: web/src/components/feed/ArticleCard.tsx,
+#        web/src/components/feed/FeedView.tsx
+#
+# ── Homepage: three new sections added ──
+# Section 2 — Manifesto ("THE DEAL"): IBM Plex Mono label, crimson
+# accent rule, four Literata italic statements separated by rules.
+# Section 3 — How it works: green container (#DDEEE4) with 1.5px
+# border, three-column responsive grid (01/02/03 steps).
+# Section 4 — Featured writers: mono label, 3 article cards from
+# new /api/v1/feed/featured endpoint, "Read the feed →" btn-soft.
+# CTA button changed from .btn to .btn-accent.
+# New component: web/src/components/home/FeaturedWriters.tsx
+# Files: web/src/app/page.tsx,
+#        web/src/components/home/FeaturedWriters.tsx (new)
+#
+# ── Paywall gate redesigned ──
+# Gradient fade: 80px → 100px. Top/bottom borders: 3px solid #B5242A.
+# Heading: 20px → 26px. Price: 28px → 40px. Subtext: 13px → 15px.
+# Trust signals: 12px → 13px, weight 500. Ornament: 0.75rem.
+# Colour refs updated to new content-muted/faint values.
+# File: web/src/components/article/PaywallGate.tsx
+#
+# ── Auth page inputs bordered ──
+# Heading: text-2xl (24px) → 28px. All inputs gain
+# border: 1.5px solid #B8D2C1, padding px-3 py-2.5 → px-4 py-[14px],
+# font-size text-mono-sm → 16px. Google button gains same border
+# and padding. Labels: 12px → 13px.
+# File: web/src/app/auth/page.tsx
+#
+# ── Note composer bordered ──
+# Container gains border: 1.5px solid #B8D2C1.
+# Padding standardised to 0.875rem 1.25rem. Font: 15px.
+# File: web/src/components/feed/NoteComposer.tsx
+#
+# ── NoteCard type scale consistency ──
+# Note body: 15px → 16px. Timestamp: 12px → 13px.
+# Action labels: 12px → 13px. Delete button: 12px → 13px.
+# Excerpt pennant metadata: 11px → 13px.
+# Colour refs updated to new content-faint (#6B8E7A).
+# File: web/src/components/feed/NoteCard.tsx
+#
+# ── ArticleReader byline pass ──
+# Author name: text-sm → 14px. Publish date: text-ui-xs → 13px.
+# File: web/src/components/article/ArticleReader.tsx
+#
+# Files changed:
+#   web/tailwind.config.js
+#   web/src/app/globals.css
+#   web/src/app/page.tsx
+#   web/src/app/auth/page.tsx
+#   web/src/components/layout/Nav.tsx
+#   web/src/components/feed/ArticleCard.tsx
+#   web/src/components/feed/FeedView.tsx
+#   web/src/components/feed/NoteCard.tsx
+#   web/src/components/feed/NoteComposer.tsx
+#   web/src/components/article/PaywallGate.tsx
+#   web/src/components/article/ArticleReader.tsx
+#   web/src/components/home/FeaturedWriters.tsx (new)
+```
+
+---
 
 ### From v3.24.0
 
