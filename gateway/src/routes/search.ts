@@ -70,14 +70,14 @@ async function searchArticles(
     title: string
     summary: string | null
     word_count: number | null
-    is_paywalled: boolean
+    access_mode: string
     published_at: Date
     writer_username: string
     writer_display_name: string | null
     similarity: number
   }>(
     `SELECT a.id, a.nostr_event_id, a.nostr_d_tag, a.title, a.summary,
-            a.word_count, a.is_paywalled, a.published_at,
+            a.word_count, a.access_mode, a.published_at,
             w.username AS writer_username,
             w.display_name AS writer_display_name,
             similarity(a.title, $1) AS similarity
@@ -103,7 +103,8 @@ async function searchArticles(
     title: r.title,
     summary: r.summary,
     wordCount: r.word_count,
-    isPaywalled: r.is_paywalled,
+    accessMode: r.access_mode,
+    isPaywalled: r.access_mode === 'paywalled',
     publishedAt: r.published_at.toISOString(),
     writer: {
       username: r.writer_username,

@@ -27,7 +27,7 @@ export async function historyRoutes(app: FastifyInstance) {
       slug: string | null
       nostr_d_tag: string | null
       word_count: number | null
-      is_paywalled: boolean
+      access_mode: string
       writer_username: string | null
       writer_display_name: string | null
       writer_avatar: string | null
@@ -41,7 +41,7 @@ export async function historyRoutes(app: FastifyInstance) {
            a.slug,
            a.nostr_d_tag,
            a.word_count,
-           a.is_paywalled,
+           a.access_mode,
            w.username          AS writer_username,
            w.display_name      AS writer_display_name,
            w.avatar_blossom_url AS writer_avatar
@@ -63,7 +63,8 @@ export async function historyRoutes(app: FastifyInstance) {
       slug: r.slug,
       dTag: r.nostr_d_tag,
       wordCount: r.word_count,
-      isPaywalled: r.is_paywalled,
+      accessMode: r.access_mode,
+      isPaywalled: r.access_mode === 'paywalled',
       writer: {
         username: r.writer_username,
         displayName: r.writer_display_name,

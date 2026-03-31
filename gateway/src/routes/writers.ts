@@ -111,13 +111,13 @@ export async function writerRoutes(app: FastifyInstance) {
         summary: string | null
         content_free: string | null
         word_count: number | null
-        is_paywalled: boolean
+        access_mode: string
         price_pence: number | null
         gate_position_pct: number | null
         published_at: Date | null
       }>(
         `SELECT id, nostr_event_id, nostr_d_tag, title, slug, summary,
-                content_free, word_count, is_paywalled, price_pence,
+                content_free, word_count, access_mode, price_pence,
                 gate_position_pct, published_at
          FROM articles
          WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL
@@ -134,7 +134,8 @@ export async function writerRoutes(app: FastifyInstance) {
         slug: r.slug,
         summary: r.summary,
         wordCount: r.word_count,
-        isPaywalled: r.is_paywalled,
+        accessMode: r.access_mode,
+        isPaywalled: r.access_mode === 'paywalled',
         publishedAt: r.published_at?.toISOString() ?? null,
       }))
 

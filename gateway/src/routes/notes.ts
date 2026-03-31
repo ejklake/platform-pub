@@ -218,7 +218,7 @@ export async function noteRoutes(app: FastifyInstance) {
         // Check articles table
         const articleResult = await pool.query(
           `SELECT ar.nostr_event_id, ar.title, ar.nostr_d_tag, ar.summary,
-                  ar.content_free, ar.is_paywalled, ar.published_at,
+                  ar.content_free, ar.access_mode, ar.published_at,
                   a.username, a.display_name, a.avatar
            FROM articles ar
            JOIN accounts a ON a.id = ar.writer_id
@@ -236,7 +236,8 @@ export async function noteRoutes(app: FastifyInstance) {
             eventId: row.nostr_event_id,
             title: row.title,
             dTag: row.nostr_d_tag,
-            isPaywalled: row.is_paywalled,
+            accessMode: row.access_mode,
+            isPaywalled: row.access_mode === 'paywalled',
             content: contentSnippet,
             publishedAt: Math.floor(new Date(row.published_at).getTime() / 1000),
             author: {
@@ -268,7 +269,7 @@ export async function noteRoutes(app: FastifyInstance) {
         pool.query(`
           SELECT
             a.nostr_event_id, a.nostr_d_tag, a.title, a.summary, a.content_free,
-            a.is_paywalled, a.price_pence, a.gate_position_pct,
+            a.access_mode, a.price_pence, a.gate_position_pct,
             EXTRACT(EPOCH FROM a.published_at)::bigint AS published_at,
             acc.nostr_pubkey
           FROM articles a
@@ -311,7 +312,8 @@ export async function noteRoutes(app: FastifyInstance) {
           title: row.title,
           summary: row.summary ?? '',
           contentFree: row.content_free ?? '',
-          isPaywalled: row.is_paywalled,
+          accessMode: row.access_mode,
+          isPaywalled: row.access_mode === 'paywalled',
           pricePence: row.price_pence ?? undefined,
           gatePositionPct: row.gate_position_pct ?? undefined,
           publishedAt: Number(row.published_at),

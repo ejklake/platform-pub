@@ -110,8 +110,8 @@ CREATE TABLE articles (
   word_count            INT,
   tier                  content_tier NOT NULL DEFAULT 'tier1',
 
-  -- Paywall
-  is_paywalled          BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Access control
+  access_mode           TEXT NOT NULL DEFAULT 'public',  -- 'public' | 'paywalled' | 'invitation_only'
   price_pence           INT,                    -- NULL = free; price in pence
   gate_position_pct     INT CHECK (gate_position_pct BETWEEN 1 AND 99), -- default 50
   vault_event_id        TEXT UNIQUE,            -- Nostr event ID of kind 39701 vault
@@ -125,8 +125,10 @@ CREATE TABLE articles (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  CONSTRAINT paywalled_has_price CHECK (
-    (is_paywalled = FALSE) OR (is_paywalled = TRUE AND price_pence IS NOT NULL)
+  CONSTRAINT access_mode_price CHECK (
+    (access_mode = 'public') OR
+    (access_mode = 'paywalled' AND price_pence IS NOT NULL) OR
+    (access_mode = 'invitation_only')
   )
 );
 

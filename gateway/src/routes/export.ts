@@ -91,11 +91,11 @@ export async function exportRoutes(app: FastifyInstance) {
       nostr_event_id: string
       nostr_d_tag: string
       title: string
-      is_paywalled: boolean
+      access_mode: string
       price_pence: number | null
       published_at: Date
     }>(
-      `SELECT id, nostr_event_id, nostr_d_tag, title, is_paywalled, price_pence, published_at
+      `SELECT id, nostr_event_id, nostr_d_tag, title, access_mode, price_pence, published_at
        FROM articles
        WHERE writer_id = $1
          AND deleted_at IS NULL
@@ -141,7 +141,8 @@ export async function exportRoutes(app: FastifyInstance) {
         nostrEventId: a.nostr_event_id,
         dTag: a.nostr_d_tag,
         title: a.title,
-        isPaywalled: a.is_paywalled,
+        accessMode: a.access_mode,
+        isPaywalled: a.access_mode === 'paywalled',
         pricePence: a.price_pence ?? 0,
         publishedAt: a.published_at.toISOString(),
         // Content key info — present only for paywalled articles

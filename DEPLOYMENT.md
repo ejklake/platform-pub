@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.24.0
+# platform.pub — Deployment Reference v3.25.0
 
-**Date:** 30 March 2026
-**Replaces:** v3.23.0 (see bottom for change log)
+**Date:** 31 March 2026
+**Replaces:** v3.24.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -170,7 +170,7 @@ Verify:
 docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\dt"
 ```
 
-You should see 24+ tables.
+You should see 33+ tables.
 
 ### 5. Build and start all services
 
@@ -202,6 +202,110 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.24.0
+
+Schema changes: three new migrations (015, 016, 017). Services changed: **gateway only** (no web/frontend changes). Deploy order: **migrations → gateway**.
+
+This release adds five new backend features:
+
+1. **`access_mode` replaces `is_paywalled`** — The `articles.is_paywalled` boolean is replaced with `articles.access_mode` (`'public'` | `'paywalled'` | `'invitation_only'`). All gateway routes updated. API responses include both `accessMode` (new) and `isPaywalled` (computed, backwards-compatible).
+
+2. **Free passes** — Authors can grant free access to paywalled articles via `POST /api/v1/articles/:articleId/free-pass`. Creates an `article_unlocks` row with `unlocked_via = 'author_grant'`. No `read_event`, no tab charge.
+
+3. **Invitation-only articles** — Articles with `access_mode = 'invitation_only'` cannot be purchased. The gate-pass endpoint returns `403 invitation_required` instead of proceeding to payment. Access is granted via the free pass route.
+
+4. **Direct messages** — NIP-17 E2E encrypted conversations. New tables: `conversations`, `conversation_members`, `direct_messages`, `dm_pricing`. Routes: create conversations, send/list/read messages. Block checking, mute filtering, DM pricing (anti-spam). NIP-17 gift-wrapped events published to relay async.
+
+5. **Pledge drives** — Crowdfunding and commissions as first-class feed items. New tables: `pledge_drives`, `pledges` with `drive_status`/`drive_origin`/`pledge_status` enums. Full lifecycle: create → pledge → accept/decline (commissions) → publish → async fulfilment → fulfilled/expired/cancelled. Pledges are commitments, not charges — money only moves on fulfilment via the existing `read_events` → `reading_tabs` → `tab_settlements` pipeline. Auto-unpin on terminal state. Deadline expiry via `expireOverdueDrives()`.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply migrations in order
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/015_access_mode_and_unlock_types.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/016_direct_messages.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/017_pledge_drives.sql
+
+# 2. Rebuild and restart gateway
+docker compose build --no-cache gateway
+docker compose up -d gateway
+```
+
+Verify:
+```bash
+docker logs platform-pub-gateway-1 --tail 5
+curl -s http://localhost:3000/health
+# Should return {"status":"ok","service":"gateway"}
+
+# Verify schema changes applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name = 'articles' AND column_name = 'access_mode';"
+# Should return 1 row
+
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "\dt conversations; \dt pledge_drives; \dt dm_pricing;"
+# Should show all three tables
+```
+
+New gateway routes:
+```
+# Free passes
+POST   /api/v1/articles/:articleId/free-pass
+DELETE /api/v1/articles/:articleId/free-pass/:userId
+GET    /api/v1/articles/:articleId/free-passes
+
+# Direct messages
+POST   /api/v1/conversations
+POST   /api/v1/conversations/:id/members
+GET    /api/v1/messages
+GET    /api/v1/messages/:conversationId
+POST   /api/v1/messages/:conversationId
+POST   /api/v1/messages/:messageId/read
+
+# Pledge drives
+POST   /api/v1/drives
+GET    /api/v1/drives/:id
+PUT    /api/v1/drives/:id
+DELETE /api/v1/drives/:id
+POST   /api/v1/drives/:id/pledge
+DELETE /api/v1/drives/:id/pledge
+POST   /api/v1/drives/:id/accept
+POST   /api/v1/drives/:id/decline
+POST   /api/v1/drives/:id/pin
+GET    /api/v1/drives/by-user/:userId
+GET    /api/v1/my/pledges
+```
+
+Files changed:
+```
+# New files
+gateway/src/routes/free-passes.ts    — free pass routes
+gateway/src/routes/messages.ts       — DM routes
+gateway/src/routes/drives.ts         — pledge drive routes + fulfilment + expiry
+migrations/015_access_mode_and_unlock_types.sql
+migrations/016_direct_messages.sql
+migrations/017_pledge_drives.sql
+
+# Modified files
+gateway/src/index.ts                 — register new route modules
+gateway/src/routes/articles.ts       — access_mode, invitation_required, drive trigger
+gateway/src/routes/writers.ts        — access_mode
+gateway/src/routes/search.ts         — access_mode
+gateway/src/routes/history.ts        — access_mode
+gateway/src/routes/export.ts         — access_mode
+gateway/src/routes/notes.ts          — access_mode
+schema.sql                           — access_mode replaces is_paywalled
+seed.sql                             — access_mode
+```
+
+---
 
 ### From v3.23.0
 

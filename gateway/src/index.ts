@@ -24,6 +24,9 @@ import { exportRoutes } from './routes/export.js'
 import { notificationRoutes } from './routes/notifications.js'
 import { voteRoutes } from './routes/votes.js'
 import { historyRoutes } from './routes/history.js'
+import { freePassRoutes } from './routes/free-passes.js'
+import { messageRoutes } from './routes/messages.js'
+import { driveRoutes } from './routes/drives.js'
 import { pool } from '../shared/src/db/client.js'
 import logger from '../shared/src/lib/logger.js'
 
@@ -121,6 +124,15 @@ async function start() {
 
   // Reading history (list previously-read articles for the current reader)
   await app.register(historyRoutes, { prefix: '/api/v1' })
+
+  // Free passes (author-granted access to paywalled/invitation-only articles)
+  await app.register(freePassRoutes, { prefix: '/api/v1' })
+
+  // Direct messages (NIP-17 E2E encrypted conversations)
+  await app.register(messageRoutes, { prefix: '/api/v1' })
+
+  // Pledge drives (crowdfunding, commissions)
+  await app.register(driveRoutes, { prefix: '/api/v1' })
 
   // ---------------------------------------------------------------------------
   // Service proxies

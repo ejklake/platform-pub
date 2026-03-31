@@ -5,6 +5,7 @@ import { requireAuth, optionalAuth } from '../middleware/auth.js'
 import { checkArticleAccess, recordSubscriptionRead, recordPurchaseUnlock } from '../services/access.js'
 import { signEvent } from '../lib/key-custody-client.js'
 import { publishToRelay } from '../lib/nostr-publisher.js'
+import { checkAndTriggerDriveFulfilment } from './drives.js'
 import logger from '../../shared/src/lib/logger.js'
 
 // =============================================================================
@@ -30,10 +31,11 @@ const IndexArticleSchema = z.object({
   title: z.string().min(1),
   summary: z.string().optional(),
   content: z.string(),                // free section content
-  isPaywalled: z.boolean(),
+  accessMode: z.enum(['public', 'paywalled', 'invitation_only']).default('public'),
   pricePence: z.number().int().min(0),
   gatePositionPct: z.number().int().min(0).max(99),
   vaultEventId: z.string().optional(),
+  draftId: z.string().optional(),
 })
 
 export async function articleRoutes(app: FastifyInstance) {
@@ -66,11 +68,13 @@ export async function articleRoutes(app: FastifyInstance) {
     const wordCount = data.content.split(/\s+/).filter(Boolean).length
 
     try {
+      const isGated = data.accessMode === 'paywalled'
+
       const result = await pool.query<{ id: string }>(
         `INSERT INTO articles (
            writer_id, nostr_event_id, nostr_d_tag, title, slug, summary,
            content_free, word_count, tier,
-           is_paywalled, price_pence, gate_position_pct, vault_event_id,
+           access_mode, price_pence, gate_position_pct, vault_event_id,
            published_at
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'tier1', $9, $10, $11, $12, now())
          ON CONFLICT (writer_id, nostr_d_tag) WHERE deleted_at IS NULL DO UPDATE SET
@@ -80,7 +84,7 @@ export async function articleRoutes(app: FastifyInstance) {
            summary = EXCLUDED.summary,
            content_free = EXCLUDED.content_free,
            word_count = EXCLUDED.word_count,
-           is_paywalled = EXCLUDED.is_paywalled,
+           access_mode = EXCLUDED.access_mode,
            price_pence = EXCLUDED.price_pence,
            gate_position_pct = EXCLUDED.gate_position_pct,
            vault_event_id = EXCLUDED.vault_event_id,
@@ -95,19 +99,26 @@ export async function articleRoutes(app: FastifyInstance) {
           data.summary ?? null,
           data.content,
           wordCount,
-          data.isPaywalled,
-          data.isPaywalled ? data.pricePence : null,
-          data.isPaywalled ? data.gatePositionPct : null,
+          data.accessMode,
+          isGated ? data.pricePence : null,
+          isGated ? data.gatePositionPct : null,
           data.vaultEventId ?? null,
         ]
       )
 
+      const articleId = result.rows[0].id
+
       logger.info(
-        { articleId: result.rows[0].id, writerId, nostrEventId: data.nostrEventId },
+        { articleId, writerId, nostrEventId: data.nostrEventId },
         'Article indexed'
       )
 
-      return reply.status(201).send({ articleId: result.rows[0].id })
+      // Check if this article is linked to a pledge drive and trigger fulfilment
+      checkAndTriggerDriveFulfilment(writerId, articleId, data.draftId ?? null).catch(err => {
+        logger.error({ err, articleId, writerId }, 'Drive fulfilment trigger failed')
+      })
+
+      return reply.status(201).send({ articleId })
     } catch (err) {
       logger.error({ err, writerId }, 'Article indexing failed')
       return reply.status(500).send({ error: 'Indexing failed' })
@@ -136,7 +147,7 @@ export async function articleRoutes(app: FastifyInstance) {
         slug: string
         summary: string | null
         word_count: number | null
-        is_paywalled: boolean
+        access_mode: string
         price_pence: number | null
         gate_position_pct: number | null
         vault_event_id: string | null
@@ -148,7 +159,7 @@ export async function articleRoutes(app: FastifyInstance) {
       }>(
         `SELECT a.id, a.writer_id, a.nostr_event_id, a.nostr_d_tag,
                 a.title, a.slug, a.summary, a.word_count,
-                a.is_paywalled, a.price_pence, a.gate_position_pct,
+                a.access_mode, a.price_pence, a.gate_position_pct,
                 a.vault_event_id, a.published_at,
                 w.username AS writer_username,
                 w.display_name AS writer_display_name,
@@ -174,7 +185,8 @@ export async function articleRoutes(app: FastifyInstance) {
         slug: r.slug,
         summary: r.summary,
         wordCount: r.word_count,
-        isPaywalled: r.is_paywalled,
+        accessMode: r.access_mode,
+        isPaywalled: r.access_mode === 'paywalled',
         pricePence: r.price_pence,
         gatePositionPct: r.gate_position_pct,
         vaultEventId: r.vault_event_id,
@@ -269,9 +281,9 @@ export async function articleRoutes(app: FastifyInstance) {
           id: string
           writer_id: string
           price_pence: number
-          is_paywalled: boolean
+          access_mode: string
         }>(
-          `SELECT id, writer_id, price_pence, is_paywalled
+          `SELECT id, writer_id, price_pence, access_mode
            FROM articles WHERE nostr_event_id = $1`,
           [nostrEventId]
         )
@@ -281,8 +293,8 @@ export async function articleRoutes(app: FastifyInstance) {
         }
 
         const article = articleRow.rows[0]
-        if (!article.is_paywalled) {
-          return reply.status(400).send({ error: 'Article is not paywalled' })
+        if (article.access_mode === 'public') {
+          return reply.status(400).send({ error: 'Article is not gated' })
         }
 
         // Check for free access (own content, permanent unlock, subscription)
@@ -319,6 +331,14 @@ export async function articleRoutes(app: FastifyInstance) {
             algorithm: keyResult.algorithm,
             isReissuance: access.reason === 'already_unlocked',
             ciphertext: keyResult.ciphertext ?? undefined,
+          })
+        }
+
+        // Invitation-only articles cannot be purchased — access is by author grant only
+        if (article.access_mode === 'invitation_only') {
+          return reply.status(403).send({
+            error: 'invitation_required',
+            message: 'This is a private article. Contact the author to request access.',
           })
         }
 
@@ -485,7 +505,7 @@ export async function articleRoutes(app: FastifyInstance) {
     try {
       const { rows } = await pool.query(
         `SELECT a.id, a.title, a.slug, a.nostr_d_tag AS d_tag,
-                a.nostr_event_id, a.is_paywalled, a.price_pence,
+                a.nostr_event_id, a.access_mode, a.price_pence,
                 a.word_count, a.published_at, a.comments_enabled,
                 COALESCE(c.cnt, 0)::int AS comment_count,
                 COALESCE(r.read_count, 0)::int AS read_count,
@@ -515,7 +535,8 @@ export async function articleRoutes(app: FastifyInstance) {
           slug: r.slug,
           dTag: r.d_tag,
           nostrEventId: r.nostr_event_id,
-          isPaywalled: r.is_paywalled,
+          accessMode: r.access_mode,
+          isPaywalled: r.access_mode === 'paywalled',
           pricePence: r.price_pence,
           wordCount: r.word_count,
           publishedAt: r.published_at?.toISOString() ?? null,
