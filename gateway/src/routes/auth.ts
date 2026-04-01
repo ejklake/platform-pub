@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { signup, SignupSchema, getAccount, updateProfile, connectStripeAccount, connectPaymentMethod } from '../../shared/src/auth/accounts.js'
 import { createSession, destroySession } from '../../shared/src/auth/session.js'
 import { requestMagicLink, verifyMagicLink } from '../../shared/src/auth/magic-links.js'
+import { pool } from '../../shared/src/db/client.js'
 import { sendMagicLinkEmail } from '../../shared/src/lib/email.js'
 import { requireAuth } from '../middleware/auth.js'
 import { generateKeypair } from '../lib/key-custody-client.js'
@@ -130,6 +131,48 @@ export async function authRoutes(app: FastifyInstance) {
       displayName: account.displayName,
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // POST /auth/dev-login — instant login for local development (no magic link)
+  // Only available when NODE_ENV=development
+  // ---------------------------------------------------------------------------
+
+  if (process.env.NODE_ENV === 'development') {
+    app.post('/auth/dev-login', async (req, reply) => {
+      const parsed = LoginSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() })
+      }
+
+      const { rows } = await pool.query<{ id: string }>(
+        'SELECT id FROM accounts WHERE email = $1 AND status = $2',
+        [parsed.data.email.toLowerCase().trim(), 'active']
+      )
+
+      if (rows.length === 0) {
+        return reply.status(404).send({ error: 'No account found with that email' })
+      }
+
+      const account = await getAccount(rows[0].id)
+      if (!account) {
+        return reply.status(404).send({ error: 'Account not found' })
+      }
+
+      await createSession(reply, {
+        id: account.id,
+        nostrPubkey: account.nostrPubkey,
+        isWriter: account.isWriter,
+      })
+
+      logger.info({ email: parsed.data.email, accountId: account.id }, 'Dev login — session created')
+
+      return reply.status(200).send({
+        id: account.id,
+        username: account.username,
+        displayName: account.displayName,
+      })
+    })
+  }
 
   // ---------------------------------------------------------------------------
   // POST /auth/logout

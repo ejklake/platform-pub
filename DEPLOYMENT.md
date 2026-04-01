@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.29.0
+# platform.pub — Deployment Reference v3.30.0
 
 **Date:** 1 April 2026
-**Replaces:** v3.28.0 (see bottom for change log)
+**Replaces:** v3.29.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -204,6 +204,78 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.29.0
+
+No schema changes. Services changed: **gateway**, **web**. Deploy order: **rebuild changed services**.
+
+This release adds a dev-mode instant login flow and fixes Docker networking for the local dev environment. The `gateway/.env` service URLs now use Docker service names instead of `localhost`, and `web/.env` separates the server-side `GATEWAY_URL` (for Next.js SSR, must use Docker service name) from the client-side `NEXT_PUBLIC_GATEWAY_URL` (must use `localhost`).
+
+**Production impact: none.** The dev-login endpoint (`POST /api/v1/auth/dev-login`) only registers when `NODE_ENV=development`. The frontend dev-login button only renders in development builds.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migration needed — rebuild gateway and web only
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+curl -s http://localhost:3000/health
+# Should return {"status":"ok","service":"gateway"}
+```
+
+Changes:
+
+```
+# v3.30.0 — Dev-mode instant login and local Docker networking fixes
+#
+# ── Dev-login endpoint ──
+# Added POST /auth/dev-login (gateway, development only). Accepts an email,
+# looks up the account, and creates a session directly — no magic link needed.
+# Guarded by NODE_ENV=development; the route is not registered in production.
+# Files: gateway/src/routes/auth.ts
+#
+# ── Dev-login frontend button ──
+# Added "Instant dev login" button to /auth page, rendered only in development
+# builds (process.env.NODE_ENV === 'development'). Calls /auth/dev-login then
+# hydrates session via /auth/me.
+# Files: web/src/app/auth/page.tsx, web/src/lib/api.ts
+#
+# ── Local dev env fixes ──
+# gateway/.env: DATABASE_URL, PAYMENT_SERVICE_URL, KEY_SERVICE_URL,
+#   KEY_CUSTODY_URL, BLOSSOM_URL, and PLATFORM_RELAY_WS_URL now use Docker
+#   service names (postgres, payment, keyservice, key-custody, blossom, strfry)
+#   instead of localhost, which does not resolve correctly inside containers.
+#   MEDIA_DIR changed to /app/media (the container path).
+# web/.env: GATEWAY_URL changed to http://gateway:3000 (server-side, resolves
+#   inside Docker network). NEXT_PUBLIC_GATEWAY_URL remains http://localhost:3000
+#   (client-side, resolves in the browser).
+```
+
+#### Local development quick-start
+
+After cloning, the local dev stack can be started with:
+
+```bash
+docker compose up -d
+```
+
+To log in without email delivery:
+
+1. Go to http://localhost:3010/auth
+2. Enter your email address
+3. Click **"Instant dev login"** at the bottom of the page
+
+This bypasses the magic-link flow entirely and creates a session immediately.
+
+---
 
 ### From v3.28.0
 

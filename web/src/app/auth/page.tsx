@@ -58,6 +58,23 @@ export default function AuthPage() {
     }
   }
 
+  async function handleDevLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      await auth.devLogin(email)
+      const me = await auth.me()
+      setUser(me)
+      router.push('/feed')
+    } catch {
+      setError('Dev login failed — is that email in the database?')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (magicLinkSent) {
     return (
       <div className="mx-auto max-w-sm px-6 py-28 text-center">
@@ -151,6 +168,20 @@ export default function AuthPage() {
           <>New here?{' '}<button onClick={() => setMode('signup')} className="text-ink underline underline-offset-4 hover:text-content-secondary">Create an account</button></>
         )}
       </p>
+
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-10 pt-6" style={{ borderTop: '1.5px dashed #B8D2C1' }}>
+          <p className="text-mono-xs text-content-muted mb-3">Dev mode</p>
+          <button
+            onClick={handleDevLogin}
+            disabled={loading || !email}
+            className="w-full bg-surface-deep px-4 py-[14px] text-mono-xs text-content-secondary hover:text-content-primary disabled:opacity-50 transition-colors"
+            style={{ border: '1.5px dashed #B8D2C1' }}
+          >
+            {loading ? 'Working...' : 'Instant dev login (skip magic link)'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
