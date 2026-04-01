@@ -1,6 +1,7 @@
 -- =============================================================================
 -- platform.pub — PostgreSQL Schema
--- Derived from ADR Draft v0.7 (13 March 2026)
+-- Full schema incorporating migrations 001–017.
+-- Loaded by Docker initdb.d on first boot.
 -- =============================================================================
 
 -- Extensions
@@ -57,6 +58,27 @@ CREATE TYPE report_status AS ENUM (
   'resolved_no_action'
 );
 
+-- Pledge drive enums (migration 017)
+CREATE TYPE drive_status AS ENUM (
+  'open',        -- accepting pledges
+  'funded',      -- target reached (still accepting pledges)
+  'published',   -- article published, fulfilment pending
+  'fulfilled',   -- all pledges processed, access granted
+  'expired',     -- deadline passed without publication
+  'cancelled'    -- creator deleted the drive
+);
+
+CREATE TYPE drive_origin AS ENUM (
+  'crowdfund',   -- creator is the writer
+  'commission'   -- creator is a reader, target writer is specified
+);
+
+CREATE TYPE pledge_status AS ENUM (
+  'active',      -- pledge is live, awaiting publication
+  'fulfilled',   -- article published, read_event created, access granted
+  'void'         -- drive cancelled or expired, pledge is void
+);
+
 -- =============================================================================
 -- ACCOUNTS
 -- Covers both writers and readers (a user can be both).
@@ -70,6 +92,7 @@ CREATE TABLE accounts (
   display_name          TEXT,
   bio                   TEXT,
   avatar_blossom_url    TEXT,
+  email                 TEXT UNIQUE,            -- (migration 001)
   is_writer             BOOLEAN NOT NULL DEFAULT FALSE,
   is_reader             BOOLEAN NOT NULL DEFAULT TRUE,
   status                account_status NOT NULL DEFAULT 'active',
@@ -79,6 +102,7 @@ CREATE TABLE accounts (
   hosting_type          TEXT NOT NULL DEFAULT 'hosted' CHECK (hosting_type IN ('hosted', 'self_hosted')),
   self_hosted_relay_url TEXT,                   -- populated for self-hosted writers
   free_allowance_remaining_pence INT NOT NULL DEFAULT 500,  -- £5.00 in pence
+  subscription_price_pence INTEGER NOT NULL DEFAULT 500,    -- writer-configurable (migration 005)
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -86,6 +110,24 @@ CREATE TABLE accounts (
 CREATE INDEX idx_accounts_nostr_pubkey ON accounts (nostr_pubkey);
 CREATE INDEX idx_accounts_username ON accounts (username);
 CREATE INDEX idx_accounts_is_writer ON accounts (is_writer) WHERE is_writer = TRUE;
+CREATE INDEX idx_accounts_email ON accounts (email) WHERE email IS NOT NULL;
+
+-- =============================================================================
+-- MAGIC LINKS (migration 001)
+-- Token-based passwordless login. Each token is single-use, expires in 15 min.
+-- =============================================================================
+
+CREATE TABLE magic_links (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      UUID NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  token_hash      TEXT NOT NULL UNIQUE,   -- SHA-256 hash of the token (never store raw)
+  expires_at      TIMESTAMPTZ NOT NULL,
+  used_at         TIMESTAMPTZ,            -- NULL = unused
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_magic_links_token_hash ON magic_links (token_hash) WHERE used_at IS NULL;
+CREATE INDEX idx_magic_links_expires ON magic_links (expires_at) WHERE used_at IS NULL;
 
 -- =============================================================================
 -- ARTICLES
@@ -137,6 +179,11 @@ CREATE INDEX idx_articles_nostr_d_tag ON articles (writer_id, nostr_d_tag);
 CREATE INDEX idx_articles_published_at ON articles (published_at DESC) WHERE published_at IS NOT NULL;
 CREATE INDEX idx_articles_title_trgm ON articles USING gin (title gin_trgm_ops);
 
+-- One live article per (writer, d-tag). Deleted rows are excluded. (migration 008)
+CREATE UNIQUE INDEX idx_articles_unique_live
+  ON articles (writer_id, nostr_d_tag)
+  WHERE deleted_at IS NULL;
+
 -- =============================================================================
 -- ARTICLE DRAFTS
 -- NIP-23 kind 30024. Separate table to keep the articles table clean.
@@ -157,6 +204,11 @@ CREATE TABLE article_drafts (
 
 CREATE INDEX idx_drafts_writer_id ON article_drafts (writer_id);
 
+-- Partial unique index for upsert by (writer_id, nostr_d_tag) when d-tag is non-null. (migration 002)
+CREATE UNIQUE INDEX idx_drafts_writer_dtag
+  ON article_drafts (writer_id, nostr_d_tag)
+  WHERE nostr_d_tag IS NOT NULL;
+
 -- =============================================================================
 -- VAULT KEYS
 -- The key service's private store. Never exposed in Nostr events.
@@ -168,6 +220,7 @@ CREATE TABLE vault_keys (
   nostr_article_event_id TEXT NOT NULL UNIQUE,
   content_key_enc       TEXT NOT NULL,          -- AES-256 key, encrypted at rest with platform KMS key
   algorithm             TEXT NOT NULL DEFAULT 'aes-256-gcm',
+  ciphertext            TEXT,                   -- encrypted paywall body, stored for resilience (migration 011)
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   rotated_at            TIMESTAMPTZ             -- NULL = never rotated
 );
@@ -192,6 +245,58 @@ CREATE TABLE reading_tabs (
 );
 
 CREATE INDEX idx_reading_tabs_reader_id ON reading_tabs (reader_id);
+
+-- =============================================================================
+-- SUBSCRIPTIONS (migration 005)
+-- Reader ↔ writer monthly relationships.
+-- Status lifecycle: active → cancelled → expired
+-- =============================================================================
+
+CREATE TABLE subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reader_id UUID NOT NULL REFERENCES accounts(id),
+  writer_id UUID NOT NULL REFERENCES accounts(id),
+  price_pence INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired')),
+  nostr_event_id TEXT,                           -- kind 7003 subscription attestation (migration 007)
+  started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  current_period_start TIMESTAMPTZ NOT NULL DEFAULT now(),
+  current_period_end TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '1 month'),
+  cancelled_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (reader_id, writer_id)
+);
+
+CREATE INDEX idx_subscriptions_reader ON subscriptions(reader_id);
+CREATE INDEX idx_subscriptions_writer ON subscriptions(writer_id);
+CREATE INDEX idx_subscriptions_status ON subscriptions(status) WHERE status = 'active' OR status = 'cancelled';
+CREATE INDEX idx_subscriptions_period_end ON subscriptions(current_period_end) WHERE status IN ('active', 'cancelled');
+
+-- =============================================================================
+-- SUBSCRIPTION EVENTS (migration 005)
+-- Audit log for credits/debits dashboards.
+-- =============================================================================
+
+CREATE TABLE subscription_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id UUID NOT NULL REFERENCES subscriptions(id),
+  event_type TEXT NOT NULL CHECK (event_type IN ('subscription_charge', 'subscription_earning', 'subscription_read')),
+  reader_id UUID NOT NULL REFERENCES accounts(id),
+  writer_id UUID NOT NULL REFERENCES accounts(id),
+  article_id UUID REFERENCES articles(id),
+  amount_pence INTEGER NOT NULL DEFAULT 0,
+  period_start TIMESTAMPTZ,
+  period_end TIMESTAMPTZ,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_sub_events_subscription ON subscription_events(subscription_id);
+CREATE INDEX idx_sub_events_reader ON subscription_events(reader_id);
+CREATE INDEX idx_sub_events_writer ON subscription_events(writer_id);
+CREATE INDEX idx_sub_events_type ON subscription_events(event_type);
+CREATE INDEX idx_sub_events_created ON subscription_events(created_at DESC);
 
 -- =============================================================================
 -- READ EVENTS
@@ -220,6 +325,10 @@ CREATE TABLE read_events (
 
   -- Free allowance tracking
   on_free_allowance     BOOLEAN NOT NULL DEFAULT FALSE,
+
+  -- Subscription linkage (migration 005)
+  via_subscription_id   UUID REFERENCES subscriptions(id),
+  is_subscription_read  BOOLEAN NOT NULL DEFAULT FALSE,
 
   read_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   state_updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -289,6 +398,27 @@ CREATE INDEX idx_writer_payouts_status ON writer_payouts (status);
 ALTER TABLE read_events
   ADD CONSTRAINT fk_read_events_writer_payout
   FOREIGN KEY (writer_payout_id) REFERENCES writer_payouts (id) ON DELETE SET NULL;
+
+-- =============================================================================
+-- ARTICLE UNLOCKS (migration 005)
+-- Permanent unlock records — survives subscription cancellation.
+-- =============================================================================
+
+CREATE TABLE article_unlocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reader_id UUID NOT NULL REFERENCES accounts(id),
+  article_id UUID NOT NULL REFERENCES articles(id),
+  unlocked_via TEXT NOT NULL CHECK (unlocked_via IN (
+    'purchase', 'subscription', 'own_content', 'free_allowance',
+    'author_grant', 'pledge', 'invitation'
+  )),
+  subscription_id UUID REFERENCES subscriptions(id),
+  unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (reader_id, article_id)
+);
+
+CREATE INDEX idx_article_unlocks_reader ON article_unlocks(reader_id);
+CREATE INDEX idx_article_unlocks_article ON article_unlocks(article_id);
 
 -- =============================================================================
 -- CONTENT KEY ISSUANCES
@@ -362,6 +492,9 @@ CREATE TABLE notes (
   is_quote_comment      BOOLEAN NOT NULL DEFAULT FALSE,
   quoted_event_id       TEXT,                   -- nostr_event_id of quoted content
   quoted_event_kind     INT,                    -- kind of quoted content (enables rendering without fetch)
+  quoted_excerpt        TEXT,                   -- (migration 013)
+  quoted_title          TEXT,                   -- (migration 013)
+  quoted_author         TEXT,                   -- (migration 013)
 
   -- Reply linkage
   reply_to_event_id     TEXT,
@@ -417,7 +550,6 @@ CREATE INDEX idx_reports_status ON moderation_reports (status, created_at DESC);
 -- =============================================================================
 -- PLATFORM CONFIGURATION
 -- Key-value store for threshold values and tunable parameters.
--- Values defined in ADR §II.3 as provisional and subject to post-launch review.
 -- =============================================================================
 
 CREATE TABLE platform_config (
@@ -442,7 +574,6 @@ INSERT INTO platform_config (key, value, description) VALUES
 -- =============================================================================
 -- COMMENTS
 -- Indexed app-layer store for Nostr kind 1 reply events.
--- Canonical content lives on the relay; this table is for feed/thread queries.
 -- =============================================================================
 
 CREATE TABLE comments (
@@ -483,6 +614,191 @@ CREATE INDEX idx_media_uploads_uploader ON media_uploads(uploader_id);
 CREATE INDEX idx_media_uploads_sha256 ON media_uploads(sha256);
 
 -- =============================================================================
+-- NOTIFICATIONS (migration 009)
+-- =============================================================================
+
+CREATE TABLE notifications (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  recipient_id  UUID        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  actor_id      UUID        REFERENCES accounts(id) ON DELETE SET NULL,
+  type          TEXT        NOT NULL,
+  article_id    UUID        REFERENCES articles(id) ON DELETE CASCADE,
+  comment_id    UUID        REFERENCES comments(id) ON DELETE CASCADE,
+  note_id       UUID        REFERENCES notes(id) ON DELETE CASCADE,  -- (migration 012)
+  read          BOOLEAN     NOT NULL DEFAULT false,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_notifications_recipient ON notifications(recipient_id, created_at DESC);
+CREATE INDEX idx_notifications_note ON notifications(note_id) WHERE note_id IS NOT NULL;
+
+-- Prevent duplicate notifications (migration 014)
+CREATE UNIQUE INDEX idx_notifications_dedup
+  ON notifications (
+    recipient_id,
+    actor_id,
+    type,
+    COALESCE(article_id, '00000000-0000-0000-0000-000000000000'),
+    COALESCE(note_id, '00000000-0000-0000-0000-000000000000'),
+    COALESCE(comment_id, '00000000-0000-0000-0000-000000000000')
+  );
+
+-- =============================================================================
+-- VOTES (migration 010)
+-- Individual vote events for upvoting/downvoting content.
+-- =============================================================================
+
+CREATE TABLE votes (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  voter_id              UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  target_nostr_event_id TEXT NOT NULL,
+  target_author_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  direction             TEXT NOT NULL CHECK (direction IN ('up', 'down')),
+
+  -- Pricing at time of vote (immutable audit trail)
+  sequence_number       INT NOT NULL,
+  cost_pence            BIGINT NOT NULL DEFAULT 0,
+
+  -- Billing linkage
+  tab_id                UUID REFERENCES reading_tabs(id) ON DELETE SET NULL,
+  on_free_allowance     BOOLEAN NOT NULL DEFAULT FALSE,
+
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_votes_target ON votes(target_nostr_event_id);
+CREATE INDEX idx_votes_voter_target ON votes(voter_id, target_nostr_event_id, direction);
+CREATE INDEX idx_votes_author ON votes(target_author_id);
+CREATE INDEX idx_votes_created ON votes(created_at DESC);
+
+-- Materialised vote tallies for fast display.
+CREATE TABLE vote_tallies (
+  target_nostr_event_id TEXT PRIMARY KEY,
+  upvote_count          INT NOT NULL DEFAULT 0,
+  downvote_count        INT NOT NULL DEFAULT 0,
+  net_score             INT NOT NULL DEFAULT 0,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Vote charges — billing records for paid votes.
+CREATE TABLE vote_charges (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vote_id           UUID NOT NULL REFERENCES votes(id),
+  voter_id          UUID NOT NULL REFERENCES accounts(id),
+  recipient_id      UUID REFERENCES accounts(id),  -- NULL for downvotes (platform revenue)
+  amount_pence      BIGINT NOT NULL,
+  tab_id            UUID REFERENCES reading_tabs(id) ON DELETE SET NULL,
+  on_free_allowance BOOLEAN NOT NULL DEFAULT FALSE,
+  state             read_state NOT NULL DEFAULT 'provisional',
+  writer_payout_id  UUID,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE vote_charges
+  ADD CONSTRAINT fk_vote_charges_writer_payout
+  FOREIGN KEY (writer_payout_id) REFERENCES writer_payouts (id) ON DELETE SET NULL;
+
+CREATE INDEX idx_vote_charges_vote_id ON vote_charges(vote_id);
+CREATE INDEX idx_vote_charges_voter_id ON vote_charges(voter_id);
+CREATE INDEX idx_vote_charges_recipient_id ON vote_charges(recipient_id) WHERE recipient_id IS NOT NULL;
+CREATE INDEX idx_vote_charges_state ON vote_charges(state);
+CREATE INDEX idx_vote_charges_tab_id ON vote_charges(tab_id) WHERE tab_id IS NOT NULL;
+
+-- =============================================================================
+-- DIRECT MESSAGES (migration 016)
+-- =============================================================================
+
+CREATE TABLE conversations (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_by      UUID NOT NULL REFERENCES accounts(id),
+  last_message_at TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE conversation_members (
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  joined_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (conversation_id, user_id)
+);
+
+CREATE INDEX idx_conv_members_user ON conversation_members(user_id);
+
+CREATE TABLE direct_messages (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id  UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  sender_id        UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  recipient_id     UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  content_enc      TEXT NOT NULL,  -- NIP-44 encrypted to recipient's pubkey
+  nostr_event_id   TEXT UNIQUE,
+  read_at          TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_dm_conversation ON direct_messages(conversation_id, created_at DESC);
+CREATE INDEX idx_dm_sender ON direct_messages(sender_id);
+CREATE INDEX idx_dm_recipient ON direct_messages(recipient_id);
+
+CREATE TABLE dm_pricing (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id      UUID NOT NULL REFERENCES accounts(id),
+  target_id     UUID REFERENCES accounts(id),  -- NULL = default rate for all senders
+  price_pence   INT NOT NULL,
+  UNIQUE (owner_id, target_id)
+);
+
+CREATE UNIQUE INDEX idx_dm_pricing_default ON dm_pricing(owner_id) WHERE target_id IS NULL;
+
+-- =============================================================================
+-- PLEDGE DRIVES (migration 017)
+-- =============================================================================
+
+CREATE TABLE pledge_drives (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  creator_id            UUID NOT NULL REFERENCES accounts(id),
+  origin                drive_origin NOT NULL,
+  target_writer_id      UUID NOT NULL REFERENCES accounts(id),
+  title                 TEXT NOT NULL,
+  description           TEXT,
+  funding_target_pence  INT,
+  current_total_pence   INT NOT NULL DEFAULT 0,
+  suggested_price_pence INT,
+  status                drive_status NOT NULL DEFAULT 'open',
+  article_id            UUID REFERENCES articles(id),
+  draft_id              UUID REFERENCES article_drafts(id),
+  nostr_event_id        TEXT UNIQUE,
+  pinned                BOOLEAN NOT NULL DEFAULT TRUE,
+  accepted_at           TIMESTAMPTZ,
+  deadline              TIMESTAMPTZ,
+  published_at          TIMESTAMPTZ,
+  fulfilled_at          TIMESTAMPTZ,
+  cancelled_at          TIMESTAMPTZ,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_drives_creator ON pledge_drives(creator_id);
+CREATE INDEX idx_drives_writer ON pledge_drives(target_writer_id);
+CREATE INDEX idx_drives_status ON pledge_drives(status);
+CREATE INDEX idx_drives_nostr ON pledge_drives(nostr_event_id);
+
+CREATE TABLE pledges (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  drive_id      UUID NOT NULL REFERENCES pledge_drives(id),
+  pledger_id    UUID NOT NULL REFERENCES accounts(id),
+  amount_pence  INT NOT NULL,
+  status        pledge_status NOT NULL DEFAULT 'active',
+  read_event_id UUID REFERENCES read_events(id),
+  fulfilled_at  TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (drive_id, pledger_id)
+);
+
+CREATE INDEX idx_pledges_drive ON pledges(drive_id);
+CREATE INDEX idx_pledges_pledger ON pledges(pledger_id);
+CREATE INDEX idx_pledges_status ON pledges(status);
+
+-- =============================================================================
 -- UPDATED_AT TRIGGERS
 -- Auto-update updated_at on mutation for key tables.
 -- =============================================================================
@@ -505,4 +821,8 @@ CREATE TRIGGER trg_articles_updated_at
 
 CREATE TRIGGER trg_reading_tabs_updated_at
   BEFORE UPDATE ON reading_tabs
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_pledge_drives_updated_at
+  BEFORE UPDATE ON pledge_drives
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();

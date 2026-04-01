@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.26.0
+# platform.pub — Deployment Reference v3.27.0
 
-**Date:** 31 March 2026
-**Replaces:** v3.25.0 (see bottom for change log)
+**Date:** 1 April 2026
+**Replaces:** v3.26.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -156,7 +156,9 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema is auto-applied on first postgres boot via the `initdb.d` volume mount. Then run all migrations:
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v3.27.0, `schema.sql` includes all tables and columns from migrations 001–017, so a fresh install gets the complete database schema immediately.
+
+Migrations still need to be run for **existing** databases that were initialised with an earlier `schema.sql`:
 
 ```bash
 for f in migrations/*.sql; do
@@ -202,6 +204,73 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.26.0
+
+No new migrations. Schema file regenerated. Services changed: **gateway** (bug fixes). Deploy order: **gateway**.
+
+This release fixes three critical bugs identified in the codebase audit (see `AUDIT.md`). No database migration needed — the fixes are application-level. `schema.sql` has been regenerated to include all tables from migrations 001–017 so fresh Docker installs produce a working database.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build --no-cache gateway
+docker compose up -d gateway
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep gateway
+docker logs platform-pub-gateway-1 --tail 5
+curl -s http://localhost:3000/health
+# Should return {"status":"ok","service":"gateway"}
+```
+
+Changes:
+
+```
+# v3.27.0 — Critical audit fixes: schema.sql, drive fulfilment, gate-pass idempotency
+#
+# ── schema.sql regenerated (Audit #1) ──
+# schema.sql was frozen at the pre-migration state. Fresh Docker installs
+# got a database missing 13+ tables (subscriptions, notifications, votes,
+# conversations, pledge_drives, etc). The file now includes all tables
+# and columns from migrations 001–017. Fresh `docker compose up` on a
+# new checkout now produces a complete, working database.
+# File: schema.sql
+#
+# ── Drive fulfilment wrapped in transaction (Audit #3) ──
+# checkAndTriggerDriveFulfilment issued SELECT ... FOR UPDATE via the
+# shared pool (auto-commit mode). The row lock was released immediately
+# after the SELECT, leaving the subsequent UPDATE unprotected. Concurrent
+# article publishes for the same draft could trigger double fulfilment.
+# Now wrapped in withTransaction() so the lock is held for both queries.
+# File: gateway/src/routes/drives.ts
+#
+# ── Gate-pass made idempotent (Audit #4) ──
+# The gate-pass flow called the payment service, then the key service,
+# then recordPurchaseUnlock. A crash between payment and unlock left the
+# reader charged with no permanent access record. On retry,
+# checkArticleAccess found no unlock, so the reader was charged again.
+# Fix: recordPurchaseUnlock is now called immediately after payment
+# succeeds (before key issuance). On retry, checkArticleAccess finds
+# the existing unlock and serves the key without re-charging.
+# File: gateway/src/routes/articles.ts
+#
+# ── Remaining audit items documented ──
+# FIXES.md added with prioritised fix list for all remaining audit
+# findings (high/medium/low).
+# File: FIXES.md
+#
+# Files changed:
+#   schema.sql                          — regenerated with all migrations
+#   gateway/src/routes/drives.ts        — transaction wrapping
+#   gateway/src/routes/articles.ts      — idempotent gate-pass
+#   FIXES.md                            — remaining audit fix plan (new)
+```
+
+---
 
 ### From v3.25.0
 

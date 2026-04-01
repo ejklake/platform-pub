@@ -305,7 +305,8 @@ export async function articleRoutes(app: FastifyInstance) {
             await recordSubscriptionRead(readerId, article.id, article.writer_id, access.subscriptionId)
           }
 
-          // Issue content key without charging
+          // Issue content key without charging (idempotent — covers retry after
+          // a previous gate-pass that charged but crashed before unlock was recorded)
           const keyRes = await fetch(
             `${KEY_SERVICE_URL}/api/v1/articles/${nostrEventId}/key`,
             {
@@ -394,6 +395,11 @@ export async function articleRoutes(app: FastifyInstance) {
 
         const paymentResult = await paymentRes.json() as any
 
+        // Record permanent unlock immediately after payment succeeds.
+        // This ensures a retry (if key issuance fails below) hits
+        // checkArticleAccess → 'already_unlocked' and skips re-charging.
+        await recordPurchaseUnlock(readerId, article.id)
+
         // Step 3: Request content key from key service
         const keyRes = await fetch(
           `${KEY_SERVICE_URL}/api/v1/articles/${nostrEventId}/key`,
@@ -414,8 +420,8 @@ export async function articleRoutes(app: FastifyInstance) {
             { status: keyRes.status, body: keyBody, readerId, nostrEventId },
             'Key service issuance failed after gate pass'
           )
-          // The gate pass succeeded — the read is recorded and will be charged.
-          // Key issuance failed — this is a retriable error.
+          // Payment recorded and unlock persisted — retry will skip payment
+          // and go straight to key issuance via the 'already_unlocked' path.
           return reply.status(502).send({
             error: 'Key issuance failed — the read has been recorded. Retry to get the content key.',
             readEventId: paymentResult.readEventId,
@@ -423,9 +429,6 @@ export async function articleRoutes(app: FastifyInstance) {
         }
 
         const keyResult = await keyRes.json() as any
-
-        // Record permanent unlock for this purchase
-        await recordPurchaseUnlock(readerId, article.id)
 
         logger.info(
           { readerId, nostrEventId, readEventId: paymentResult.readEventId },

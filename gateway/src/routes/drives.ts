@@ -615,22 +615,28 @@ export async function checkAndTriggerDriveFulfilment(
 ): Promise<void> {
   if (!draftId) return
 
-  const driveRow = await pool.query<{ id: string }>(
-    `SELECT id FROM pledge_drives
-     WHERE target_writer_id = $1 AND draft_id = $2 AND status IN ('open', 'funded')
-     FOR UPDATE`,
-    [writerId, draftId]
-  )
+  const driveId = await withTransaction(async (client) => {
+    const driveRow = await client.query<{ id: string }>(
+      `SELECT id FROM pledge_drives
+       WHERE target_writer_id = $1 AND draft_id = $2 AND status IN ('open', 'funded')
+       FOR UPDATE`,
+      [writerId, draftId]
+    )
 
-  if (driveRow.rows.length === 0) return
+    if (driveRow.rows.length === 0) return null
 
-  const driveId = driveRow.rows[0].id
+    const id = driveRow.rows[0].id
 
-  await pool.query(
-    `UPDATE pledge_drives SET article_id = $1, status = 'published',
-     published_at = now() WHERE id = $2`,
-    [articleId, driveId]
-  )
+    await client.query(
+      `UPDATE pledge_drives SET article_id = $1, status = 'published',
+       published_at = now() WHERE id = $2`,
+      [articleId, id]
+    )
+
+    return id
+  })
+
+  if (!driveId) return
 
   // Queue async fulfilment (runs outside the publish request path)
   fulfillDrive(driveId).catch(err => {

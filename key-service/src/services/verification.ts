@@ -8,16 +8,12 @@ import type { PaymentVerification } from '../types/index.js'
 // a valid payment record for the article. This queries the shared PostgreSQL
 // database — the key service and payment service share the same DB.
 //
-// Valid states for key issuance: accrued, platform_settled, writer_paid.
-// (All three mean the reader has a real payment obligation or settlement.)
+// Valid states for key issuance: provisional, accrued, platform_settled,
+// writer_paid. All four represent a real purchase — provisional reads are
+// paid from the reader's free £5 starting credit and grant permanent access.
 //
-// Provisional reads are NOT valid for key issuance — the reader has no card
-// connected and is on the free allowance. The free sample (pre-gate content)
-// is available without payment; the paywalled body requires a real read event.
-//
-// Re-issuance: a reader who has previously paid can request the key again
-// at any time (new device, session expiry, account recovery). The service
-// checks for any non-provisional read event — not just the most recent one.
+// Re-issuance: a reader who has previously unlocked an article can request
+// the key again at any time (new device, session expiry, account recovery).
 // =============================================================================
 
 export async function verifyPayment(
@@ -39,19 +35,11 @@ export async function verifyPayment(
   )
 
   if (rows.length === 0) {
-    // Check if there's a provisional read (free allowance — not sufficient)
-    const { rows: provisional } = await pool.query<{ id: string }>(
-      `SELECT id FROM read_events
-       WHERE reader_id = $1 AND article_id = $2 AND state = 'provisional'
-       LIMIT 1`,
-      [readerId, articleId]
-    )
-
     return {
       isVerified: false,
-      readEventId: provisional[0]?.id ?? null,
+      readEventId: null,
       state: null,
-      readEventExists: provisional.length > 0,
+      readEventExists: false,
     }
   }
 
