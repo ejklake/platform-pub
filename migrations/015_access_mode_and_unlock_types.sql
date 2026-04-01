@@ -29,7 +29,20 @@ ALTER TABLE articles ADD CONSTRAINT access_mode_price CHECK (
 -- 4. Drop old column
 ALTER TABLE articles DROP COLUMN is_paywalled;
 
--- 5. Expand article_unlocks unlocked_via to include new grant types
+-- 5. Create article_unlocks if missing, then expand unlocked_via
+CREATE TABLE IF NOT EXISTS article_unlocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reader_id UUID NOT NULL REFERENCES accounts(id),
+  article_id UUID NOT NULL REFERENCES articles(id),
+  unlocked_via TEXT NOT NULL,
+  unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  UNIQUE (reader_id, article_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_article_unlocks_reader ON article_unlocks(reader_id);
+CREATE INDEX IF NOT EXISTS idx_article_unlocks_article ON article_unlocks(article_id);
+
 ALTER TABLE article_unlocks
   DROP CONSTRAINT IF EXISTS article_unlocks_unlocked_via_check,
   ADD CONSTRAINT article_unlocks_unlocked_via_check

@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.27.0
+# platform.pub — Deployment Reference v3.27.1
 
 **Date:** 1 April 2026
-**Replaces:** v3.26.0 (see bottom for change log)
+**Replaces:** v3.27.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -204,6 +204,46 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.27.0
+
+Migration fix only. No service rebuilds needed. Deploy order: **git pull → re-run migrations**.
+
+Migration 015 (`access_mode_and_unlock_types.sql`) failed on production because the `article_unlocks` table did not exist. This table should have been created by migration 005, but on databases where 005 was bootstrapped (marked as applied without running its SQL — see v3.21.0 Case C notes), the table was never created. The fix adds `CREATE TABLE IF NOT EXISTS article_unlocks` to migration 015 before altering the table, so it works whether or not the table already exists.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# Re-run the migration runner (014 already applied, 015 will now succeed)
+DATABASE_URL=postgresql://platformpub:$POSTGRES_PASSWORD@127.0.0.1:5432/platformpub \
+  npx tsx shared/src/db/migrate.ts
+```
+
+Verify:
+```bash
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\d article_unlocks"
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "SELECT filename FROM _migrations ORDER BY id;"
+# Should show 015_access_mode_and_unlock_types.sql (and 016, 017) as applied
+```
+
+Changes:
+
+```
+# v3.27.1 — Fix migration 015 failure on databases missing article_unlocks table
+#
+# Migration 015 assumed article_unlocks existed (created by migration 005).
+# On databases where 005 was bootstrapped via INSERT into _migrations
+# without running the SQL, the table was never created.
+#
+# Fix: migration 015 now includes CREATE TABLE IF NOT EXISTS article_unlocks
+# before altering the constraint, so it works on all database states.
+#
+# Files changed:
+#   migrations/015_access_mode_and_unlock_types.sql — added CREATE TABLE IF NOT EXISTS
+```
+
+---
 
 ### From v3.26.0
 
