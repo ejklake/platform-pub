@@ -11,6 +11,8 @@ import { QuoteCard } from './QuoteCard'
 import { VoteControls } from '../ui/VoteControls'
 import type { VoteTally, MyVoteCount } from '../../lib/api'
 import type { QuoteTarget } from '../../lib/publishNote'
+import { formatDateRelative } from '../../lib/format'
+import { content as contentApi } from '../../lib/api'
 
 interface NoteCardProps {
   note: NoteEvent
@@ -26,8 +28,7 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
 
   useEffect(() => {
     if (!note.quotedEventId) return
-    fetch(`/api/v1/content/resolve?eventId=${encodeURIComponent(note.quotedEventId)}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+    contentApi.resolve(note.quotedEventId)
       .then(data => {
         if (data?.dTag) setArticleDTag(data.dTag)
         if (data?.author?.username && data.author.username.length < 40) setAuthorUsername(data.author.username)
@@ -147,7 +148,7 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
               </span>
             )}
             <span className="font-mono text-[11px] uppercase text-grey-300">
-              {formatDate(note.publishedAt)}
+              {formatDateRelative(note.publishedAt)}
             </span>
             {isAuthor && (
               <button
@@ -248,10 +249,3 @@ function EmbedPreview({ url }: { url: string }) {
   )
 }
 
-function formatDate(ts: number) {
-  const d = new Date(ts*1000), now = new Date(), ms = now.getTime()-d.getTime()
-  const mins = Math.floor(ms/60000), hrs = Math.floor(ms/3600000), days = Math.floor(ms/86400000)
-  if (mins<1) return 'just now'; if (mins<60) return `${mins}m`; if (hrs<24) return `${hrs}h`
-  if (days===1) return '1d'; if (days<7) return `${days}d`
-  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})
-}

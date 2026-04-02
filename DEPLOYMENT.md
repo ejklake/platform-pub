@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v4.1.0
+# platform.pub — Deployment Reference v4.2.0
 
 **Date:** 2 April 2026
-**Replaces:** v4.0.0 (see bottom for change log)
+**Replaces:** v4.1.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -102,6 +102,8 @@ Key variables:
 
 > **Security:** `ACCOUNT_KEY_HEX` must never be set on the gateway — the key-custody service is the sole holder of this key by design. The gateway cannot decrypt user private keys.
 
+> **Startup validation (v4.2.0):** All services now validate required environment variables at startup and refuse to boot if any are missing. `SESSION_SECRET` must be at least 32 characters. `ACCOUNT_KEY_HEX` and `KMS_MASTER_KEY_HEX` must be at least 32 characters. `APP_URL` is now required (no localhost fallback in production). If a service exits immediately on boot, check its logs for `Missing required environment variable:` messages.
+
 ---
 
 ## Fresh deployment
@@ -156,7 +158,7 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.1.0, `schema.sql` includes the notification routing columns (`conversation_id`, `drive_id` on notifications table). Migrations 018–020 must be run separately on existing databases.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.2.0, `schema.sql` includes the notification routing columns (`conversation_id`, `drive_id` on notifications table). Migrations 018–022 must be run separately on existing databases.
 
 Migrations still need to be run for **existing** databases that were initialised with an earlier `schema.sql`:
 
@@ -204,6 +206,190 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v4.1.0
+
+New migrations (021, 022). Services changed: **gateway**, **payment-service**, **key-service**, **key-custody**, **web**. Deploy order: **migrate → rebuild all services**.
+
+This release addresses critical and high-priority issues surfaced by a full codebase review, plus resilience prep work for the upcoming Server Component conversion (see `RESILIENCE.md`).
+
+**Breaking change:** All services now validate required environment variables at startup and will refuse to boot if any are missing or too short. Verify your `.env` files before deploying. See the env var table above for minimum length requirements.
+
+**Backend fixes:**
+
+1. **Race condition in tab balance** — Reading tab balance updates now acquire a `FOR UPDATE` lock before incrementing, preventing lost updates from concurrent gate passes.
+2. **Silent Nostr ID fallbacks** — `getArticleNostrEventId()` and `getWriterPubkey()` now throw on missing data instead of returning empty strings that produced invalid receipt events.
+3. **Auth bypass via header array** — Internal service secret validation in key-custody and key-service now normalizes headers to string before comparing, closing a potential bypass when Fastify returns duplicate headers as arrays.
+4. **N+1 notification inserts** — Mention notifications are now batched into a single multi-row INSERT instead of one query per mentioned user.
+5. **Double-webhook settlement race** — Settlement confirmation now uses an atomic `UPDATE ... WHERE stripe_charge_id IS NULL` with rowCount check, preventing double-debit from concurrent Stripe webhooks.
+6. **Env var validation** — All four services fail fast on missing `DATABASE_URL`, `STRIPE_SECRET_KEY`, `INTERNAL_SECRET`, `ACCOUNT_KEY_HEX`, `KMS_MASTER_KEY_HEX`, `SESSION_SECRET`, and `APP_URL`.
+
+**Database migrations:**
+
+- Migration 021: Adds missing `ON DELETE` clauses to `subscriptions`, `subscription_events`, `article_unlocks`, `vote_charges`, and `pledges` tables.
+- Migration 022: Adds composite index `idx_read_events_reader_article` on `(reader_id, article_id)` for faster payment verification queries.
+
+**Frontend fixes / resilience prep:**
+
+1. **Shared format utilities** — `formatDate`, `truncate`, `stripMarkdown` consolidated from 4 files into `web/src/lib/format.ts`.
+2. **Centralized API client** — Raw `fetch()` calls in VoteControls, ReplySection, FeedView, NoteCard, and FeaturedWriters replaced with typed `api.ts` client. New API namespaces: `content`, `feed`, `follows`, `search`.
+3. **Error boundaries** — New `ErrorBoundary` component and `error.tsx` files for `/`, `/article`, `/feed`, `/dashboard`.
+4. **Editor lazy-loaded** — TipTap loaded via `next/dynamic` on `/write`, removing it from all other route bundles.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply new migrations
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/021_missing_on_delete_clauses.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/022_composite_index_read_events.sql
+
+# 2. Rebuild all services (env validation + backend fixes)
+docker compose build
+docker compose up -d
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# All services should show (healthy) after ~30s
+
+curl -s http://localhost:3000/health
+# Should return {"status":"ok","service":"gateway"}
+
+# Verify migrations applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT indexname FROM pg_indexes WHERE indexname = 'idx_read_events_reader_article';"
+# Should return 1 row
+
+# Verify ON DELETE clauses
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT confdeltype FROM pg_constraint WHERE conname = 'subscriptions_reader_id_fkey';"
+# Should return 'c' (CASCADE)
+
+# If any service fails to start, check for missing env vars:
+docker logs platform-pub-gateway-1 --tail 10
+# Look for "Missing required environment variable:" messages
+```
+
+Changes:
+
+```
+# v4.2.0 — Codebase audit fixes + resilience prep
+#
+# ── Critical: Race condition in tab balance updates ──
+# Added SELECT FOR UPDATE lock before balance increment in recordGatePass().
+# Prevents lost updates when concurrent gate passes hit the same reader's tab.
+# File: payment-service/src/services/accrual.ts
+#
+# ── Critical: Silent empty-string fallbacks for Nostr IDs ──
+# getArticleNostrEventId() and getWriterPubkey() now throw on missing data
+# instead of returning '' which produced invalid Nostr receipt events.
+# File: payment-service/src/services/accrual.ts
+#
+# ── Critical: Env var validation at startup ──
+# All services validate required env vars on boot and refuse to start if
+# any are missing. SESSION_SECRET requires min 32 chars. ACCOUNT_KEY_HEX
+# and KMS_MASTER_KEY_HEX require min 32 chars. APP_URL is now required.
+# Files: gateway/src/index.ts, payment-service/src/index.ts,
+#        key-service/src/index.ts, key-custody/src/index.ts,
+#        shared/src/lib/env.ts (new)
+#
+# ── Critical: Missing ON DELETE clauses ──
+# Migration 021 adds CASCADE/RESTRICT to subscriptions, subscription_events,
+# article_unlocks, vote_charges, and pledges FK constraints.
+# File: migrations/021_missing_on_delete_clauses.sql (new)
+#
+# ── High: Auth bypass via header array ──
+# Internal service secret validation now normalizes x-internal-secret header
+# to string before comparing. Fastify can return string[] for duplicate headers.
+# Files: key-custody/src/routes/keypairs.ts, key-service/src/routes/keys.ts
+#
+# ── High: N+1 notification inserts batched ──
+# Mention notifications consolidated into single multi-row INSERT.
+# File: gateway/src/routes/notes.ts
+#
+# ── High: Composite index for payment verification ──
+# Migration 022 adds idx_read_events_reader_article on (reader_id, article_id).
+# File: migrations/022_composite_index_read_events.sql (new)
+#
+# ── High: Double-webhook race in settlement ──
+# confirmSettlement now uses atomic UPDATE with rowCount check to prevent
+# TOCTOU race between concurrent Stripe webhooks.
+# File: payment-service/src/services/settlement.ts
+#
+# ── High: Error boundaries ──
+# New ErrorBoundary component for client islands. error.tsx files added
+# for /, /article, /feed, /dashboard routes.
+# Files: web/src/components/ui/ErrorBoundary.tsx (new),
+#        web/src/app/error.tsx (new), web/src/app/article/error.tsx (new),
+#        web/src/app/feed/error.tsx (new), web/src/app/dashboard/error.tsx (new)
+#
+# ── Resilience: Shared format utilities ──
+# formatDate, truncate, stripMarkdown extracted from ArticleCard, NoteCard,
+# FeaturedWriters, [username]/page into shared web/src/lib/format.ts.
+# Files: web/src/lib/format.ts (new),
+#        web/src/components/feed/ArticleCard.tsx,
+#        web/src/components/feed/NoteCard.tsx,
+#        web/src/components/home/FeaturedWriters.tsx,
+#        web/src/app/[username]/page.tsx
+#
+# ── Resilience: Centralized API client ──
+# Raw fetch() calls in VoteControls, ReplySection, FeedView, NoteCard,
+# FeaturedWriters replaced with typed api.ts methods. New namespaces:
+# content.resolve(), feed.global(), feed.featured(), follows.follow(),
+# follows.pubkeys(), search.writers().
+# Files: web/src/lib/api.ts,
+#        web/src/components/ui/VoteControls.tsx,
+#        web/src/components/replies/ReplySection.tsx,
+#        web/src/components/feed/FeedView.tsx,
+#        web/src/components/feed/NoteCard.tsx,
+#        web/src/components/home/FeaturedWriters.tsx
+#
+# ── Resilience: Editor lazy-loaded ──
+# TipTap loaded via next/dynamic with ssr:false on /write page.
+# Removes editor bundle from all other route bundles.
+# File: web/src/app/write/page.tsx
+#
+# New files (8):
+#   migrations/021_missing_on_delete_clauses.sql
+#   migrations/022_composite_index_read_events.sql
+#   shared/src/lib/env.ts
+#   web/src/lib/format.ts
+#   web/src/components/ui/ErrorBoundary.tsx
+#   web/src/app/error.tsx
+#   web/src/app/article/error.tsx
+#   web/src/app/feed/error.tsx
+#   web/src/app/dashboard/error.tsx
+#
+# Modified files (16):
+#   gateway/src/index.ts                        — env validation, APP_URL required
+#   gateway/src/routes/notes.ts                 — batched notification inserts
+#   payment-service/src/index.ts                — env validation
+#   payment-service/src/services/accrual.ts     — FOR UPDATE lock, throw on missing IDs
+#   payment-service/src/services/settlement.ts  — atomic webhook idempotency
+#   key-service/src/index.ts                    — env validation
+#   key-service/src/routes/keys.ts              — header normalization
+#   key-custody/src/index.ts                    — env validation
+#   key-custody/src/routes/keypairs.ts          — header normalization
+#   web/src/lib/api.ts                          — new content/feed/follows/search namespaces
+#   web/src/components/feed/ArticleCard.tsx      — use shared format utils
+#   web/src/components/feed/NoteCard.tsx          — use shared format utils + api client
+#   web/src/components/feed/FeedView.tsx          — use api client
+#   web/src/components/home/FeaturedWriters.tsx   — use shared format utils + api client
+#   web/src/components/ui/VoteControls.tsx        — use api client
+#   web/src/components/replies/ReplySection.tsx   — use api client
+#   web/src/app/write/page.tsx                   — lazy-load editor
+#   web/src/app/[username]/page.tsx              — use shared format utils
+#   RESILIENCE.md                                — prep work documented
+#   DEPLOYMENT.md                                — v4.2.0 upgrade section
+#   FIXES-REMAINING.md                           — remaining medium/low issues (new)
+```
+
+---
 
 ### From v4.0.0
 

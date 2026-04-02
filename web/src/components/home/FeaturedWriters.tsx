@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { formatDateRelative, truncateText, stripMarkdown } from '../../lib/format'
+import { feed as feedApi } from '../../lib/api'
 
 interface FeaturedArticle {
   dTag: string
@@ -20,8 +22,7 @@ export function FeaturedWriters() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/v1/feed/featured')
-      .then(r => r.ok ? r.json() : { articles: [] })
+    feedApi.featured()
       .then(data => setArticles((data.articles ?? []).slice(0, 3)))
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -53,7 +54,7 @@ export function FeaturedWriters() {
 }
 
 function FeaturedCard({ article }: { article: FeaturedArticle }) {
-  const excerpt = article.summary || truncate(stripMarkdown(article.contentFree), 200)
+  const excerpt = article.summary || truncateText(stripMarkdown(article.contentFree), 200)
   const wordCount = article.contentFree.split(/\s+/).length
   const readMinutes = Math.max(1, Math.round(wordCount / 200))
 
@@ -78,7 +79,7 @@ function FeaturedCard({ article }: { article: FeaturedArticle }) {
       </p>
 
       <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.02em] text-grey-300">
-        <span>{formatDate(article.publishedAt)}</span>
+        <span>{formatDateRelative(article.publishedAt)}</span>
         <span className="opacity-40">/</span>
         <span>{readMinutes} min</span>
         {article.isPaywalled && article.pricePence && (
@@ -92,13 +93,3 @@ function FeaturedCard({ article }: { article: FeaturedArticle }) {
   )
 }
 
-function truncate(t: string, n: number) { return t.length <= n ? t : t.slice(0, n).replace(/\s+\S*$/, '') + '...' }
-function stripMarkdown(md: string) {
-  return md.replace(/^#{1,6}\s+/gm,'').replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1')
-    .replace(/\[(.+?)\]\(.+?\)/g,'$1').replace(/!\[.*?\]\(.+?\)/g,'').replace(/\n+/g,' ').trim()
-}
-function formatDate(ts: number) {
-  const d = new Date(ts*1000), now = new Date(), days = Math.floor((now.getTime()-d.getTime())/86400000)
-  if (days===0) return 'Today'; if (days===1) return 'Yesterday'; if (days<7) return `${days}d ago`
-  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:d.getFullYear()!==now.getFullYear()?'numeric':undefined})
-}

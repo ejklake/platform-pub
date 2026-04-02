@@ -11,6 +11,7 @@ import { NoteComposer } from '../../components/feed/NoteComposer'
 import { VoteControls } from '../../components/ui/VoteControls'
 import type { ArticleEvent, NoteEvent } from '../../lib/ndk'
 import type { QuoteTarget } from '../../lib/publishNote'
+import { formatDateFromISO } from '../../lib/format'
 
 interface DbArticle {
   id: string
@@ -420,7 +421,7 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
         <span className="label-ui text-grey-400">{writerName} · Reply</span>
-        <time className="text-ui-xs text-grey-300" dateTime={reply.publishedAt}>{formatDate(reply.publishedAt)}</time>
+        <time className="text-ui-xs text-grey-300" dateTime={reply.publishedAt}>{formatDateFromISO(reply.publishedAt)}</time>
         {isOwnProfile && (
           <button
             onClick={handleDelete}
@@ -477,8 +478,3 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
   )
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso), now = new Date(), days = Math.floor((now.getTime()-d.getTime())/86400000)
-  if (days===0) return 'Today'; if (days===1) return 'Yesterday'; if (days<7) return `${days}d ago`
-  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:d.getFullYear()!==now.getFullYear()?'numeric':undefined})
-}

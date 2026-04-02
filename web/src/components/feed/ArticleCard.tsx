@@ -11,6 +11,7 @@ import { VoteControls } from '../ui/VoteControls'
 import { ShareButton } from '../ui/ShareButton'
 import type { VoteTally, MyVoteCount } from '../../lib/api'
 import type { QuoteTarget } from '../../lib/publishNote'
+import { formatDateRelative, truncateText, stripMarkdown } from '../../lib/format'
 
 interface ArticleCardProps {
   article: ArticleEvent
@@ -26,7 +27,7 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
   const [replyCount, setReplyCount] = useState<number | null>(null)
   const wordCount = article.content.split(/\s+/).length
   const readMinutes = Math.max(1, Math.round(wordCount / 200))
-  const excerpt = article.summary || truncate(stripMarkdown(article.content), 200)
+  const excerpt = article.summary || truncateText(stripMarkdown(article.content), 200)
 
   useEffect(() => {
     repliesApi.getForTarget(article.id).then(d => setReplyCount(d.totalCount)).catch(() => {})
@@ -85,7 +86,7 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
 
       {/* Metadata — Plex Mono caps */}
       <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.02em] text-grey-300">
-        <time dateTime={new Date(article.publishedAt * 1000).toISOString()}>{formatDate(article.publishedAt)}</time>
+        <time dateTime={new Date(article.publishedAt * 1000).toISOString()}>{formatDateRelative(article.publishedAt)}</time>
         <span className="opacity-40">/</span>
         <span>{readMinutes} min</span>
         {replyCount !== null && replyCount > 0 && (
@@ -119,13 +120,3 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
   )
 }
 
-function truncate(t: string, n: number) { return t.length <= n ? t : t.slice(0, n).replace(/\s+\S*$/, '') + '...' }
-function stripMarkdown(md: string) {
-  return md.replace(/^#{1,6}\s+/gm,'').replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1')
-    .replace(/\[(.+?)\]\(.+?\)/g,'$1').replace(/!\[.*?\]\(.+?\)/g,'').replace(/\n+/g,' ').trim()
-}
-function formatDate(ts: number) {
-  const d = new Date(ts*1000), now = new Date(), days = Math.floor((now.getTime()-d.getTime())/86400000)
-  if (days===0) return 'Today'; if (days===1) return 'Yesterday'; if (days<7) return `${days}d ago`
-  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:d.getFullYear()!==now.getFullYear()?'numeric':undefined})
-}

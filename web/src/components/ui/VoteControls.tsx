@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../stores/auth'
 import { voteCostPence } from '../../lib/voting'
+import { votes as votesApi } from '../../lib/api'
 import { VoteConfirmModal } from './VoteConfirmModal'
 
 export interface VoteTally {
@@ -47,8 +48,7 @@ export function VoteControls({
 
   useEffect(() => {
     if (!initialTally) {
-      fetch(`/api/v1/votes/tally?eventIds=${targetEventId}`)
-        .then(r => r.ok ? r.json() : null)
+      votesApi.getTallies([targetEventId])
         .then(data => {
           if (data?.tallies?.[targetEventId]) {
             setTally(data.tallies[targetEventId])
@@ -60,8 +60,7 @@ export function VoteControls({
 
   useEffect(() => {
     if (!initialMyVotes && user) {
-      fetch(`/api/v1/votes/mine?eventIds=${targetEventId}`, { credentials: 'include' })
-        .then(r => r.ok ? r.json() : null)
+      votesApi.getMyVotes([targetEventId])
         .then(data => {
           if (data?.voteCounts?.[targetEventId]) {
             setMyVotes(data.voteCounts[targetEventId])
@@ -95,22 +94,13 @@ export function VoteControls({
   async function castVote(direction: 'up' | 'down') {
     setSubmitting(true)
     try {
-      const res = await fetch('/api/v1/votes', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetEventId, targetKind, direction }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setTally(data.tally)
-        setMyVotes(prev => ({
-          upCount: direction === 'up' ? prev.upCount + 1 : prev.upCount,
-          downCount: direction === 'down' ? prev.downCount + 1 : prev.downCount,
-        }))
-        // Refresh user balance so the Nav counter updates immediately
-        useAuth.getState().fetchMe()
-      }
+      const data = await votesApi.cast(targetEventId, targetKind, direction)
+      setTally(data.tally)
+      setMyVotes(prev => ({
+        upCount: direction === 'up' ? prev.upCount + 1 : prev.upCount,
+        downCount: direction === 'down' ? prev.downCount + 1 : prev.downCount,
+      }))
+      useAuth.getState().fetchMe()
     } catch { /* silent */ }
     finally {
       setSubmitting(false)

@@ -182,8 +182,9 @@ export async function keyRoutes(app: FastifyInstance) {
 
   app.get('/writers/export-keys', async (req, reply) => {
     // Validate internal service secret — only the gateway should call this endpoint
-    const secret = req.headers['x-internal-secret']
-    if (!secret || secret !== process.env.INTERNAL_SECRET) {
+    const rawSecret = req.headers['x-internal-secret']
+    const secret = Array.isArray(rawSecret) ? rawSecret[0] : rawSecret
+    if (typeof secret !== 'string' || secret !== process.env.INTERNAL_SECRET) {
       return reply.status(401).send({ error: 'Unauthorized' })
     }
 

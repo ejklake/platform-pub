@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { requireEnv, requireEnvMinLength } from '../shared/src/lib/env.js'
 import Fastify from 'fastify'
 import sensible from '@fastify/sensible'
 import cookie from '@fastify/cookie'
@@ -50,16 +51,20 @@ import logger from '../shared/src/lib/logger.js'
 // Cloudflare Tunnel) that handles TLS termination.
 // =============================================================================
 
+// Validate required env vars at startup — fail fast
+const SESSION_SECRET = requireEnvMinLength('SESSION_SECRET', 32)
+const APP_URL = requireEnv('APP_URL')
+
 const app = Fastify({ logger })
 
 async function start() {
   // Plugins
   await app.register(sensible)
   await app.register(cookie, {
-    secret: process.env.SESSION_SECRET,
+    secret: SESSION_SECRET,
   })
   await app.register(cors, {
-    origin: process.env.APP_URL ?? 'http://localhost:3000', // APP_URL required in production
+    origin: APP_URL,
     credentials: true,       // allow cookies
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   })

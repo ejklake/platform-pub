@@ -14,6 +14,14 @@ import logger from './lib/logger.js'
 // to that reader's public key using NIP-44.
 // =============================================================================
 
+// Validate required env vars at startup — fail fast
+for (const name of ['INTERNAL_SECRET', 'KMS_MASTER_KEY_HEX', 'DATABASE_URL']) {
+  if (!process.env[name]) throw new Error(`Missing required environment variable: ${name}`)
+}
+if (process.env.KMS_MASTER_KEY_HEX!.length < 32) {
+  throw new Error('KMS_MASTER_KEY_HEX must be at least 32 characters')
+}
+
 const app = Fastify({ logger })
 
 async function start() {

@@ -232,6 +232,64 @@ export const keys = {
 }
 
 // =============================================================================
+// Content Resolution
+// =============================================================================
+
+export interface ResolvedContent {
+  type: 'note' | 'article'
+  eventId: string
+  content?: string
+  title?: string
+  dTag?: string
+  accessMode?: string
+  isPaywalled?: boolean
+  publishedAt: number
+  author: {
+    username: string
+    displayName: string | null
+    avatar: string | null
+  }
+}
+
+export const content = {
+  resolve: (eventId: string) =>
+    request<ResolvedContent>(`/content/resolve?eventId=${encodeURIComponent(eventId)}`),
+}
+
+// =============================================================================
+// Feed
+// =============================================================================
+
+export const feed = {
+  global: () =>
+    request<{ items: any[] }>('/feed/global'),
+
+  featured: () =>
+    request<{ articles: any[] }>('/feed/featured'),
+}
+
+// =============================================================================
+// Follows
+// =============================================================================
+
+export const follows = {
+  follow: (writerId: string) =>
+    request<{ ok: boolean }>(`/follows/${writerId}`, { method: 'POST' }),
+
+  pubkeys: () =>
+    request<{ pubkeys: string[] }>('/follows/pubkeys'),
+}
+
+// =============================================================================
+// Search
+// =============================================================================
+
+export const search = {
+  writers: (q: string, limit = 10) =>
+    request<{ writers: any[] }>(`/search?type=writers&q=${encodeURIComponent(q)}&limit=${limit}`),
+}
+
+// =============================================================================
 // Writers (public)
 // =============================================================================
 

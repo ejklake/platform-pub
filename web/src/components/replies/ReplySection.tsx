@@ -4,9 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../stores/auth'
 import { ReplyComposer } from './ReplyComposer'
 import { ReplyItem, type ReplyData } from './ReplyItem'
-import type { VoteTally, MyVoteCount } from '../../lib/api'
-
-const API_BASE = '/api/v1'
+import { replies as repliesApi, votes as votesApi, type VoteTally, type MyVoteCount } from '../../lib/api'
 
 interface ReplySectionProps {
   targetEventId: string
@@ -50,35 +48,24 @@ export function ReplySection({
     async function loadReplies() {
       setLoading(true)
       try {
-        const res = await fetch(
-          `${API_BASE}/replies/${targetEventId}`,
-          { credentials: 'include' }
-        )
-        if (res.ok) {
-          const data = await res.json()
-          const comments: ReplyData[] = data.comments ?? []
-          setReplies(comments)
-          const count = data.totalCount ?? 0
-          setTotalCount(count)
-          setRepliesEnabled(data.repliesEnabled ?? data.commentsEnabled ?? true)
-          onReplyCountLoaded?.(count)
+        const data = await repliesApi.getForTarget(targetEventId)
+        const comments: ReplyData[] = data.comments ?? []
+        setReplies(comments)
+        const count = data.totalCount ?? 0
+        setTotalCount(count)
+        setRepliesEnabled(data.repliesEnabled ?? data.commentsEnabled ?? true)
+        onReplyCountLoaded?.(count)
 
-          const allEventIds = flattenEventIds(comments)
-          if (allEventIds.length > 0) {
-            const idsParam = allEventIds.join(',')
-            const [talliesRes, myVotesRes] = await Promise.all([
-              fetch(`${API_BASE}/votes/tally?eventIds=${idsParam}`)
-                .then(r => r.ok ? r.json() : { tallies: {} })
-                .catch(() => ({ tallies: {} })),
-              user
-                ? fetch(`${API_BASE}/votes/mine?eventIds=${idsParam}`, { credentials: 'include' })
-                    .then(r => r.ok ? r.json() : { voteCounts: {} })
-                    .catch(() => ({ voteCounts: {} }))
-                : Promise.resolve({ voteCounts: {} }),
-            ])
-            setVoteTallies(talliesRes.tallies ?? {})
-            setMyVoteCounts(myVotesRes.voteCounts ?? {})
-          }
+        const allEventIds = flattenEventIds(comments)
+        if (allEventIds.length > 0) {
+          const [talliesRes, myVotesRes] = await Promise.all([
+            votesApi.getTallies(allEventIds).catch(() => ({ tallies: {} })),
+            user
+              ? votesApi.getMyVotes(allEventIds).catch(() => ({ voteCounts: {} }))
+              : Promise.resolve({ voteCounts: {} as Record<string, MyVoteCount> }),
+          ])
+          setVoteTallies(talliesRes.tallies ?? {})
+          setMyVoteCounts(myVotesRes.voteCounts ?? {})
         }
       } catch (err) {
         console.error('Failed to load replies:', err)
@@ -118,14 +105,9 @@ export function ReplySection({
 
   const handleDelete = useCallback(async (replyId: string) => {
     try {
-      const res = await fetch(`${API_BASE}/replies/${replyId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      if (res.ok) {
-        setReplies(prev => markDeleted(prev, replyId))
-        setTotalCount(prev => prev - 1)
-      }
+      await repliesApi.deleteReply(replyId)
+      setReplies(prev => markDeleted(prev, replyId))
+      setTotalCount(prev => prev - 1)
     } catch (err) {
       console.error('Failed to delete reply:', err)
     }

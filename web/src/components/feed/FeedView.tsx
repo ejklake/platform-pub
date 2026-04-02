@@ -11,7 +11,7 @@ import type { FeedItem, NoteEvent } from '../../lib/ndk'
 import { getNdk, parseArticleEvent, parseNoteEvent, KIND_ARTICLE, KIND_NOTE, KIND_DELETION } from '../../lib/ndk'
 import type { QuoteTarget } from '../../lib/publishNote'
 import type { NDKKind } from '@nostr-dev-kit/ndk'
-import type { VoteTally, MyVoteCount } from '../../lib/api'
+import { feed as feedApi, votes as votesApi, follows as followsApi, search as searchApi, type VoteTally, type MyVoteCount } from '../../lib/api'
 
 type FeedTab = 'for-you' | 'following' | 'add'
 
@@ -56,9 +56,7 @@ export function FeedView() {
     async function loadGlobalFeed() {
       setGlobalLoading(true)
       try {
-        const res = await fetch('/api/v1/feed/global', { credentials: 'include' })
-        if (!res.ok) return
-        const data = await res.json()
+        const data = await feedApi.global()
         const items: GlobalFeedItem[] = (data.items ?? []).map((item: any) => {
           if (item.type === 'article') {
             return {
@@ -98,14 +96,9 @@ export function FeedView() {
           .filter((i): i is FeedItem => i.type !== 'new_user')
           .map(i => i.id)
         if (feedOnlyIds.length > 0) {
-          const idsParam = feedOnlyIds.join(',')
           const [talliesRes, myVotesRes] = await Promise.all([
-            fetch(`/api/v1/votes/tally?eventIds=${idsParam}`)
-              .then(r => r.ok ? r.json() : { tallies: {} })
-              .catch(() => ({ tallies: {} })),
-            fetch(`/api/v1/votes/mine?eventIds=${idsParam}`, { credentials: 'include' })
-              .then(r => r.ok ? r.json() : { voteCounts: {} })
-              .catch(() => ({ voteCounts: {} })),
+            votesApi.getTallies(feedOnlyIds).catch(() => ({ tallies: {} })),
+            votesApi.getMyVotes(feedOnlyIds).catch(() => ({ voteCounts: {} })),
           ])
           setVoteTallies(talliesRes.tallies ?? {})
           setMyVoteCounts(myVotesRes.voteCounts ?? {})
@@ -152,16 +145,11 @@ export function FeedView() {
 
           const eventIds = allItems.map(i => i.id)
           if (eventIds.length > 0) {
-            const idsParam = eventIds.join(',')
             const [talliesRes, myVotesRes] = await Promise.all([
-              fetch(`/api/v1/votes/tally?eventIds=${idsParam}`)
-                .then(r => r.ok ? r.json() : { tallies: {} })
-                .catch(() => ({ tallies: {} })),
+              votesApi.getTallies(eventIds).catch(() => ({ tallies: {} })),
               user
-                ? fetch(`/api/v1/votes/mine?eventIds=${idsParam}`, { credentials: 'include' })
-                    .then(r => r.ok ? r.json() : { voteCounts: {} })
-                    .catch(() => ({ voteCounts: {} }))
-                : Promise.resolve({ voteCounts: {} }),
+                ? votesApi.getMyVotes(eventIds).catch(() => ({ voteCounts: {} }))
+                : Promise.resolve({ voteCounts: {} as Record<string, MyVoteCount> }),
             ])
             setVoteTallies(talliesRes.tallies ?? {})
             setMyVoteCounts(myVotesRes.voteCounts ?? {})
@@ -341,11 +329,8 @@ function AddPanel({ onFollowed }: { onFollowed: () => void }) {
     debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(`/api/v1/search?type=writers&q=${encodeURIComponent(query.trim())}&limit=10`, { credentials: 'include' })
-        if (res.ok) {
-          const data = await res.json()
-          setResults(data.writers ?? [])
-        }
+        const data = await searchApi.writers(query.trim(), 10)
+        setResults(data.writers ?? [])
       } catch { /* ignore */ }
       finally { setSearching(false) }
     }, 300)
@@ -353,11 +338,9 @@ function AddPanel({ onFollowed }: { onFollowed: () => void }) {
 
   async function handleFollow(writerId: string) {
     try {
-      const res = await fetch(`/api/v1/follows/${writerId}`, { method: 'POST', credentials: 'include' })
-      if (res.ok) {
-        setFollowed(prev => new Set([...prev, writerId]))
-        onFollowed()
-      }
+      await followsApi.follow(writerId)
+      setFollowed(prev => new Set([...prev, writerId]))
+      onFollowed()
     } catch { /* ignore */ }
   }
 
@@ -481,8 +464,7 @@ function InlineSkeleton() {
 
 async function fetchFollowedPubkeys(readerId: string): Promise<string[]> {
   try {
-    const res = await fetch('/api/v1/follows/pubkeys', { credentials: 'include' })
-    if (!res.ok) return []
-    return (await res.json()).pubkeys ?? []
+    const data = await followsApi.pubkeys()
+    return data.pubkeys ?? []
   } catch { return [] }
 }

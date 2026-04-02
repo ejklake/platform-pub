@@ -98,7 +98,7 @@ export async function noteRoutes(app: FastifyInstance) {
         }
       }
 
-      // Notify @mentioned users (fire-and-forget)
+      // Notify @mentioned users (fire-and-forget, batched)
       const mentionMatches = data.content.matchAll(/(?<![a-zA-Z0-9.])@([a-zA-Z0-9_]+)/g)
       const mentionedUsernames = [...new Set([...mentionMatches].map(m => m[1]))]
       if (mentionedUsernames.length > 0) {
@@ -106,13 +106,19 @@ export async function noteRoutes(app: FastifyInstance) {
           `SELECT id FROM accounts WHERE username = ANY($1) AND status = 'active' AND id != $2`,
           [mentionedUsernames, authorId]
         )
-        for (const mentioned of mentionedUsers) {
+        if (mentionedUsers.length > 0) {
+          const values: string[] = []
+          const params: string[] = []
+          mentionedUsers.forEach((mentioned, i) => {
+            values.push(`($${i * 2 + 1}, $${i * 2 + 2}, 'new_mention')`)
+            params.push(mentioned.id, authorId)
+          })
           pool.query(
             `INSERT INTO notifications (recipient_id, actor_id, type)
-             VALUES ($1, $2, 'new_mention')
+             VALUES ${values.join(', ')}
              ON CONFLICT DO NOTHING`,
-            [mentioned.id, authorId]
-          ).catch((err) => logger.warn({ err }, 'Failed to insert mention notification'))
+            params
+          ).catch((err) => logger.warn({ err }, 'Failed to insert mention notifications'))
         }
       }
 

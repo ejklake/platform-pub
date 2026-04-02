@@ -3,7 +3,21 @@
 import { useAuth } from '../../stores/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { ArticleEditor, type PublishData } from '../../components/editor/ArticleEditor'
+import dynamic from 'next/dynamic'
+import type { PublishData } from '../../components/editor/ArticleEditor'
+
+const ArticleEditor = dynamic(
+  () => import('../../components/editor/ArticleEditor').then(m => m.ArticleEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mx-auto max-w-article px-6 pt-16 pb-16 lg:pt-8 text-center">
+        <div className="h-8 w-48 mx-auto animate-pulse rounded bg-grey-100" />
+        <p className="mt-4 text-sm text-grey-300">Loading editor...</p>
+      </div>
+    ),
+  }
+)
 import { publishArticle } from '../../lib/publish'
 import { loadDraft } from '../../lib/drafts'
 import { getNdk, fetchArticleByDTag, KIND_ARTICLE } from '../../lib/ndk'

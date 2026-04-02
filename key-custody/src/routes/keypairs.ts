@@ -18,11 +18,13 @@ import logger from '../lib/logger.js'
 function requireInternalSecret(req: any, reply: any, done: () => void) {
   const secret = process.env.INTERNAL_SECRET
   if (!secret) {
-    // If no secret configured, reject all requests
     reply.status(503).send({ error: 'Service misconfigured' })
     return
   }
-  if (req.headers['x-internal-secret'] !== secret) {
+  // Normalize header to string — Fastify can return string[] for duplicate headers
+  const header = req.headers['x-internal-secret']
+  const provided = Array.isArray(header) ? header[0] : header
+  if (typeof provided !== 'string' || provided !== secret) {
     reply.status(401).send({ error: 'Unauthorized' })
     return
   }

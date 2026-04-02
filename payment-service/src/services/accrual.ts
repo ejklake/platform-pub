@@ -108,7 +108,12 @@ export class AccrualService {
       const readEvent = readEventRow.rows[0]
 
       // Update reading tab balance (only for accrued reads — tab is real money owed)
+      // Lock the tab row first to prevent lost updates from concurrent gate passes
       if (readState === 'accrued') {
+        await client.query(
+          `SELECT id FROM reading_tabs WHERE id = $1 FOR UPDATE`,
+          [event.tabId]
+        )
         await client.query(
           `UPDATE reading_tabs
            SET balance_pence = balance_pence + $1,
@@ -268,7 +273,10 @@ async function getArticleNostrEventId(articleId: string): Promise<string> {
     'SELECT nostr_event_id FROM articles WHERE id = $1',
     [articleId]
   )
-  return rows[0]?.nostr_event_id ?? ''
+  if (!rows[0]?.nostr_event_id) {
+    throw new Error(`Article not found or missing nostr_event_id: ${articleId}`)
+  }
+  return rows[0].nostr_event_id
 }
 
 async function getWriterPubkey(writerId: string): Promise<string> {
@@ -276,7 +284,10 @@ async function getWriterPubkey(writerId: string): Promise<string> {
     'SELECT nostr_pubkey FROM accounts WHERE id = $1',
     [writerId]
   )
-  return rows[0]?.nostr_pubkey ?? ''
+  if (!rows[0]?.nostr_pubkey) {
+    throw new Error(`Writer not found or missing nostr_pubkey: ${writerId}`)
+  }
+  return rows[0].nostr_pubkey
 }
 
 export const accrualService = new AccrualService()

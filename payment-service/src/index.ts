@@ -11,6 +11,11 @@ import logger from './lib/logger.js'
 // platform.pub — Payment Service
 // =============================================================================
 
+// Validate required env vars at startup — fail fast
+for (const name of ['STRIPE_SECRET_KEY', 'DATABASE_URL']) {
+  if (!process.env[name]) throw new Error(`Missing required environment variable: ${name}`)
+}
+
 const app = Fastify({ logger })
 
 async function start() {

@@ -259,11 +259,19 @@ export class SettlementService {
         return
       }
 
-      // Record Stripe charge ID
-      await client.query(
+      // Atomic claim: only proceed if we successfully set the charge ID.
+      // Prevents TOCTOU race between the SELECT above and concurrent webhooks.
+      const claimed = await client.query(
         `UPDATE tab_settlements SET stripe_charge_id = $1 WHERE id = $2 AND stripe_charge_id IS NULL`,
         [stripeChargeId, settlement.id]
       )
+      if (claimed.rowCount === 0) {
+        logger.warn(
+          { settlementId: settlement.id, stripeChargeId },
+          'Settlement claimed by concurrent webhook — skipping'
+        )
+        return
+      }
 
       // FIX #13: Subtract the settled amount from the tab (not zero it).
       // New reads may have accrued since settlement was initiated.
