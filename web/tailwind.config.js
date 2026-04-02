@@ -6,12 +6,30 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Source Sans 3"', '"Source Sans Pro"', 'system-ui', 'sans-serif'],
+        sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
         serif: ['"Literata"', 'Georgia', 'serif'],
         mono: ['"IBM Plex Mono"', '"Courier New"', 'monospace'],
+        // Legacy alias — remove once all components are migrated
+        'source': ['"Source Sans 3"', '"Source Sans Pro"', 'system-ui', 'sans-serif'],
       },
       colors: {
-        // ── New design tokens (DESIGN.md) ──
+        // ── v2 design tokens (DESIGN.md) ──
+        white: '#FFFFFF',
+        black: '#1A1A1A',
+        grey: {
+          50:  '#FAFAFA',
+          100: '#F0F0F0',
+          200: '#E5E5E5',
+          300: '#BBBBBB',
+          400: '#999999',
+          600: '#666666',
+        },
+        crimson: {
+          DEFAULT: '#B5242A',
+          dark: '#921D22',
+        },
+
+        // ── Legacy tokens (keep until component migration) ──
         surface: {
           DEFAULT: '#EDF5F0',
           deep: '#DDEEE4',
@@ -48,15 +66,15 @@ module.exports = {
         DEFAULT: {
           css: {
             maxWidth: '640px',
-            fontSize: '1.125rem',
+            fontSize: '1.0625rem',
             lineHeight: '1.8',
-            color: '#0F1F18',
+            color: '#1A1A1A',
             fontFamily: '"Literata", Georgia, serif',
-            h1: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', fontStyle: 'italic', letterSpacing: '-0.025em', fontSize: '2.25rem', lineHeight: '1.15' },
-            h2: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', fontStyle: 'italic', letterSpacing: '-0.02em', fontSize: '1.75rem', lineHeight: '1.2' },
-            h3: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', fontStyle: 'italic', fontSize: '1.35rem', lineHeight: '1.3' },
-            a: { color: '#B5242A', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationThickness: '1px', '&:hover': { color: '#921D22' } },
-            blockquote: { borderLeftColor: '#B5242A', borderLeftWidth: '2.5px', fontStyle: 'italic', color: '#263D32' },
+            h1: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', letterSpacing: '-0.025em', fontSize: '2.25rem', lineHeight: '1.15' },
+            h2: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', letterSpacing: '-0.02em', fontSize: '1.75rem', lineHeight: '1.2' },
+            h3: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', fontSize: '1.35rem', lineHeight: '1.3' },
+            a: { color: '#1A1A1A', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationThickness: '1px', '&:hover': { color: '#666666' } },
+            blockquote: { borderLeftColor: '#E5E5E5', borderLeftWidth: '2px', fontStyle: 'italic', color: '#666666' },
             code: { fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.875em' },
             p: { marginTop: '1.5em', marginBottom: '1.5em' },
           },
@@ -72,6 +90,10 @@ module.exports = {
       letterSpacing: {
         'mono-tight': '-0.01em',
         'mono-wide': '0.05em',
+        // v2 mono-caps spacing (DESIGN.md)
+        'mono-nav': '0.04em',
+        'mono-byline': '0.06em',
+        'mono-meta': '0.02em',
       },
       fontSize: {
         'mono-xs': ['0.8125rem', { lineHeight: '1.5', letterSpacing: '0.03em' }],

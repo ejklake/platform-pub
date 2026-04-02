@@ -2,12 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,300;1,7..72,400;1,7..72,500;1,7..72,600&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,300;1,7..72,400;1,7..72,500;1,7..72,600&family=IBM+Plex+Mono:wght@400&display=swap');
 
 @layer base {
   body {
-    @apply bg-surface text-content-primary antialiased;
-    font-family: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
+    @apply bg-white text-black antialiased;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
     font-size: 0.9375rem;
     line-height: 1.6;
     padding-top: 0;
@@ -20,8 +20,8 @@
 
   hr {
     border: none;
-    height: 2px;
-    background: #B8D2C1;
+    height: 1px;
+    background: #E5E5E5;
   }
 
   input[type="text"],
@@ -30,23 +30,23 @@
   input[type="password"],
   textarea,
   select {
-    @apply bg-card text-content-primary rounded-none;
-    font-family: 'Source Sans 3', system-ui, sans-serif;
+    @apply bg-white text-black rounded-none;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
     font-size: 0.9375rem;
-    border: none;
-    transition: background-color 0.15s ease;
+    border: 1px solid #E5E5E5;
+    transition: border-color 0.15s ease;
   }
 
   input:focus,
   textarea:focus,
   select:focus {
     @apply outline-none;
-    background-color: #FFFAEF;
+    border-color: #BBBBBB;
     box-shadow: none;
   }
 
   ::placeholder {
-    @apply text-content-muted;
+    color: #BBBBBB;
     font-style: normal;
   }
 
@@ -57,7 +57,7 @@
   }
   input[type="checkbox"] {
     @apply rounded;
-    border-color: #7A9A8A;
+    border-color: #E5E5E5;
     width: 1rem;
     height: 1rem;
   }
@@ -88,7 +88,7 @@
     font-family: 'IBM Plex Mono', monospace;
     letter-spacing: 0.5em;
     font-size: 0.75rem;
-    color: #B5242A;
+    color: #BBBBBB;
   }
   .ornament::before {
     content: '· · ·';
@@ -97,69 +97,70 @@
   /* ----- Rules ----- */
   .rule {
     border: none;
-    height: 2px;
-    background: #B8D2C1;
+    height: 1px;
+    background: #F0F0F0;
   }
   .rule-inset {
     border: none;
-    height: 1.5px;
-    background: #B8D2C1;
+    height: 1px;
+    background: #E5E5E5;
     margin-left: 1.5rem;
     margin-right: 1.5rem;
   }
   .rule-accent {
-    border-top: 2.5px solid #B8D2C1;
+    border-top: 2.5px solid #B5242A;
   }
 
   /* ----- Label styles ----- */
   .label-ui {
-    font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
   .label-muted {
-    font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #3D5E4D;
+    color: #BBBBBB;
   }
 
-  /* ----- Feed tabs (on nav green background) ----- */
+  /* ----- Feed tabs ----- */
   .tab-feed {
-    font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.9375rem;
-    font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     padding: 0.625rem 1.25rem;
     margin-right: 1.25rem;
     border: none;
-    border-bottom: 3px solid transparent;
+    border-bottom: 2px solid transparent;
     background: transparent;
     cursor: pointer;
     transition: color 0.15s ease;
-    color: #6B8E7A;
-    margin-bottom: -3px;
+    color: #BBBBBB;
+    margin-bottom: -2px;
   }
   .tab-feed-active {
-    color: #0F1F18;
-    font-weight: 700;
-    border-bottom-color: #0F1F18;
+    color: #1A1A1A;
+    border-bottom-color: #B5242A;
   }
   .tab-feed:hover:not(.tab-feed-active) {
-    color: #3D5E4D;
+    color: #666666;
   }
 
   /* ----- Dashboard tab pills ----- */
   .tab-pill {
-    font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    text-transform: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     padding: 0.5rem 1rem;
     margin-right: 6px;
     border: none;
@@ -168,39 +169,34 @@
     transition: background-color 0.15s ease, color 0.15s ease;
   }
   .tab-pill-active {
-    background: #263D32;
+    background: #1A1A1A;
     color: #FFFFFF;
   }
   .tab-pill-inactive {
-    background: #DDEEE4;
-    color: #4A6B5A;
+    background: #F0F0F0;
+    color: #999999;
   }
   .tab-pill-inactive:hover {
-    color: #263D32;
-    background: #C2DBC9;
+    color: #1A1A1A;
+    background: #E5E5E5;
   }
 
   /* ----- Buttons ----- */
   .btn {
-    background: #0F1F18;
+    background: #1A1A1A;
     color: #FFFFFF;
-    font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 1rem;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 0.9375rem;
     font-weight: 600;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     text-transform: none;
     border: none;
-    border-bottom: 3px solid #060e0a;
-    border-radius: 2px;
-    padding: 1rem 2.5rem;
-    transition: background-color 0.15s ease, transform 0.08s ease;
+    border-radius: 0;
+    padding: 0.875rem 2.25rem;
+    transition: opacity 0.15s ease;
     cursor: pointer;
   }
-  .btn:hover { background: #263D32; }
-  .btn:active {
-    transform: translateY(2px);
-    border-bottom-width: 1px;
-  }
+  .btn:hover { opacity: 0.85; }
   .btn:focus-visible {
     outline: 2px solid #B5242A;
     outline-offset: 2px;
@@ -210,48 +206,58 @@
   .btn-accent {
     background: #B5242A;
     color: #FFFFFF;
-    font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 1rem;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 0.9375rem;
     font-weight: 600;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     text-transform: none;
     border: none;
-    border-bottom: 3px solid #8A1B20;
-    border-radius: 2px;
-    padding: 1rem 2.5rem;
-    transition: background-color 0.15s ease, transform 0.08s ease;
+    border-radius: 0;
+    padding: 0.875rem 2.25rem;
+    transition: opacity 0.15s ease;
     cursor: pointer;
   }
-  .btn-accent:hover { background: #921D22; }
-  .btn-accent:active {
-    transform: translateY(2px);
-    border-bottom-width: 1px;
-  }
+  .btn-accent:hover { opacity: 0.85; }
   .btn-accent:focus-visible {
-    outline: 2px solid #0F1F18;
+    outline: 2px solid #1A1A1A;
     outline-offset: 2px;
   }
   .btn-accent:disabled { opacity: 0.5; }
 
-  .btn-soft {
+  .btn-ghost {
     background: transparent;
-    color: #0F1F18;
-    font-family: 'Source Sans 3', system-ui, sans-serif;
-    font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
+    color: #666666;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    letter-spacing: 0;
     text-transform: none;
-    border: 1.5px solid #B8D2C1;
-    border-radius: 2px;
-    padding: 1rem 2.5rem;
-    transition: background-color 0.15s ease, transform 0.08s ease;
+    border: 1px solid #E5E5E5;
+    border-radius: 0;
+    padding: 0.875rem 2.25rem;
+    transition: opacity 0.15s ease;
     cursor: pointer;
   }
-  .btn-soft:hover {
-    background: #263D32;
-    color: #FFFFFF;
-    border-color: #263D32;
+  .btn-ghost:hover { opacity: 0.85; }
+  .btn-ghost:focus-visible {
+    outline: 2px solid #B5242A;
+    outline-offset: 2px;
   }
+
+  /* Legacy alias — old code still references .btn-soft */
+  .btn-soft {
+    background: transparent;
+    color: #666666;
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    border: 1px solid #E5E5E5;
+    border-radius: 0;
+    padding: 0.875rem 2.25rem;
+    transition: opacity 0.15s ease;
+    cursor: pointer;
+  }
+  .btn-soft:hover { opacity: 0.85; }
   .btn-soft:focus-visible {
     outline: 2px solid #B5242A;
     outline-offset: 2px;
@@ -276,7 +282,7 @@
     float: left;
     line-height: 0.8;
     margin: 0.05em 0.08em 0 0;
-    color: #B5242A;
+    color: #1A1A1A;
     font-weight: 500;
   }
 
@@ -288,7 +294,7 @@
     color: #FFFFFF !important;
   }
   .ProseMirror .is-editor-empty:first-child::before {
-    color: #7A9A8A;
+    color: #BBBBBB;
   }
 
   /* ----- Paywall gate marker in editor ----- */
@@ -296,7 +302,7 @@
     position: relative;
     margin: 2rem 0;
     padding: 0.75rem 1rem;
-    background: #DDEEE4;
+    background: #F0F0F0;
     border: 1px dashed #B5242A;
     cursor: default;
     user-select: none;
@@ -323,12 +329,12 @@
   }
   .paywall-gate-marker .gate-remove {
     font-size: 0.75rem;
-    color: #7A9A8A;
+    color: #999999;
     cursor: pointer;
     transition: color 0.15s ease;
   }
   .paywall-gate-marker .gate-remove:hover {
-    color: #263D32;
+    color: #1A1A1A;
   }
 
   /* ----- Article hero image ----- */
@@ -346,7 +352,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(15, 31, 24, 0.75) 0%, rgba(15, 31, 24, 0.15) 60%, transparent 100%);
+    background: linear-gradient(to top, rgba(26, 26, 26, 0.75) 0%, rgba(26, 26, 26, 0.15) 60%, transparent 100%);
   }
   .article-hero-content {
     position: relative;
@@ -359,8 +365,4 @@
 
 @layer utilities {
   .sharp { border-radius: 0 !important; }
-
-  @media (max-width: 1023px) {
-    body { padding-top: 56px; }
-  }
 }

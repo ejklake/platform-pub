@@ -79,16 +79,16 @@ export default function AuthPage() {
     return (
       <div className="mx-auto max-w-sm px-6 py-28 text-center">
         <div className="ornament mb-8" />
-        <h1 className="font-serif text-2xl font-medium text-ink mb-4 tracking-tight">
+        <h1 className="font-serif text-2xl font-medium text-black mb-4 tracking-tight">
           Check your email
         </h1>
-        <p className="text-mono-sm text-content-secondary leading-relaxed">
-          If an account exists for <span className="text-ink">{email}</span>,
+        <p className="text-mono-sm text-grey-600 leading-relaxed">
+          If an account exists for <span className="text-black">{email}</span>,
           we've sent a login link. It expires in 15 minutes.
         </p>
         <button
           onClick={() => { setMagicLinkSent(false); setEmail('') }}
-          className="mt-8 text-mono-xs text-content-secondary hover:text-content-primary underline underline-offset-4 transition-colors"
+          className="mt-8 text-mono-xs text-grey-600 hover:text-black underline underline-offset-4 transition-colors"
         >
           Try a different email
         </button>
@@ -98,25 +98,25 @@ export default function AuthPage() {
 
   return (
     <div className="mx-auto max-w-sm px-6 py-28">
-      <h1 className="font-serif font-medium text-ink mb-2 tracking-tight" style={{ fontSize: '28px' }}>
+      <h1 className="font-serif font-medium text-black mb-2 tracking-tight" style={{ fontSize: '28px' }}>
         {mode === 'signup' ? 'Create your account' : 'Welcome back'}
       </h1>
-      <p className="text-mono-xs text-content-secondary mb-10">
+      <p className="text-mono-xs text-grey-600 mb-10">
         {mode === 'signup'
           ? 'Your first £5 of reading is free. No card required.'
           : 'We\'ll send a login link to your email.'}
       </p>
 
       {error && (
-        <div className="mb-6 bg-card px-4 py-3 text-mono-xs text-content-primary">
+        <div className="mb-6 bg-white px-4 py-3 text-mono-xs text-black">
           {error}
         </div>
       )}
 
       <a
         href="/api/v1/auth/google"
-        className="flex w-full items-center justify-center gap-3 bg-card px-4 py-[14px] text-mono-xs text-content-primary hover:bg-surface-deep transition-colors"
-        style={{ border: '1.5px solid #B8D2C1' }}
+        className="flex w-full items-center justify-center gap-3 bg-white px-4 py-[14px] text-mono-xs text-black hover:bg-grey-100 transition-colors"
+        style={{ border: '1.5px solid #E5E5E5' }}
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -132,26 +132,26 @@ export default function AuthPage() {
           <div className="w-full rule" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-surface px-4 text-mono-xs text-content-muted">or</span>
+          <span className="bg-white px-4 text-mono-xs text-grey-400">or</span>
         </div>
       </div>
 
       <form onSubmit={mode === 'signup' ? handleSignup : handleLogin} className="space-y-5">
         <div>
           <label htmlFor="email" className="label-muted block mb-2" style={{ fontSize: '13px' }}>Email</label>
-          <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-card px-4 py-[14px] text-content-primary focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #B8D2C1' }} placeholder="you@example.com" />
+          <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-white px-4 py-[14px] text-black focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #E5E5E5' }} placeholder="you@example.com" />
         </div>
 
         {mode === 'signup' && (
           <>
             <div>
               <label htmlFor="displayName" className="label-muted block mb-2" style={{ fontSize: '13px' }}>Display name</label>
-              <input id="displayName" type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-card px-4 py-[14px] text-content-primary focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #B8D2C1' }} placeholder="Your Name" />
+              <input id="displayName" type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-white px-4 py-[14px] text-black focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #E5E5E5' }} placeholder="Your Name" />
             </div>
             <div>
               <label htmlFor="username" className="label-muted block mb-2" style={{ fontSize: '13px' }}>Username</label>
-              <input id="username" type="text" required pattern="^[a-z0-9_-]+$" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} className="w-full bg-card px-4 py-[14px] text-content-primary focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #B8D2C1' }} placeholder="yourname" />
-              <p className="mt-2 text-mono-xs text-content-muted">yourname.platform.pub</p>
+              <input id="username" type="text" required pattern="^[a-z0-9_-]+$" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} className="w-full bg-white px-4 py-[14px] text-black focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #E5E5E5' }} placeholder="yourname" />
+              <p className="mt-2 text-mono-xs text-grey-400">yourname.platform.pub</p>
             </div>
           </>
         )}
@@ -161,22 +161,22 @@ export default function AuthPage() {
         </button>
       </form>
 
-      <p className="mt-8 text-center text-mono-xs text-content-secondary">
+      <p className="mt-8 text-center text-mono-xs text-grey-600">
         {mode === 'signup' ? (
-          <>Already have an account?{' '}<button onClick={() => setMode('login')} className="text-ink underline underline-offset-4 hover:text-content-secondary">Log in</button></>
+          <>Already have an account?{' '}<button onClick={() => setMode('login')} className="text-black underline underline-offset-4 hover:text-grey-600">Log in</button></>
         ) : (
-          <>New here?{' '}<button onClick={() => setMode('signup')} className="text-ink underline underline-offset-4 hover:text-content-secondary">Create an account</button></>
+          <>New here?{' '}<button onClick={() => setMode('signup')} className="text-black underline underline-offset-4 hover:text-grey-600">Create an account</button></>
         )}
       </p>
 
       {process.env.NODE_ENV === 'development' && (
-        <div className="mt-10 pt-6" style={{ borderTop: '1.5px dashed #B8D2C1' }}>
-          <p className="text-mono-xs text-content-muted mb-3">Dev mode</p>
+        <div className="mt-10 pt-6" style={{ borderTop: '1.5px dashed #E5E5E5' }}>
+          <p className="text-mono-xs text-grey-400 mb-3">Dev mode</p>
           <button
             onClick={handleDevLogin}
             disabled={loading || !email}
-            className="w-full bg-surface-deep px-4 py-[14px] text-mono-xs text-content-secondary hover:text-content-primary disabled:opacity-50 transition-colors"
-            style={{ border: '1.5px dashed #B8D2C1' }}
+            className="w-full bg-grey-100 px-4 py-[14px] text-mono-xs text-grey-600 hover:text-black disabled:opacity-50 transition-colors"
+            style={{ border: '1.5px dashed #E5E5E5' }}
           >
             {loading ? 'Working...' : 'Instant dev login (skip magic link)'}
           </button>

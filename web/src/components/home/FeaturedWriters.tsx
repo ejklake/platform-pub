@@ -31,10 +31,10 @@ export function FeaturedWriters() {
     return (
       <div className="space-y-0">
         {[1, 2, 3].map(i => (
-          <div key={i} style={{ background: '#FFFAEF', borderBottom: '2.5px solid #B8D2C1', padding: '1.5rem 1.75rem' }}>
-            <div className="h-3 w-24 animate-pulse bg-surface-deep mb-4" />
-            <div className="h-5 w-3/4 animate-pulse bg-surface-deep mb-3" />
-            <div className="h-3 w-full animate-pulse bg-surface-deep" />
+          <div key={i} className="py-6 px-6 border-b border-grey-100">
+            <div className="h-3 w-24 animate-pulse bg-grey-100 mb-4" />
+            <div className="h-5 w-3/4 animate-pulse bg-grey-100 mb-3" />
+            <div className="h-3 w-full animate-pulse bg-grey-100" />
           </div>
         ))}
       </div>
@@ -60,40 +60,31 @@ function FeaturedCard({ article }: { article: FeaturedArticle }) {
   return (
     <Link
       href={`/article/${article.dTag}`}
-      className="block"
-      style={{
-        background: '#FFFAEF',
-        padding: '1.5rem 1.75rem',
-        borderLeft: '4px solid transparent',
-        borderBottom: '2.5px solid #B8D2C1',
-        cursor: 'pointer',
-        transition: 'border-left-color 0.12s ease',
-      }}
-      onMouseEnter={e => (e.currentTarget.style.borderLeftColor = '#B5242A')}
-      onMouseLeave={e => (e.currentTarget.style.borderLeftColor = 'transparent')}
+      className="block py-6 px-6 border-b border-grey-100 transition-colors hover:bg-grey-50"
+      style={{ borderLeft: article.isPaywalled ? '3px solid #B5242A' : '3px solid transparent' }}
     >
       {article.authorDisplayName && (
-        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8A8578', marginBottom: '10px' }}>
+        <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-grey-300 mb-2.5">
           {article.authorDisplayName}
         </p>
       )}
 
-      <h2 style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '28px', fontWeight: 500, fontStyle: 'italic', color: '#0F1F18', lineHeight: 1.2, letterSpacing: '-0.02em', marginBottom: '10px' }}>
+      <h2 className="font-serif text-[24px] font-medium italic text-black leading-[1.2] tracking-[-0.02em] mb-2.5">
         {article.title}
       </h2>
 
-      <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '16px', fontWeight: 400, color: '#263D32', lineHeight: 1.6, marginBottom: '14px' }}>
+      <p className="font-serif text-[15px] text-grey-600 leading-[1.6] mb-3.5">
         {excerpt}
       </p>
 
-      <div className="flex items-center gap-3" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', color: '#ACA69C' }}>
+      <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.02em] text-grey-300">
         <span>{formatDate(article.publishedAt)}</span>
-        <span style={{ opacity: 0.4 }}>/</span>
+        <span className="opacity-40">/</span>
         <span>{readMinutes} min</span>
         {article.isPaywalled && article.pricePence && (
           <>
-            <span style={{ opacity: 0.4 }}>/</span>
-            <span style={{ color: '#B5242A' }}>£{(article.pricePence / 100).toFixed(2)}</span>
+            <span className="opacity-40">/</span>
+            <span className="text-crimson">£{(article.pricePence / 100).toFixed(2)}</span>
           </>
         )}
       </div>

@@ -68,12 +68,12 @@ function NotificationRow({ n, onDismiss }: { n: Notification; onDismiss: (id: st
       tabIndex={0}
       onClick={() => onDismiss(n.id, destUrl)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onDismiss(n.id, destUrl) }}
-      className="flex items-start gap-3 py-4 hover:bg-card transition-colors bg-surface/50 cursor-pointer"
+      className="flex items-start gap-3 py-4 hover:bg-white transition-colors bg-white/50 cursor-pointer"
     >
       {n.actor?.avatar ? (
         <img src={n.actor.avatar} alt="" className="h-10 w-10 rounded-full object-cover flex-shrink-0 mt-0.5" />
       ) : (
-        <span className="flex h-10 w-10 items-center justify-center bg-surface-deep text-sm font-medium text-content-muted rounded-full flex-shrink-0 mt-0.5">
+        <span className="flex h-10 w-10 items-center justify-center bg-grey-100 text-sm font-medium text-grey-400 rounded-full flex-shrink-0 mt-0.5">
           {(n.actor?.displayName ?? n.actor?.username ?? '?')[0].toUpperCase()}
         </span>
       )}
@@ -81,25 +81,25 @@ function NotificationRow({ n, onDismiss }: { n: Notification; onDismiss: (id: st
       <div className="min-w-0 flex-1">
         {n.type === 'new_reply' ? (
           <>
-            <p className="text-sm text-content-primary leading-snug">
+            <p className="text-sm text-black leading-snug">
               <span className="font-medium">{actorName}</span>
               {' replied'}
               {n.article?.title && <>{' to '}<span className="italic">{n.article.title}</span></>}
             </p>
             {n.comment?.content && (
-              <p className="text-sm text-content-muted mt-1 line-clamp-2 leading-snug">{n.comment.content}</p>
+              <p className="text-sm text-grey-400 mt-1 line-clamp-2 leading-snug">{n.comment.content}</p>
             )}
           </>
         ) : (
-          <p className="text-sm text-content-primary leading-snug">
+          <p className="text-sm text-black leading-snug">
             <span className="font-medium">{actorName}</span>
             {' '}{labels[n.type] ?? 'sent you a notification'}
           </p>
         )}
-        <p className="text-xs text-content-muted mt-1">{timeAgo(n.createdAt)}</p>
+        <p className="text-xs text-grey-400 mt-1">{timeAgo(n.createdAt)}</p>
       </div>
 
-      <span className="flex-shrink-0 mt-2 h-2 w-2 rounded-full bg-accent" />
+      <span className="flex-shrink-0 mt-2 h-2 w-2 rounded-full bg-crimson" />
     </div>
   )
 }
@@ -131,32 +131,32 @@ export default function NotificationsPage() {
   if (loading || !user) {
     return (
       <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
-        <div className="h-7 w-36 animate-pulse bg-surface-deep mb-2 rounded" />
-        <div className="h-4 w-48 animate-pulse bg-surface-deep mb-8 rounded" />
+        <div className="h-7 w-36 animate-pulse bg-grey-100 mb-2 rounded" />
+        <div className="h-4 w-48 animate-pulse bg-grey-100 mb-8 rounded" />
       </div>
     )
   }
 
   return (
     <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
-      <h1 className="font-serif text-3xl sm:text-4xl font-light text-content-primary mb-1">Notifications</h1>
-      <p className="text-ui-sm text-content-muted mb-8">Your recent activity</p>
+      <h1 className="font-serif text-3xl sm:text-4xl font-light text-black mb-1">Notifications</h1>
+      <p className="text-ui-sm text-grey-400 mb-8">Your recent activity</p>
 
       {dataLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex items-start gap-3 py-4 animate-pulse">
-              <div className="h-10 w-10 rounded-full bg-surface-deep flex-shrink-0" />
+              <div className="h-10 w-10 rounded-full bg-grey-100 flex-shrink-0" />
               <div className="flex-1">
-                <div className="h-3.5 w-48 bg-surface-deep mb-2 rounded" />
-                <div className="h-3 w-20 bg-surface-deep rounded" />
+                <div className="h-3.5 w-48 bg-grey-100 mb-2 rounded" />
+                <div className="h-3 w-20 bg-grey-100 rounded" />
               </div>
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
         <div className="py-20 text-center">
-          <p className="text-ui-sm text-content-muted">No notifications yet</p>
+          <p className="text-ui-sm text-grey-400">No notifications yet</p>
         </div>
       ) : (
         <div>

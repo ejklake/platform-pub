@@ -33,13 +33,13 @@ function HistoryItemRow({ item }: { item: ReadingHistoryItem }) {
   return (
     <Link
       href={href}
-      className="flex items-start gap-3 py-4 mb-1 hover:bg-card transition-colors"
+      className="flex items-start gap-3 py-4 mb-1 hover:bg-white transition-colors"
     >
       <div className="min-w-0 flex-1">
-        <p className="font-serif text-base text-content-primary leading-snug mb-1">
+        <p className="font-serif text-base text-black leading-snug mb-1">
           {item.title ?? 'Untitled'}
         </p>
-        <div className="flex items-center gap-2 text-ui-xs text-content-muted flex-wrap">
+        <div className="flex items-center gap-2 text-ui-xs text-grey-400 flex-wrap">
           <span>{writerName}</span>
           {readMinutes && (
             <>
@@ -50,7 +50,7 @@ function HistoryItemRow({ item }: { item: ReadingHistoryItem }) {
           {item.isPaywalled && (
             <>
               <span className="opacity-40">/</span>
-              <span className="text-accent">£</span>
+              <span className="text-crimson">£</span>
             </>
           )}
           <span className="opacity-40">/</span>
@@ -82,29 +82,29 @@ export default function HistoryPage() {
   if (loading || !user) {
     return (
       <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
-        <div className="h-7 w-36 animate-pulse bg-surface-deep mb-2 rounded" />
-        <div className="h-4 w-48 animate-pulse bg-surface-deep mb-8 rounded" />
+        <div className="h-7 w-36 animate-pulse bg-grey-100 mb-2 rounded" />
+        <div className="h-4 w-48 animate-pulse bg-grey-100 mb-8 rounded" />
       </div>
     )
   }
 
   return (
     <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
-      <h1 className="font-serif text-3xl sm:text-4xl font-light text-content-primary mb-1">Reading History</h1>
-      <p className="text-ui-sm text-content-muted mb-8">Articles you've read</p>
+      <h1 className="font-serif text-3xl sm:text-4xl font-light text-black mb-1">Reading History</h1>
+      <p className="text-ui-sm text-grey-400 mb-8">Articles you've read</p>
 
       {dataLoading ? (
         <div className="space-y-1">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="py-4 mb-1 animate-pulse">
-              <div className="h-4 w-3/4 bg-surface-deep mb-2 rounded" />
-              <div className="h-3 w-40 bg-surface-deep rounded" />
+              <div className="h-4 w-3/4 bg-grey-100 mb-2 rounded" />
+              <div className="h-3 w-40 bg-grey-100 rounded" />
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
         <div className="py-20 text-center">
-          <p className="text-ui-sm text-content-muted">You haven't read any articles yet</p>
+          <p className="text-ui-sm text-grey-400">You haven't read any articles yet</p>
         </div>
       ) : (
         <div>

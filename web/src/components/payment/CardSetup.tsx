@@ -39,9 +39,9 @@ export function CardSetup({ onSuccess }: CardSetupProps) {
         appearance: {
           theme: 'stripe',
           variables: {
-            colorPrimary: '#0F1F18',
-            colorText: '#0F1F18',
-            fontFamily: '"Source Sans 3", system-ui, sans-serif',
+            colorPrimary: '#1A1A1A',
+            colorText: '#1A1A1A',
+            fontFamily: '"Instrument Sans", system-ui, sans-serif',
             borderRadius: '2px',
           },
         },
@@ -99,7 +99,7 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="border border-rule px-3 py-3 mb-3">
+      <div className="border border-grey-200 px-3 py-3 mb-3">
         <CardElement
           options={{
             style: {
@@ -125,7 +125,7 @@ function CardForm({ onSuccess }: { onSuccess: () => void }) {
         {saving ? 'Saving...' : 'Add card'}
       </button>
 
-      <p className="mt-3 text-xs text-content-faint">
+      <p className="mt-3 text-xs text-grey-300">
         Your card won't be charged now. It will be used when your reading tab
         settles (at £8 or monthly).
       </p>

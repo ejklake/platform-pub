@@ -24,29 +24,29 @@ export function VoteConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onCancel}
     >
       <div
-        className="mx-4 w-full max-w-sm bg-card border border-rule shadow-xl p-6"
+        className="mx-4 w-full max-w-sm bg-white border border-grey-200 shadow-xl p-6"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-center mb-4">
-          <span className="text-3xl text-content-muted">
+          <span className="text-3xl text-grey-400">
             {direction === 'up' ? '▲' : '▼'}
           </span>
         </div>
 
-        <p className="text-ui-sm text-content-primary text-center mb-1">
+        <p className="text-ui-sm text-black text-center mb-1">
           This is your <span className="font-medium">{ordinal} {directionLabel}</span> on this content.
         </p>
 
-        <p className="text-2xl font-medium text-ink text-center mt-4 mb-1">
+        <p className="text-2xl font-medium text-black text-center mt-4 mb-1">
           {formatPence(costPence)}
         </p>
 
         {totalSpentPence > 0 && (
-          <p className="text-ui-xs text-content-faint text-center mb-4">
+          <p className="text-ui-xs text-grey-300 text-center mb-4">
             Your total spend on this content: {formatPence(totalSpentPence + costPence)}
           </p>
         )}

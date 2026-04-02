@@ -61,7 +61,7 @@ export function CommentItem({
   }
 
   return (
-    <div className={`${depth > 0 ? 'ml-8 border-l border-rule pl-4' : ''}`}>
+    <div className={`${depth > 0 ? 'ml-8 border-l border-grey-200 pl-4' : ''}`}>
       <div className="py-3">
         <div className="flex items-center gap-2 mb-1.5">
           {comment.author.avatar ? (
@@ -71,30 +71,30 @@ export function CommentItem({
               className="h-6 w-6 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-avatar-bg text-[10px] font-medium text-content-muted">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-grey-100 text-[10px] font-medium text-grey-400">
               {initial}
             </div>
           )}
           {comment.author.username ? (
-            <Link href={`/${comment.author.username}`} className="text-xs font-medium text-content-secondary hover:text-content-primary transition-colors">
+            <Link href={`/${comment.author.username}`} className="text-xs font-medium text-grey-600 hover:text-black transition-colors">
               {authorName}
             </Link>
           ) : (
-            <span className="text-xs font-medium text-content-secondary">
+            <span className="text-xs font-medium text-grey-600">
               {authorName}
             </span>
           )}
-          <span className="text-xs text-content-faint">&middot;</span>
+          <span className="text-xs text-grey-300">&middot;</span>
           <time
             dateTime={comment.publishedAt}
-            className="text-xs text-content-faint"
+            className="text-xs text-grey-300"
           >
             {formatRelativeTime(comment.publishedAt)}
           </time>
         </div>
 
         <p className={`text-sm leading-relaxed whitespace-pre-wrap ${
-          comment.isDeleted ? 'text-content-faint italic' : 'text-content-secondary'
+          comment.isDeleted ? 'text-grey-300 italic' : 'text-grey-600'
         }`}>
           {comment.content}
         </p>
@@ -104,7 +104,7 @@ export function CommentItem({
             {currentUserId && onReply && depth < 2 && (
               <button
                 onClick={() => onReply(comment.id, comment.nostrEventId, authorName)}
-                className="text-xs text-content-faint hover:text-content-muted transition-colors"
+                className="text-xs text-grey-300 hover:text-grey-400 transition-colors"
               >
                 Reply
               </button>
@@ -114,8 +114,8 @@ export function CommentItem({
                 onClick={handleDelete}
                 className={`text-xs transition-colors ${
                   confirmDelete
-                    ? 'text-accent font-medium'
-                    : 'text-content-faint hover:text-accent'
+                    ? 'text-crimson font-medium'
+                    : 'text-grey-300 hover:text-crimson'
                 }`}
               >
                 {confirmDelete ? 'Confirm delete' : 'Delete'}

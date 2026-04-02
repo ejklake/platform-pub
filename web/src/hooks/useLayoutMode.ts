@@ -1,0 +1,47 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
+
+export type LayoutMode = 'platform' | 'canvas'
+
+/**
+ * Known platform-register route prefixes.
+ * Everything else at the root level (/:username) is canvas.
+ */
+const PLATFORM_PREFIXES = [
+  '/feed',
+  '/write',
+  '/dashboard',
+  '/about',
+  '/auth',
+  '/search',
+  '/profile',
+  '/settings',
+  '/notifications',
+  '/history',
+  '/following',
+  '/followers',
+  '/messages',
+  '/account',
+  '/admin',
+]
+
+export function useLayoutMode(): LayoutMode {
+  const pathname = usePathname()
+
+  // Article reader is always canvas
+  if (pathname.startsWith('/article/')) return 'canvas'
+
+  // Homepage is platform
+  if (pathname === '/') return 'platform'
+
+  // Known platform routes
+  for (const prefix of PLATFORM_PREFIXES) {
+    if (pathname === prefix || pathname.startsWith(prefix + '/')) {
+      return 'platform'
+    }
+  }
+
+  // Anything else at root level (e.g. /:username) is canvas
+  return 'canvas'
+}

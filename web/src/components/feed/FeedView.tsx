@@ -195,10 +195,10 @@ export function FeedView() {
   if (loading || !user) return <FeedSkeleton />
 
   return (
-    <div className="mx-auto max-w-feed pt-[53px] lg:pt-0">
+    <div className="mx-auto max-w-feed pt-0">
 
       {/* Sticky zone: composer + tabs */}
-      <div className="sticky top-[53px] lg:top-0 z-10 bg-nav">
+      <div className="sticky top-[56px] z-10 bg-white">
         <div ref={composerRef} className="px-6 pt-4">
           <NoteComposer
             quoteTarget={pendingQuote ?? undefined}
@@ -206,7 +206,7 @@ export function FeedView() {
             onClearQuote={() => setPendingQuote(null)}
           />
         </div>
-        <div className="flex px-6 pt-1 border-b-2 border-rule">
+        <div className="flex px-6 pt-1 border-b-2 border-grey-200">
           <button
             onClick={() => setActiveTab('for-you')}
             className={`tab-feed ${activeTab === 'for-you' ? 'tab-feed-active' : ''}`}
@@ -235,7 +235,7 @@ export function FeedView() {
         ) : activeTab === 'for-you' ? (
           globalLoading ? <InlineSkeleton /> : globalItems.length === 0 ? (
             <div className="py-20 text-center px-6">
-              <p className="text-ui-sm text-content-muted">Nothing here yet.</p>
+              <p className="text-ui-sm text-grey-400">Nothing here yet.</p>
             </div>
           ) : (
             <div className="px-6">
@@ -258,7 +258,7 @@ export function FeedView() {
           <InlineSkeleton />
         ) : feedItems.length === 0 ? (
           <div className="py-20 text-center px-6">
-            <p className="text-ui-sm text-content-muted">
+            <p className="text-ui-sm text-grey-400">
               Nothing here yet. Use the Add tab to follow writers.
             </p>
           </div>
@@ -291,21 +291,21 @@ function NewUserCard({ item }: { item: NewUserItem }) {
       {item.avatar ? (
         <img src={item.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
       ) : (
-        <span className="flex h-7 w-7 items-center justify-center bg-avatar-bg text-[12px] font-medium text-content-muted rounded-full flex-shrink-0">
+        <span className="flex h-7 w-7 items-center justify-center bg-grey-100 text-[12px] font-medium text-grey-400 rounded-full flex-shrink-0">
           {initial}
         </span>
       )}
-      <p className="text-ui-xs text-content-muted flex-1 min-w-0">
+      <p className="text-ui-xs text-grey-400 flex-1 min-w-0">
         {item.username ? (
-          <Link href={`/${item.username}`} className="font-medium text-content-primary hover:underline">
+          <Link href={`/${item.username}`} className="font-medium text-black hover:underline">
             {name}
           </Link>
         ) : (
-          <span className="font-medium text-content-primary">{name}</span>
+          <span className="font-medium text-black">{name}</span>
         )}
         {' '}joined the platform
       </p>
-      <span className="text-ui-xs text-content-faint flex-shrink-0">{timeAgo(item.joinedAt)}</span>
+      <span className="text-ui-xs text-grey-300 flex-shrink-0">{timeAgo(item.joinedAt)}</span>
     </div>
   )
 }
@@ -363,7 +363,7 @@ function AddPanel({ onFollowed }: { onFollowed: () => void }) {
 
   return (
     <div className="px-6 pt-5">
-      <div className="flex gap-0 mb-4 border-b border-rule">
+      <div className="flex gap-0 mb-4 border-b border-grey-200">
         <button
           onClick={() => setMode('people')}
           className={`tab-pill ${mode === 'people' ? 'tab-pill-active' : 'tab-pill-inactive'}`}
@@ -386,17 +386,17 @@ function AddPanel({ onFollowed }: { onFollowed: () => void }) {
             onChange={e => setQuery(e.target.value)}
             placeholder="Search for writers..."
             autoFocus
-            className="w-full bg-card px-4 py-3 text-ui-sm text-content-primary placeholder:text-content-faint focus:outline-none transition-colors mb-4"
+            className="w-full bg-white border border-grey-100 px-4 py-3 text-ui-sm text-black placeholder:text-grey-300 focus:outline-none transition-colors mb-4"
           />
 
           {searching && (
             <div className="space-y-2">
-              {[1, 2, 3].map(i => <div key={i} className="h-14 animate-pulse bg-surface-deep" />)}
+              {[1, 2, 3].map(i => <div key={i} className="h-14 animate-pulse bg-grey-100" />)}
             </div>
           )}
 
           {!searching && results.length === 0 && query.trim().length >= 2 && (
-            <p className="text-ui-sm text-content-muted text-center py-8">No writers found.</p>
+            <p className="text-ui-sm text-grey-400 text-center py-8">No writers found.</p>
           )}
 
           {!searching && results.map(w => (
@@ -404,13 +404,13 @@ function AddPanel({ onFollowed }: { onFollowed: () => void }) {
               {w.avatar ? (
                 <img src={w.avatar} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
               ) : (
-                <span className="flex h-9 w-9 items-center justify-center bg-avatar-bg text-xs font-medium text-content-muted flex-shrink-0 rounded-full">
+                <span className="flex h-9 w-9 items-center justify-center bg-grey-100 text-xs font-medium text-grey-400 flex-shrink-0 rounded-full">
                   {(w.displayName ?? w.username)[0].toUpperCase()}
                 </span>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-ui-sm font-medium text-content-primary truncate">{w.displayName ?? w.username}</p>
-                <p className="text-ui-xs text-content-muted">@{w.username} &middot; {w.articleCount} articles</p>
+                <p className="text-ui-sm font-medium text-black truncate">{w.displayName ?? w.username}</p>
+                <p className="text-ui-xs text-grey-400">@{w.username} &middot; {w.articleCount} articles</p>
               </div>
               <button
                 onClick={() => handleFollow(w.id)}
@@ -430,9 +430,9 @@ function AddPanel({ onFollowed }: { onFollowed: () => void }) {
             onChange={e => setRssUrl(e.target.value)}
             placeholder="Paste an RSS or Atom feed URL..."
             autoFocus
-            className="w-full bg-card px-4 py-3 text-ui-sm text-content-primary placeholder:text-content-faint focus:outline-none transition-colors mb-4"
+            className="w-full bg-white border border-grey-100 px-4 py-3 text-ui-sm text-black placeholder:text-grey-300 focus:outline-none transition-colors mb-4"
           />
-          <p className="text-ui-xs text-content-faint mb-4">
+          <p className="text-ui-xs text-grey-300 mb-4">
             External feed following is coming soon. Paste a feed URL to get notified when it's ready.
           </p>
           <button
@@ -455,10 +455,10 @@ function FeedSkeleton() {
   return (
     <div className="mx-auto max-w-feed pt-16 lg:pt-0 px-6 py-10 space-y-[10px]">
       {[1, 2, 3].map(i => (
-        <div key={i} className="bg-card p-5">
-          <div className="h-3 w-24 animate-pulse bg-surface-deep mb-4" />
-          <div className="h-5 w-3/4 animate-pulse bg-surface-deep mb-3" />
-          <div className="h-3 w-full animate-pulse bg-surface-deep" />
+        <div key={i} className="bg-white border border-grey-100 p-5">
+          <div className="h-3 w-24 animate-pulse bg-grey-100 mb-4" />
+          <div className="h-5 w-3/4 animate-pulse bg-grey-100 mb-3" />
+          <div className="h-3 w-full animate-pulse bg-grey-100" />
         </div>
       ))}
     </div>
@@ -469,10 +469,10 @@ function InlineSkeleton() {
   return (
     <div className="px-6 pt-1 space-y-[10px]">
       {[1, 2, 3].map(i => (
-        <div key={i} className="bg-card p-5">
-          <div className="h-3 w-24 animate-pulse bg-surface-deep mb-4" />
-          <div className="h-5 w-3/4 animate-pulse bg-surface-deep mb-3" />
-          <div className="h-3 w-full animate-pulse bg-surface-deep" />
+        <div key={i} className="bg-white border border-grey-100 p-5">
+          <div className="h-3 w-24 animate-pulse bg-grey-100 mb-4" />
+          <div className="h-5 w-3/4 animate-pulse bg-grey-100 mb-3" />
+          <div className="h-3 w-full animate-pulse bg-grey-100" />
         </div>
       ))}
     </div>

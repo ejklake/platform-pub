@@ -2,38 +2,196 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../stores/auth'
-import { NotificationBell } from '../ui/NotificationBell'
+import type { MeResponse } from '../../lib/api'
+import { useLayoutModeContext } from './LayoutShell'
+
+// ─── Nav link styling (Plex Mono, uppercase) ─────────────────────────────────
+
+function navLinkClass(active: boolean) {
+  return [
+    'font-mono text-[12px] uppercase tracking-[0.04em] transition-colors px-3 py-1',
+    active
+      ? 'text-black border-b-2 border-crimson'
+      : 'text-grey-400 hover:text-black',
+  ].join(' ')
+}
+
+// ─── Avatar ──────────────────────────────────────────────────────────────────
+
+function Avatar({ user, size = 32 }: { user: { avatar: string | null; displayName: string | null; username: string | null }; size?: number }) {
+  const px = `${size}px`
+  if (user.avatar) {
+    return <img src={user.avatar} alt="" className="rounded-full object-cover" style={{ width: px, height: px }} />
+  }
+  return (
+    <span
+      className="flex items-center justify-center rounded-full bg-grey-100 text-grey-400 font-mono uppercase"
+      style={{ width: px, height: px, fontSize: `${Math.round(size * 0.38)}px` }}
+    >
+      {(user.displayName ?? user.username ?? '?')[0]}
+    </span>
+  )
+}
+
+// ─── Avatar dropdown (the "me" menu) ─────────────────────────────────────────
+
+function AvatarDropdown({ user, onLogout, onClose }: {
+  user: { avatar: string | null; displayName: string | null; username: string | null; freeAllowanceRemainingPence: number; isWriter: boolean }
+  onLogout: () => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const linkClass = 'block px-4 py-2 text-[14px] text-black hover:bg-grey-100 transition-colors font-sans'
+  const balance = `£${(user.freeAllowanceRemainingPence / 100).toFixed(2)}`
+
+  return (
+    <div ref={ref} className="absolute right-0 top-full mt-2 w-56 bg-white border border-grey-200 shadow-lg z-50">
+      {/* Identity */}
+      <div className="px-4 py-3 border-b border-grey-200">
+        <p className="text-[14px] font-semibold text-black font-sans">{user.displayName ?? user.username}</p>
+        {user.username && (
+          <p className="text-[12px] text-grey-400 font-mono">@{user.username}</p>
+        )}
+      </div>
+
+      {/* Navigation group 1 */}
+      <div className="py-1 border-b border-grey-200">
+        <Link href="/profile" onClick={onClose} className={linkClass}>Profile</Link>
+        <Link href="/notifications" onClick={onClose} className={linkClass}>Notifications</Link>
+      </div>
+
+      {/* Navigation group 2 — money & content */}
+      <div className="py-1 border-b border-grey-200">
+        <Link href="/history" onClick={onClose} className={linkClass}>Reading history</Link>
+        <div className="px-4 py-2 text-[14px] text-grey-400 font-sans">
+          Balance: <span className="text-black tabular-nums">{balance}</span>
+        </div>
+      </div>
+
+      {/* Navigation group 3 — meta */}
+      <div className="py-1">
+        <Link href="/settings" onClick={onClose} className={linkClass}>Settings</Link>
+        <button onClick={onLogout} className="block w-full text-left px-4 py-2 text-[14px] text-grey-600 hover:bg-grey-100 transition-colors font-sans">
+          Log out
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Mobile sheet ────────────────────────────────────────────────────────────
+
+function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
+  user: MeResponse | null
+  loading: boolean
+  onLogout: () => void
+  onClose: () => void
+  onSearch: (q: string) => void
+}) {
+  const pathname = usePathname()
+  const [query, setQuery] = useState('')
+
+  function isActive(path: string) {
+    if (path === '/feed') return pathname === '/feed' || pathname === '/'
+    return pathname.startsWith(path)
+  }
+
+  const linkClass = (path: string) => [
+    'block py-3 font-mono text-[12px] uppercase tracking-[0.04em] transition-colors',
+    isActive(path) ? 'text-black font-medium' : 'text-grey-400 hover:text-black',
+  ].join(' ')
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    if (query.trim().length >= 2) {
+      onSearch(query.trim())
+      setQuery('')
+    }
+  }
+
+  return (
+    <div className="fixed inset-x-0 top-[56px] bg-white border-b border-grey-200 z-40 px-6 py-4 shadow-sm">
+      {loading ? (
+        <div className="h-4 w-24 animate-pulse bg-grey-100" />
+      ) : user ? (
+        <>
+          <Link href="/feed" onClick={onClose} className={linkClass('/feed')}>Feed</Link>
+          <Link href="/write" onClick={onClose} className={linkClass('/write')}>Write</Link>
+          <Link href="/dashboard" onClick={onClose} className={linkClass('/dashboard')}>Dashboard</Link>
+          <Link href="/about" onClick={onClose} className={linkClass('/about')}>About</Link>
+
+          <div className="border-t border-grey-200 my-2" />
+
+          <form onSubmit={handleSearch} className="py-2">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search…"
+              className="w-full bg-grey-100 px-3 py-2 text-[13px] text-black placeholder-grey-300 font-mono"
+            />
+          </form>
+
+          <div className="border-t border-grey-200 my-2" />
+
+          <Link href="/notifications" onClick={onClose} className={linkClass('/notifications')}>Notifications</Link>
+          <Link href="/profile" onClick={onClose} className={linkClass('/profile')}>Profile</Link>
+          <Link href="/history" onClick={onClose} className={linkClass('/history')}>Reading history</Link>
+          <Link href="/settings" onClick={onClose} className={linkClass('/settings')}>Settings</Link>
+
+          <div className="border-t border-grey-200 my-2" />
+
+          <button
+            onClick={() => { onLogout(); onClose() }}
+            className="block py-3 font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
+          >
+            Log out
+          </button>
+        </>
+      ) : (
+        <>
+          <Link href="/feed" onClick={onClose} className={linkClass('/feed')}>Feed</Link>
+          <Link href="/about" onClick={onClose} className={linkClass('/about')}>About</Link>
+
+          <div className="border-t border-grey-200 my-2" />
+
+          <Link href="/auth?mode=login" onClick={onClose} className="block py-3 font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors">Log in</Link>
+          <Link href="/auth?mode=signup" onClick={onClose} className="inline-block mt-1 btn text-center text-sm">Sign up</Link>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Nav ────────────────────────────────────────────────────────────────
 
 export function Nav() {
   const { user, loading, logout } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
+  const mode = useLayoutModeContext()
   const [searchQuery, setSearchQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  // Close mobile sheet on route change
+  useEffect(() => { setMenuOpen(false); setDropdownOpen(false) }, [pathname])
 
   function isActive(path: string) {
     if (path === '/feed') return pathname === '/feed' || pathname === '/'
     if (path === '/dashboard') return pathname.startsWith('/dashboard')
-    if (path === '/write') return pathname === '/write'
-    if (path === '/about') return pathname === '/about'
-    if (path === '/following') return pathname === '/following'
-    if (path === '/followers') return pathname === '/followers'
-    if (path === '/profile') return pathname === '/profile'
-    if (path === '/search') return pathname === '/search'
-    if (path === '/history') return pathname === '/history'
-    return false
-  }
-
-  // Desktop sidebar link style (on nav green background)
-  function sidebarLinkClass(path: string) {
-    return `block font-sans text-[17px] py-[14px] pr-5 transition-colors w-full ${
-      isActive(path)
-        ? 'pl-[calc(1.25rem-4px)] border-l-4 border-accent text-ink font-bold'
-        : 'pl-5 border-l-4 border-transparent font-medium text-content-faint hover:text-content-secondary hover:bg-nav-hover'
-    }`
+    return pathname === path
   }
 
   function handleSearch(e: React.FormEvent) {
@@ -41,232 +199,164 @@ export function Nav() {
     if (searchQuery.trim().length >= 2) {
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
       setSearchQuery('')
-      setMenuOpen(false)
-      setSearchOpen(false)
     }
   }
 
-  function handleNavClick() {
+  function handleMobileSearch(q: string) {
+    router.push(`/search?q=${encodeURIComponent(q)}`)
     setMenuOpen(false)
   }
 
   const logoHref = user ? '/feed' : '/'
 
-  return (
-    <header className="fixed z-50 bg-nav top-0 left-0 right-0 lg:right-auto lg:bottom-0 lg:w-[240px] lg:flex lg:flex-col lg:border-r-2 lg:border-rule">
+  // ── Canvas mode: minimal bar ───────────────────────────────────────────────
 
-      {/* ================================================================
-          TOP BAR — visible below lg breakpoint
-          ================================================================ */}
-      <div className="flex items-center justify-between px-6 py-3 lg:px-6 lg:pt-8 lg:pb-6 lg:justify-center">
-        {/* Logo — Literata in ink box */}
-        <Link
-          href={logoHref}
-          onClick={handleNavClick}
-          className="flex-shrink-0"
-          style={{
-            fontFamily: '"Literata", Georgia, serif',
-            padding: '5px 15px 8px',
-            lineHeight: '1.1',
-            fontSize: '30px',
-            fontWeight: '700',
-            letterSpacing: '-0.02em',
-            color: '#B5242A',
-            backgroundColor: '#FFFAEF',
-            border: '3.5px solid #B5242A',
-          }}
-        >
-          Platform
-        </Link>
+  if (mode === 'canvas') {
+    return (
+      <>
+        <header className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur-sm border-b border-grey-100">
+          <div className="flex items-center justify-between px-6 h-[56px] max-w-content mx-auto">
+            {/* Logo — small, grey */}
+            <Link
+              href={logoHref}
+              className="font-serif text-[16px] font-medium italic text-grey-300 hover:text-grey-400 transition-colors"
+            >
+              Platform
+            </Link>
 
-        {/* Hamburger — below md only */}
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="flex flex-col justify-center gap-[5px] w-6 h-6 md:hidden"
-          aria-label="Menu"
-        >
-          <span className="block w-full h-[2px] bg-ink" />
-          <span className="block w-full h-[2px] bg-ink" />
-          <span className="block w-full h-[2px] bg-ink" />
-        </button>
+            {/* Back to feed */}
+            <Link
+              href="/feed"
+              className="font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
+            >
+              &#8592; Feed
+            </Link>
 
-        {/* Desktop inline nav (between md and lg) — shown md+ but hidden lg+ */}
-        <div className="hidden md:flex lg:hidden items-center gap-4">
-          {loading ? (
-            <div className="h-4 w-16 animate-pulse bg-content-secondary" />
-          ) : user ? (
-            <>
-              <Link href="/feed" className={`font-sans text-sm transition-colors px-2.5 py-1 ${isActive('/feed') ? 'text-ink font-semibold border-b-2 border-accent' : 'text-content-faint hover:text-content-secondary'}`}>Feed</Link>
-              <Link href="/write" className={`font-sans text-sm transition-colors px-2.5 py-1 ${isActive('/write') ? 'text-ink font-semibold border-b-2 border-accent' : 'text-content-faint hover:text-content-secondary'}`}>Write</Link>
-              <Link href="/dashboard" className={`font-sans text-sm transition-colors px-2.5 py-1 ${isActive('/dashboard') ? 'text-ink font-semibold border-b-2 border-accent' : 'text-content-faint hover:text-content-secondary'}`}>Dashboard</Link>
-              <Link href="/about" className={`font-sans text-sm transition-colors px-2.5 py-1 ${isActive('/about') ? 'text-ink font-semibold border-b-2 border-accent' : 'text-content-faint hover:text-content-secondary'}`}>About</Link>
-
-              <form onSubmit={handleSearch} className="relative flex items-center">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search…"
-                  className="w-28 bg-surface-deep px-3 py-1.5 text-xs text-ink placeholder-content-muted focus:w-44 transition-all"
-                />
-              </form>
-
-              <Link href="/profile" className="flex items-center gap-2 font-sans text-sm text-content-faint hover:text-content-secondary transition-colors">
-                {user.avatar ? (
-                  <img src={user.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-6 w-6 items-center justify-center bg-surface-deep text-[12px] font-medium text-content-secondary rounded-full">
-                    {(user.displayName ?? user.username ?? '?')[0].toUpperCase()}
-                  </span>
-                )}
-                <span>{user.displayName ?? user.username}</span>
-                <span className="text-mono-xs text-content-muted tabular-nums">
-                  £{(user.freeAllowanceRemainingPence / 100).toFixed(2)}
-                </span>
-              </Link>
-
-              <button onClick={logout} className="font-sans text-sm text-content-faint hover:text-content-secondary transition-colors">
-                Log out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/feed" className={`font-sans text-sm transition-colors px-2.5 py-1 ${isActive('/feed') ? 'text-ink font-semibold border-b-2 border-accent' : 'text-content-faint hover:text-content-secondary'}`}>Feed</Link>
-              <Link href="/about" className={`font-sans text-sm transition-colors px-2.5 py-1 ${isActive('/about') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>About</Link>
-              <Link href="/auth?mode=login" className="font-sans text-sm text-content-faint hover:text-content-secondary transition-colors">Log in</Link>
-              <Link href="/auth?mode=signup" className="btn">Sign up</Link>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ================================================================
-          MOBILE DRAWER — below lg, shown when menuOpen
-          ================================================================ */}
-      {menuOpen && (
-        <div className="md:hidden bg-nav px-6 pb-4">
-          {loading ? (
-            <div className="h-4 w-16 animate-pulse bg-content-secondary" />
-          ) : user ? (
-            <>
-              <Link href="/feed" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/feed') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Feed</Link>
-              <Link href="/write" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/write') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Write</Link>
-              <Link href="/profile" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/profile') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Profile</Link>
-              <Link href="/notifications" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${pathname === '/notifications' ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Notifications</Link>
-              <Link href="/following" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/following') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Following</Link>
-              <Link href="/followers" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/followers') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Followers</Link>
-              <Link href="/dashboard" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/dashboard') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Dashboard</Link>
-              <Link href="/about" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/about') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>About</Link>
-
-              <form onSubmit={handleSearch} className="mt-3">
-                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search..." className="w-full bg-surface-deep px-3 py-2 text-sm text-ink placeholder-content-muted" />
-              </form>
-
-              <div className="flex items-center gap-2 mt-3">
-                {user.avatar ? (
-                  <img src={user.avatar} alt="" className="h-6 w-6 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-6 w-6 items-center justify-center bg-surface-deep text-[12px] font-medium text-content-secondary rounded-full">
-                    {(user.displayName ?? user.username ?? '?')[0].toUpperCase()}
-                  </span>
-                )}
-                <span className="font-sans text-sm text-content-faint">{user.displayName ?? user.username}</span>
-              </div>
-
-              <button onClick={() => { logout(); setMenuOpen(false) }} className="mt-3 text-sm text-content-faint hover:text-content-secondary transition-colors">
-                Log out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/feed" onClick={handleNavClick} className={`block font-sans text-sm py-3 ${isActive('/feed') ? 'text-ink font-semibold' : 'text-content-faint hover:text-content-secondary'}`}>Feed</Link>
-              <Link href="/about" onClick={handleNavClick} className="block font-sans text-sm py-3 text-content-faint hover:text-content-secondary transition-colors">About</Link>
-              <Link href="/auth?mode=login" onClick={handleNavClick} className="block font-sans text-sm py-3 text-content-faint hover:text-content-secondary transition-colors">Log in</Link>
-              <Link href="/auth?mode=signup" onClick={handleNavClick} className="btn inline-block mt-2">Sign up</Link>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ================================================================
-          LEFT SIDEBAR NAV — lg+ only
-          ================================================================ */}
-      <nav className="hidden lg:flex flex-col flex-1 overflow-y-auto py-2">
-        {loading ? (
-          <div className="px-4 py-3 h-4 w-24 animate-pulse bg-surface-deep rounded" />
-        ) : user ? (
-          <>
-            <Link href="/feed" onClick={handleNavClick} className={sidebarLinkClass('/feed')}>Feed</Link>
-            <Link href="/write" onClick={handleNavClick} className={sidebarLinkClass('/write')}>Write</Link>
-            <Link href="/profile" onClick={handleNavClick} className={sidebarLinkClass('/profile')}>Profile</Link>
-            <NotificationBell />
-            <Link href="/following" onClick={handleNavClick} className={sidebarLinkClass('/following')}>Following</Link>
-            <Link href="/followers" onClick={handleNavClick} className={sidebarLinkClass('/followers')}>Followers</Link>
-            <Link href="/dashboard" onClick={handleNavClick} className={sidebarLinkClass('/dashboard')}>Dashboard</Link>
-            <Link href="/about" onClick={handleNavClick} className={sidebarLinkClass('/about')}>About</Link>
-
-            {/* Search */}
-            {searchOpen ? (
-              <form onSubmit={handleSearch} className="mx-3 mt-1 flex items-center gap-2 bg-surface-deep px-3 py-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
-                  autoFocus
-                  onBlur={() => { if (!searchQuery) setSearchOpen(false) }}
-                  className="flex-1 bg-transparent text-xs text-ink placeholder-content-muted focus:outline-none"
-                />
-                <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery('') }} className="text-content-muted hover:text-ink text-xs">×</button>
-              </form>
-            ) : (
-              <button
-                onClick={() => setSearchOpen(true)}
-                className={`block font-sans text-[17px] py-[14px] pl-5 pr-5 transition-colors w-full text-left border-l-4 ${
-                  isActive('/search') ? 'pl-[calc(1.25rem-4px)] border-accent text-ink font-bold' : 'border-transparent font-medium text-content-faint hover:text-content-secondary hover:bg-nav-hover'
-                }`}
-              >
-                Search
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <Link href="/feed" onClick={handleNavClick} className={sidebarLinkClass('/feed')}>Feed</Link>
-            <Link href="/about" onClick={handleNavClick} className={sidebarLinkClass('/about')}>About</Link>
-            <Link href="/auth?mode=login" onClick={handleNavClick} className={sidebarLinkClass('/auth')}>Log in</Link>
-            <Link href="/auth?mode=signup" onClick={handleNavClick} className="block mx-4 mt-2 btn text-center text-sm">Sign up</Link>
-          </>
-        )}
-      </nav>
-
-      {/* Sidebar bottom — user info */}
-      {user && (
-        <div className="hidden lg:block px-5 py-4 space-y-3 border-t-2 border-rule">
-          <Link href="/profile" className="flex items-center gap-2 group">
-            {user.avatar ? (
-              <img src={user.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
-            ) : (
-              <span className="flex h-7 w-7 items-center justify-center bg-surface-deep text-[12px] font-medium text-content-faint rounded-full flex-shrink-0">
-                {(user.displayName ?? user.username ?? '?')[0].toUpperCase()}
-              </span>
-            )}
-            <div className="min-w-0">
-              <p className="font-sans text-[14px] text-content-faint leading-tight truncate group-hover:text-content-secondary transition-colors">
-                {user.displayName ?? user.username}
-              </p>
-              <p className="text-[13px] text-content-muted tabular-nums">
-                £{(user.freeAllowanceRemainingPence / 100).toFixed(2)}
-              </p>
+            {/* Avatar (if logged in) */}
+            <div className="flex items-center">
+              {!loading && user && (
+                <div className="relative">
+                  <button onClick={() => setDropdownOpen(!dropdownOpen)}>
+                    <Avatar user={user} size={28} />
+                  </button>
+                  {dropdownOpen && (
+                    <AvatarDropdown
+                      user={user}
+                      onLogout={logout}
+                      onClose={() => setDropdownOpen(false)}
+                    />
+                  )}
+                </div>
+              )}
             </div>
-          </Link>
+          </div>
+        </header>
+        {menuOpen && (
+          <MobileSheet user={user} loading={loading} onLogout={logout} onClose={() => setMenuOpen(false)} onSearch={handleMobileSearch} />
+        )}
+      </>
+    )
+  }
 
-          <button onClick={logout} className="text-[13px] text-content-faint hover:text-content-secondary transition-colors">
-            Log out
-          </button>
+  // ── Platform mode: full top bar ────────────────────────────────────────────
+
+  return (
+    <>
+      <header className="fixed top-0 inset-x-0 z-50 bg-white border-b border-grey-200">
+        <div className="flex items-center justify-between px-6 h-[56px] max-w-content mx-auto">
+
+          {/* Left: logo + nav links */}
+          <div className="flex items-center gap-6">
+            {/* Logo */}
+            <Link
+              href={logoHref}
+              className="font-serif text-[20px] font-medium italic text-crimson hover:text-crimson-dark transition-colors flex-shrink-0"
+            >
+              Platform
+            </Link>
+
+            {/* Nav links — hidden on mobile */}
+            <nav className="hidden md:flex items-center gap-1">
+              {loading ? (
+                <div className="h-3 w-32 animate-pulse bg-grey-100" />
+              ) : user ? (
+                <>
+                  <Link href="/feed" className={navLinkClass(isActive('/feed'))}>Feed</Link>
+                  <Link href="/write" className={navLinkClass(isActive('/write'))}>Write</Link>
+                  <Link href="/dashboard" className={navLinkClass(isActive('/dashboard'))}>Dashboard</Link>
+                  <Link href="/about" className={navLinkClass(isActive('/about'))}>About</Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/feed" className={navLinkClass(isActive('/feed'))}>Feed</Link>
+                  <Link href="/about" className={navLinkClass(isActive('/about'))}>About</Link>
+                </>
+              )}
+            </nav>
+          </div>
+
+          {/* Right: search + auth/avatar */}
+          <div className="flex items-center gap-4">
+            {/* Search — hidden on mobile */}
+            <form onSubmit={handleSearch} className="hidden md:block">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search…"
+                className="w-36 bg-grey-100 px-3 py-1.5 text-[12px] text-black placeholder-grey-300 font-mono focus:w-52 transition-all border-none"
+              />
+            </form>
+
+            {loading ? (
+              <div className="h-8 w-8 animate-pulse bg-grey-100 rounded-full" />
+            ) : user ? (
+              /* Avatar + dropdown */
+              <div className="relative hidden md:block">
+                <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center">
+                  <Avatar user={user} size={32} />
+                </button>
+                {dropdownOpen && (
+                  <AvatarDropdown
+                    user={user}
+                    onLogout={logout}
+                    onClose={() => setDropdownOpen(false)}
+                  />
+                )}
+              </div>
+            ) : (
+              /* Logged-out auth links */
+              <div className="hidden md:flex items-center gap-3">
+                <Link
+                  href="/auth?mode=login"
+                  className="font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
+                >
+                  Log in
+                </Link>
+                <Link href="/auth?mode=signup" className="btn btn-sm">
+                  Sign up
+                </Link>
+              </div>
+            )}
+
+            {/* Hamburger — mobile only */}
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex flex-col justify-center gap-[5px] w-6 h-6 md:hidden"
+              aria-label="Menu"
+            >
+              <span className={`block w-full h-[2px] bg-black transition-transform ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+              <span className={`block w-full h-[2px] bg-black transition-opacity ${menuOpen ? 'opacity-0' : ''}`} />
+              <span className={`block w-full h-[2px] bg-black transition-transform ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+            </button>
+          </div>
         </div>
-      )}
+      </header>
 
-    </header>
+      {/* Mobile sheet */}
+      {menuOpen && (
+        <MobileSheet user={user} loading={loading} onLogout={logout} onClose={() => setMenuOpen(false)} onSearch={handleMobileSearch} />
+      )}
+    </>
   )
 }

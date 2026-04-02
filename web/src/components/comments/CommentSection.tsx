@@ -104,11 +104,11 @@ export function CommentSection({
 
   if (loading) {
     return (
-      <div className="mt-8 pt-6 border-t border-rule">
-        <div className="h-4 w-28 animate-pulse bg-surface-deep mb-4" />
+      <div className="mt-8 pt-6 border-t border-grey-200">
+        <div className="h-4 w-28 animate-pulse bg-grey-100 mb-4" />
         <div className="space-y-3">
           {[1, 2].map(i => (
-            <div key={i} className="h-16 animate-pulse bg-surface-deep" />
+            <div key={i} className="h-16 animate-pulse bg-grey-100" />
           ))}
         </div>
       </div>
@@ -116,8 +116,8 @@ export function CommentSection({
   }
 
   return (
-    <div className={`${compact ? 'mt-3' : 'mt-8 pt-6 border-t border-rule'}`}>
-      <h3 className={`font-medium mb-4 ${compact ? 'text-xs text-content-muted' : 'text-sm text-content-secondary'}`}>
+    <div className={`${compact ? 'mt-3' : 'mt-8 pt-6 border-t border-grey-200'}`}>
+      <h3 className={`font-medium mb-4 ${compact ? 'text-xs text-grey-400' : 'text-sm text-grey-600'}`}>
         {totalCount > 0
           ? `${totalCount} comment${totalCount !== 1 ? 's' : ''}`
           : 'Comments'}
@@ -131,12 +131,12 @@ export function CommentSection({
           onPublished={handleNewComment}
         />
       ) : !commentsEnabled ? (
-        <p className="text-xs text-content-faint italic mb-4">
+        <p className="text-xs text-grey-300 italic mb-4">
           The author has closed comments on this piece.
         </p>
       ) : (
-        <p className="text-xs text-content-faint mb-4">
-          <a href="/auth?mode=login" className="text-accent hover:text-accent-dark">
+        <p className="text-xs text-grey-300 mb-4">
+          <a href="/auth?mode=login" className="text-crimson hover:text-crimson-dark">
             Log in
           </a>{' '}
           to leave a comment.
@@ -155,7 +155,7 @@ export function CommentSection({
                 onDelete={handleDelete}
               />
               {replyTarget?.commentId === comment.id && (
-                <div className="ml-8 pl-4 border-l border-rule">
+                <div className="ml-8 pl-4 border-l border-grey-200">
                   <CommentComposer
                     targetEventId={targetEventId}
                     targetKind={targetKind}

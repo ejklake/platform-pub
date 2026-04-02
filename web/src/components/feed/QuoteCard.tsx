@@ -35,13 +35,13 @@ function ArticlePennant({ data }: { data: ResolvedContent }) {
       className="block mt-2.5"
     >
       <div
+        className="py-3 px-4"
         style={{
-          background: '#FFFAEF',
-          borderLeft: '2.5px solid #B5242A',
-          padding: '12px 16px',
+          background: '#FAFAFA',
+          borderLeft: data.isPaywalled ? '3px solid #B5242A' : '3px solid #E5E5E5',
         }}
       >
-        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8A8578', marginBottom: '3px' }}>
+        <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-grey-300 mb-1">
           {authorIsProfile ? (
             <span
               className="hover:underline underline-offset-2 cursor-pointer"
@@ -51,11 +51,11 @@ function ArticlePennant({ data }: { data: ResolvedContent }) {
             </span>
           ) : data.author.displayName}
         </p>
-        <p style={{ fontFamily: '"Literata", Georgia, serif', fontSize: '16px', fontWeight: 500, fontStyle: 'italic', color: '#0F1F18', lineHeight: 1.25, letterSpacing: '-0.015em' }}>
+        <p className="font-serif text-[14px] font-medium italic text-black leading-[1.25] tracking-[-0.015em]">
           {data.title}
         </p>
         {data.content && (
-          <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', color: '#263D32', lineHeight: 1.5, marginTop: '4px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const }}>
+          <p className="font-serif text-[13px] text-grey-600 leading-[1.5] mt-1 line-clamp-2">
             {data.content}
           </p>
         )}
@@ -108,9 +108,9 @@ export function QuoteCard({ eventId }: QuoteCardProps) {
 
   if (loading) {
     return (
-      <div className="mt-2.5 p-3 animate-pulse" style={{ background: '#DDEEE4' }}>
-        <div className="h-3 w-1/3 mb-2" style={{ background: '#B8D2C1' }} />
-        <div className="h-3 w-2/3" style={{ background: '#B8D2C1' }} />
+      <div className="mt-2.5 p-3 animate-pulse bg-grey-100">
+        <div className="h-3 w-1/3 mb-2 bg-grey-200" />
+        <div className="h-3 w-2/3 bg-grey-200" />
       </div>
     )
   }
@@ -121,31 +121,28 @@ export function QuoteCard({ eventId }: QuoteCardProps) {
     return <ArticlePennant data={data} />
   }
 
-  // Quoted note — parchment chip with accent border
+  // Quoted note — grey-50 bg with grey border
   const noteHref = data.author.username.length < 40 ? `/${data.author.username}` : null
   return (
     <Link
       href={noteHref ?? '#'}
       onClick={e => { e.stopPropagation(); if (!noteHref) e.preventDefault() }}
       className="block mt-2.5 hover:opacity-90 transition-opacity"
-      style={{ background: '#FFFAEF', borderLeft: '2.5px solid #B5242A', padding: '12px 16px' }}
+      style={{ background: '#FAFAFA', borderLeft: '3px solid #E5E5E5', padding: '12px 16px' }}
     >
       <div className="flex items-center gap-2 mb-1">
         {data.author.avatar ? (
           <img src={data.author.avatar} alt="" className="h-4 w-4 rounded-full object-cover flex-shrink-0" />
         ) : (
-          <span
-            className="flex h-4 w-4 items-center justify-center text-[8px] font-medium flex-shrink-0 rounded-full"
-            style={{ background: '#C2DBC9', color: '#4A6B5A' }}
-          >
+          <span className="flex h-4 w-4 items-center justify-center text-[8px] font-mono uppercase flex-shrink-0 rounded-full bg-grey-100 text-grey-400">
             {(data.author.displayName?.[0] ?? '?').toUpperCase()}
           </span>
         )}
-        <span style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '11px', fontWeight: 600, color: '#ACA69C' }}>
+        <span className="font-sans text-[11px] font-semibold text-grey-300">
           {data.author.displayName}
         </span>
       </div>
-      <p className="line-clamp-3" style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', color: '#263D32', lineHeight: 1.55 }}>
+      <p className="line-clamp-3 font-sans text-[13px] text-grey-600 leading-[1.55]">
         {data.content}
       </p>
     </Link>

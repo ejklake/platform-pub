@@ -134,14 +134,14 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
     : `/article/${article.dTag}`
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="min-h-screen bg-white">
       {showAllowanceModal && <AllowanceExhaustedModal onClose={() => setShowAllowanceModal(false)} />}
 
       {/* Text-selection quote popup */}
       {selectionPopup && (
         <div
-          className="fixed z-50 bg-ink text-white px-3 py-1.5 text-ui-xs shadow-lg"
-          style={{ left: selectionPopup.x, top: selectionPopup.y, transform: 'translate(-50%, -100%)', borderRadius: '2px' }}
+          className="fixed z-50 bg-black text-white px-3 py-1.5 text-[12px] font-sans shadow-lg"
+          style={{ left: selectionPopup.x, top: selectionPopup.y, transform: 'translate(-50%, -100%)' }}
         >
           <button
             onMouseDown={e => {
@@ -158,7 +158,7 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
       {/* Quote composer modal */}
       {quoteComposerText !== null && (
         <div
-          className="fixed inset-0 z-50 bg-ink/60 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
           onClick={() => setQuoteComposerText(null)}
         >
           <div className="w-full max-w-lg" onClick={e => e.stopPropagation()}>
@@ -178,39 +178,32 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
         </div>
       )}
 
-      {/* Back link */}
-      <div className="mx-auto max-w-article-frame px-6 pt-16 lg:pt-8 pb-4">
-        <Link href="/feed" className="text-[13px] text-content-faint hover:text-content-muted transition-colors">
-          ← Back to feed
-        </Link>
-      </div>
-
-      {/* Parchment card containing the article */}
+      {/* Article content */}
       <div className="mx-auto max-w-article-frame px-6">
-        <div className="bg-card px-5 py-6 sm:px-10 sm:py-8 md:px-[72px] md:py-10">
-          {/* Hero image inside the card if present */}
+        <div className="px-5 py-6 sm:px-10 sm:py-8 md:px-[72px] md:py-10">
+          {/* Hero image */}
           {heroImage && (
             <div className="-mx-5 -mt-6 sm:-mx-10 sm:-mt-8 md:-mx-[72px] md:-mt-10 mb-8">
               <img src={heroImage} alt="" className="w-full max-h-[400px] object-cover" />
             </div>
           )}
 
-          {/* Content column — fixed 640px, centred within the wide parchment */}
+          {/* Content column — 640px centred */}
           <div className="max-w-article mx-auto">
 
-            {/* Byline */}
+            {/* Byline — Instrument Sans name + date */}
             <div className="mb-8 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {writerAvatar ? (
                   <img src={writerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-9 w-9 items-center justify-center text-xs font-medium bg-avatar-bg text-content-muted rounded-full">
+                  <span className="flex h-9 w-9 items-center justify-center text-[10px] font-mono uppercase bg-grey-100 text-grey-400 rounded-full">
                     {writerName[0].toUpperCase()}
                   </span>
                 )}
                 <div>
-                  <a href={`/${writerUsername}`} className="text-[14px] font-semibold text-ink hover:opacity-70 transition-opacity">{writerName}</a>
-                  <p className="text-[13px] text-content-card-faint">{publishDate}</p>
+                  <a href={`/${writerUsername}`} className="font-sans text-[14px] font-semibold text-black hover:opacity-70 transition-opacity">{writerName}</a>
+                  <p className="font-sans text-[13px] text-grey-400">{publishDate}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -219,16 +212,12 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
               </div>
             </div>
 
-            {/* Title — italic Literata */}
+            {/* Title — Literata roman (not italic in reader — writer's space) */}
             <h1
-              className="mb-4"
+              className="mb-4 font-serif text-black leading-[1.1]"
               style={{
-                fontFamily: '"Literata", Georgia, serif',
-                fontSize: 'clamp(2.25rem, 4vw, 3rem)',
+                fontSize: 'clamp(2.125rem, 4vw, 2.125rem)',
                 fontWeight: 500,
-                fontStyle: 'italic',
-                color: '#0F1F18',
-                lineHeight: 1.1,
                 letterSpacing: '-0.025em',
               }}
             >
@@ -236,13 +225,13 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
             </h1>
 
             {article.summary && (
-              <p className="font-serif text-xl text-content-secondary italic leading-relaxed mt-4 mb-2">
+              <p className="font-serif text-xl text-grey-600 italic leading-relaxed mt-4 mb-2">
                 {article.summary}
               </p>
             )}
 
-            {/* Accent rule */}
-            <div className="rule-accent mb-10 mt-6" />
+            {/* Rule — grey-200 */}
+            <div className="border-t border-grey-200 mb-10 mt-6" />
 
             {/* Article body */}
             <article>

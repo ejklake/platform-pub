@@ -38,8 +38,8 @@ export default function FollowersPage() {
 
   return (
     <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
-      <h1 className="font-serif text-3xl sm:text-4xl font-light text-content-primary mb-1">Followers</h1>
-      <p className="text-ui-sm text-content-muted mb-8">
+      <h1 className="font-serif text-3xl sm:text-4xl font-light text-black mb-1">Followers</h1>
+      <p className="text-ui-sm text-grey-400 mb-8">
         {followers.length > 0 ? `${followers.length} ${followers.length === 1 ? 'person follows' : 'people follow'} you` : 'People who follow you'}
       </p>
 
@@ -47,18 +47,18 @@ export default function FollowersPage() {
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex items-center gap-4 py-4 mb-1 animate-pulse">
-              <div className="h-11 w-11 rounded-full bg-surface-deep flex-shrink-0" />
+              <div className="h-11 w-11 rounded-full bg-grey-100 flex-shrink-0" />
               <div className="flex-1">
-                <div className="h-3.5 w-32 bg-surface-deep mb-2 rounded" />
-                <div className="h-3 w-20 bg-surface-deep rounded" />
+                <div className="h-3.5 w-32 bg-grey-100 mb-2 rounded" />
+                <div className="h-3 w-20 bg-grey-100 rounded" />
               </div>
             </div>
           ))}
         </div>
       ) : followers.length === 0 ? (
         <div className="py-20 text-center">
-          <p className="text-ui-sm text-content-muted mb-4">No followers yet.</p>
-          <p className="text-ui-xs text-content-faint">Share your writing to grow your audience.</p>
+          <p className="text-ui-sm text-grey-400 mb-4">No followers yet.</p>
+          <p className="text-ui-xs text-grey-300">Share your writing to grow your audience.</p>
         </div>
       ) : (
         <div className="space-y-1">
@@ -68,19 +68,19 @@ export default function FollowersPage() {
                 {f.avatar ? (
                   <img src={f.avatar} alt="" className="h-11 w-11 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-11 w-11 items-center justify-center bg-surface-deep text-sm font-medium text-content-muted rounded-full">
+                  <span className="flex h-11 w-11 items-center justify-center bg-grey-100 text-sm font-medium text-grey-400 rounded-full">
                     {(f.displayName ?? f.username)[0].toUpperCase()}
                   </span>
                 )}
               </Link>
               <div className="flex-1 min-w-0">
                 <Link href={`/${f.username}`} className="group">
-                  <p className="font-serif text-base text-content-primary group-hover:opacity-75 transition-opacity truncate">
+                  <p className="font-serif text-base text-black group-hover:opacity-75 transition-opacity truncate">
                     {f.displayName ?? f.username}
                   </p>
-                  <p className="text-ui-xs text-content-muted">
+                  <p className="text-ui-xs text-grey-400">
                     @{f.username}
-                    {f.isWriter && <span className="ml-2 text-content-faint">· writer</span>}
+                    {f.isWriter && <span className="ml-2 text-grey-300">· writer</span>}
                   </p>
                 </Link>
               </div>
@@ -95,15 +95,15 @@ export default function FollowersPage() {
 function PageSkeleton() {
   return (
     <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
-      <div className="h-7 w-36 animate-pulse bg-surface-deep mb-2 rounded" />
-      <div className="h-4 w-48 animate-pulse bg-surface-deep mb-8 rounded" />
+      <div className="h-7 w-36 animate-pulse bg-grey-100 mb-2 rounded" />
+      <div className="h-4 w-48 animate-pulse bg-grey-100 mb-8 rounded" />
       <div className="space-y-3">
         {[1, 2, 3].map(i => (
           <div key={i} className="flex items-center gap-4 py-4 mb-1">
-            <div className="h-11 w-11 rounded-full bg-surface-deep flex-shrink-0" />
+            <div className="h-11 w-11 rounded-full bg-grey-100 flex-shrink-0" />
             <div className="flex-1">
-              <div className="h-3.5 w-32 bg-surface-deep mb-2 rounded" />
-              <div className="h-3 w-20 bg-surface-deep rounded" />
+              <div className="h-3.5 w-32 bg-grey-100 mb-2 rounded" />
+              <div className="h-3 w-20 bg-grey-100 rounded" />
             </div>
           </div>
         ))}

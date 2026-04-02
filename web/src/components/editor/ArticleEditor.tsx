@@ -204,14 +204,14 @@ export function ArticleEditor({
   return (
     <div className="mx-auto max-w-editor-frame px-6 pt-16 lg:pt-8 pb-8">
       {/* Sticky title + toolbar — stays visible while scrolling the body */}
-      <div className="sticky top-[53px] lg:top-0 z-20 bg-surface pb-4 mb-6">
+      <div className="sticky top-[53px] lg:top-0 z-20 bg-white pb-4 mb-6">
       {/* Title input */}
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Article title"
-        className="w-full border-none bg-transparent font-serif text-4xl font-medium italic text-ink placeholder:text-content-faint focus:outline-none mb-3 pt-4 sm:text-5xl"
+        className="w-full border-none bg-transparent font-serif text-4xl font-medium italic text-black placeholder:text-grey-300 focus:outline-none mb-3 pt-4 sm:text-5xl"
         style={{ letterSpacing: '-0.02em' }}
       />
       <input
@@ -219,7 +219,7 @@ export function ArticleEditor({
         value={dek}
         onChange={(e) => setDek(e.target.value)}
         placeholder="Add a subtitle or standfirst…"
-        className="w-full border-none bg-transparent font-serif text-lg text-content-secondary italic placeholder:text-content-faint focus:outline-none mb-3"
+        className="w-full border-none bg-transparent font-serif text-lg text-grey-600 italic placeholder:text-grey-300 focus:outline-none mb-3"
       />
 
       {/* Editor toolbar */}
@@ -297,7 +297,7 @@ export function ArticleEditor({
         </ToolbarButton>
 
         {/* Paywall gate button */}
-        <span className="mx-1 text-content-faint">|</span>
+        <span className="mx-1 text-grey-300">|</span>
         <ToolbarButton
           active={gateInserted}
           accent
@@ -312,14 +312,14 @@ export function ArticleEditor({
           {gateInserted ? 'Paywall ✓' : 'Paywall'}
         </ToolbarButton>
 
-        <div className="ml-auto text-xs text-content-faint">
+        <div className="ml-auto text-xs text-grey-300">
           {wordCount} words &middot; {readMinutes} min read
         </div>
       </div>
       </div>{/* end sticky */}
 
       {/* Editor content — ink-bordered writing area */}
-      <div className="bg-card p-8 sm:p-10">
+      <div className="bg-white p-8 sm:p-10">
         <EditorContent editor={editor} />
       </div>
 
@@ -327,20 +327,20 @@ export function ArticleEditor({
       {gateInserted && (
         <div className="mt-10 pt-6">
           <div className="flex items-center gap-4">
-            <label className="block text-sm text-content-secondary">
+            <label className="block text-sm text-grey-600">
               Price
             </label>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-content-muted">&pound;</span>
+              <span className="text-sm text-grey-400">&pound;</span>
               <input
                 type="number"
                 min={0.01}
                 step={0.01}
                 value={(pricePence / 100).toFixed(2)}
                 onChange={(e) => setPricePence(Math.round(parseFloat(e.target.value) * 100))}
-                className="w-24 border border-rule px-3 py-1.5 text-sm focus:border-accent focus:outline-none"
+                className="w-24 border border-grey-200 px-3 py-1.5 text-sm focus:border-crimson focus:outline-none"
               />
-              <span className="text-xs text-content-faint">
+              <span className="text-xs text-grey-300">
                 Suggested: &pound;{priceDisplay} based on {wordCount} words
               </span>
             </div>
@@ -356,7 +356,7 @@ export function ArticleEditor({
             checked={commentsEnabled}
             onChange={(e) => setCommentsEnabled(e.target.checked)}
           />
-          <span className="text-sm text-content-secondary">
+          <span className="text-sm text-grey-600">
             Allow replies on this article
           </span>
         </label>
@@ -377,7 +377,7 @@ export function ArticleEditor({
           {publishing ? (isEditing ? 'Updating...' : 'Publishing...') : (isEditing ? 'Update' : 'Publish')}
         </button>
         <button
-          className="text-sm text-content-faint hover:text-content-secondary transition-colors"
+          className="text-sm text-grey-300 hover:text-grey-600 transition-colors"
           onClick={async () => {
             if (!editor) return
             setDraftStatus('Saving...')
@@ -397,7 +397,7 @@ export function ArticleEditor({
           Save draft
         </button>
         {draftStatus && (
-          <span className="text-xs text-content-faint">{draftStatus}</span>
+          <span className="text-xs text-grey-300">{draftStatus}</span>
         )}
       </div>
     </div>
@@ -421,11 +421,11 @@ function ToolbarButton({
 }) {
   const accentStyles = accent
     ? active
-      ? 'bg-surface-deep text-accent border border-accent'
-      : 'text-accent hover:bg-surface-deep border border-transparent'
+      ? 'bg-grey-100 text-crimson border border-crimson'
+      : 'text-crimson hover:bg-grey-100 border border-transparent'
     : active
-      ? 'bg-surface-deep text-ink'
-      : 'text-content-muted hover:bg-surface-deep hover:text-ink'
+      ? 'bg-grey-100 text-black'
+      : 'text-grey-400 hover:bg-grey-100 hover:text-black'
 
   return (
     <button

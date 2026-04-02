@@ -225,8 +225,8 @@ export default function WriterProfilePage() {
     return (
       <div className="mx-auto max-w-article-frame px-6 py-12">
         <div className="flex items-center gap-4 mb-12">
-          <div className="h-14 w-14 animate-pulse bg-card" />
-          <div><div className="h-6 w-36 animate-pulse bg-card mb-2" /><div className="h-3 w-20 animate-pulse bg-card" /></div>
+          <div className="h-14 w-14 animate-pulse bg-white" />
+          <div><div className="h-6 w-36 animate-pulse bg-white mb-2" /><div className="h-3 w-20 animate-pulse bg-white" /></div>
         </div>
       </div>
     )
@@ -235,8 +235,8 @@ export default function WriterProfilePage() {
   if (notFound) {
     return (
       <div className="mx-auto max-w-article-frame px-6 py-28 text-center">
-        <h1 className="font-serif text-2xl font-light text-ink mb-2">User not found</h1>
-        <p className="text-ui-sm text-content-muted">No user with the username @{username} exists on Platform.</p>
+        <h1 className="font-serif text-2xl font-light text-black mb-2">User not found</h1>
+        <p className="text-ui-sm text-grey-400">No user with the username @{username} exists on Platform.</p>
       </div>
     )
   }
@@ -244,7 +244,7 @@ export default function WriterProfilePage() {
   if (profileError) {
     return (
       <div className="mx-auto max-w-article-frame px-6 py-28 text-center">
-        <p className="text-ui-sm text-content-muted">Something went wrong loading this profile. Please try again.</p>
+        <p className="text-ui-sm text-grey-400">Something went wrong loading this profile. Please try again.</p>
       </div>
     )
   }
@@ -256,13 +256,13 @@ export default function WriterProfilePage() {
           {writer?.avatar ? (
             <img src={writer.avatar} alt="" className="h-14 w-14 rounded-full object-cover" />
           ) : (
-            <span className="flex h-14 w-14 items-center justify-center bg-surface-deep text-lg font-medium text-content-primary rounded-full">
+            <span className="flex h-14 w-14 items-center justify-center bg-grey-100 text-lg font-medium text-black rounded-full">
               {(writer?.displayName ?? username)[0].toUpperCase()}
             </span>
           )}
           <div className="flex-1">
-            <h1 className="font-serif text-3xl sm:text-4xl font-light text-ink" style={{ letterSpacing: '-0.02em' }}>{writer?.displayName ?? username}</h1>
-            <p className="text-ui-xs text-content-faint mt-0.5">@{username}</p>
+            <h1 className="font-serif text-3xl sm:text-4xl font-light text-black" style={{ letterSpacing: '-0.02em' }}>{writer?.displayName ?? username}</h1>
+            <p className="text-ui-xs text-grey-300 mt-0.5">@{username}</p>
           </div>
 
           {/* Action buttons — logged-in non-owner */}
@@ -302,16 +302,16 @@ export default function WriterProfilePage() {
 
           {/* Log in prompt for anonymous visitors */}
           {!user && !authLoading && writer && !isOwnProfile && (
-            <Link href="/auth?mode=login" className="text-ui-xs text-content-muted hover:text-content-primary transition-colors">
+            <Link href="/auth?mode=login" className="text-ui-xs text-grey-400 hover:text-black transition-colors">
               Log in to follow
             </Link>
           )}
         </div>
 
         {writer?.bio && (
-          <p className="font-serif text-sm text-content-secondary leading-relaxed max-w-lg" style={{ lineHeight: '1.7' }}>{writer.bio}</p>
+          <p className="font-serif text-sm text-grey-600 leading-relaxed max-w-lg" style={{ lineHeight: '1.7' }}>{writer.bio}</p>
         )}
-        <p className="mt-4 text-ui-xs text-content-faint">
+        <p className="mt-4 text-ui-xs text-grey-300">
           {articleCount} article{articleCount !== 1 ? 's' : ''}
         </p>
       </div>
@@ -321,7 +321,7 @@ export default function WriterProfilePage() {
       {/* Quote composer modal */}
       {pendingQuote && (
         <div
-          className="fixed inset-0 z-50 bg-ink/60 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
           onClick={() => setPendingQuote(null)}
         >
           <div className="w-full max-w-lg" onClick={e => e.stopPropagation()}>
@@ -335,7 +335,7 @@ export default function WriterProfilePage() {
       )}
 
       {activity.length === 0 ? (
-        <p className="text-ui-sm text-content-muted py-10">Looks like {writer?.displayName ?? username} hasn't said anything yet.</p>
+        <p className="text-ui-sm text-grey-400 py-10">Looks like {writer?.displayName ?? username} hasn't said anything yet.</p>
       ) : (
         <div className="space-y-3">
           {activity.map(item => {
@@ -408,23 +408,23 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
 
   if (isDeleted) {
     return (
-      <div className="bg-card p-5 border-l-[3px] border-rule">
-        <p className="label-ui text-content-muted mb-2">{writerName} · Reply</p>
-        <p className="text-ui-xs text-content-faint italic">[Deleted]</p>
+      <div className="bg-white p-5 border-l-[3px] border-grey-200">
+        <p className="label-ui text-grey-400 mb-2">{writerName} · Reply</p>
+        <p className="text-ui-xs text-grey-300 italic">[Deleted]</p>
       </div>
     )
   }
 
   return (
-    <div className="bg-card p-5 border-l-[3px] border-rule">
+    <div className="bg-white p-5 border-l-[3px] border-grey-200">
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
-        <span className="label-ui text-content-muted">{writerName} · Reply</span>
-        <time className="text-ui-xs text-content-faint" dateTime={reply.publishedAt}>{formatDate(reply.publishedAt)}</time>
+        <span className="label-ui text-grey-400">{writerName} · Reply</span>
+        <time className="text-ui-xs text-grey-300" dateTime={reply.publishedAt}>{formatDate(reply.publishedAt)}</time>
         {isOwnProfile && (
           <button
             onClick={handleDelete}
-            className={`ml-auto text-ui-xs transition-colors ${confirmDelete ? 'text-red-500 font-medium' : 'text-content-faint hover:text-red-500'}`}
+            className={`ml-auto text-ui-xs transition-colors ${confirmDelete ? 'text-red-500 font-medium' : 'text-grey-300 hover:text-red-500'}`}
           >
             {confirmDelete ? 'Confirm?' : 'Delete'}
           </button>
@@ -433,9 +433,9 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
 
       {/* "Replying to" badge */}
       {reply.parentAuthorUsername && (
-        <p className="text-ui-xs text-content-faint mb-2">
+        <p className="text-ui-xs text-grey-300 mb-2">
           Replying to{' '}
-          <Link href={`/${reply.parentAuthorUsername}`} className="text-content-muted hover:text-content-primary transition-colors underline underline-offset-2">
+          <Link href={`/${reply.parentAuthorUsername}`} className="text-grey-400 hover:text-black transition-colors underline underline-offset-2">
             @{reply.parentAuthorDisplayName ?? reply.parentAuthorUsername}
           </Link>
         </p>
@@ -444,10 +444,10 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
       {/* Content */}
       {fullArticleHref ? (
         <Link href={fullArticleHref} className="block hover:opacity-80 transition-opacity">
-          <p className="font-serif text-sm text-content-primary leading-relaxed" style={{ lineHeight: '1.7' }}>{content}</p>
+          <p className="font-serif text-sm text-black leading-relaxed" style={{ lineHeight: '1.7' }}>{content}</p>
         </Link>
       ) : (
-        <p className="font-serif text-sm text-content-primary leading-relaxed" style={{ lineHeight: '1.7' }}>{content}</p>
+        <p className="font-serif text-sm text-black leading-relaxed" style={{ lineHeight: '1.7' }}>{content}</p>
       )}
 
       {/* Footer: article link + actions */}
@@ -455,7 +455,7 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
         {reply.articleSlug && (
           <Link
             href={`/article/${reply.articleSlug}`}
-            className="text-ui-xs text-content-muted hover:text-content-primary transition-colors underline underline-offset-2"
+            className="text-ui-xs text-grey-400 hover:text-black transition-colors underline underline-offset-2"
             onClick={e => e.stopPropagation()}
           >
             {reply.articleTitle ?? 'View article'}
@@ -465,7 +465,7 @@ function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVo
           {onQuote && (
             <button
               onClick={() => onQuote({ eventId: reply.nostrEventId, eventKind: 1111, authorPubkey: '', previewContent: content.slice(0, 200), previewAuthorName: writerName })}
-              className="text-ui-xs text-content-faint hover:text-content-primary transition-colors"
+              className="text-ui-xs text-grey-300 hover:text-black transition-colors"
             >
               Quote
             </button>

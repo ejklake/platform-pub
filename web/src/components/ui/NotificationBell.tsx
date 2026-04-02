@@ -43,7 +43,7 @@ function NotificationItem({ n, onDismiss }: { n: Notification; onDismiss: (id: s
   const avatar = n.actor?.avatar ? (
     <img src={n.actor.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5" />
   ) : (
-    <span className="flex h-7 w-7 items-center justify-center bg-avatar-bg text-[10px] font-medium text-content-muted rounded-full flex-shrink-0 mt-0.5">
+    <span className="flex h-7 w-7 items-center justify-center bg-grey-100 text-[10px] font-medium text-grey-400 rounded-full flex-shrink-0 mt-0.5">
       {(n.actor?.displayName ?? n.actor?.username ?? '?')[0].toUpperCase()}
     </span>
   )
@@ -53,24 +53,24 @@ function NotificationItem({ n, onDismiss }: { n: Notification; onDismiss: (id: s
   if (n.type === 'new_follower') {
     body = (
       <>
-        <p className="text-xs text-ink leading-snug">
+        <p className="text-xs text-black leading-snug">
           <span className="font-medium">{actorName}</span>{' '}followed you
         </p>
-        <p className="text-[11px] text-content-faint mt-0.5">{timeAgo(n.createdAt)}</p>
+        <p className="text-[11px] text-grey-300 mt-0.5">{timeAgo(n.createdAt)}</p>
       </>
     )
   } else if (n.type === 'new_reply') {
     body = (
       <>
-        <p className="text-xs text-ink leading-snug">
+        <p className="text-xs text-black leading-snug">
           <span className="font-medium">{actorName}</span>
           {' replied'}
           {n.article?.title && <>{' to '}<span className="italic">{n.article.title}</span></>}
         </p>
         {n.comment?.content && (
-          <p className="text-[11px] text-content-faint mt-1 line-clamp-2 leading-snug">{n.comment.content}</p>
+          <p className="text-[11px] text-grey-300 mt-1 line-clamp-2 leading-snug">{n.comment.content}</p>
         )}
-        <p className="text-[11px] text-content-faint mt-0.5">{timeAgo(n.createdAt)}</p>
+        <p className="text-[11px] text-grey-300 mt-0.5">{timeAgo(n.createdAt)}</p>
       </>
     )
   } else {
@@ -89,10 +89,10 @@ function NotificationItem({ n, onDismiss }: { n: Notification; onDismiss: (id: s
     const label = simpleLabels[n.type] ?? 'sent you a notification'
     body = (
       <>
-        <p className="text-xs text-ink leading-snug">
+        <p className="text-xs text-black leading-snug">
           <span className="font-medium">{actorName}</span>{' '}{label}
         </p>
-        <p className="text-[11px] text-content-faint mt-0.5">{timeAgo(n.createdAt)}</p>
+        <p className="text-[11px] text-grey-300 mt-0.5">{timeAgo(n.createdAt)}</p>
       </>
     )
   }
@@ -103,7 +103,7 @@ function NotificationItem({ n, onDismiss }: { n: Notification; onDismiss: (id: s
       tabIndex={0}
       onClick={() => onDismiss(n.id, destUrl)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onDismiss(n.id, destUrl) }}
-      className="block px-4 py-3 border-b-2 border-rule/40 last:border-0 hover:bg-surface-deep transition-colors cursor-pointer text-left w-full"
+      className="block px-4 py-3 border-b-2 border-grey-200/40 last:border-0 hover:bg-grey-100 transition-colors cursor-pointer text-left w-full"
     >
       <div className="flex items-start gap-2.5">
         {avatar}
@@ -193,18 +193,18 @@ export function NotificationBell() {
     <div
       ref={panelRef}
       style={panelStyle}
-      className="bg-card border border-rule shadow-xl overflow-hidden flex flex-col"
+      className="bg-white border border-grey-200 shadow-xl overflow-hidden flex flex-col"
     >
-      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-rule/40 flex-shrink-0">
-        <span className="font-sans text-sm font-medium text-ink">Notifications</span>
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-grey-200/40 flex-shrink-0">
+        <span className="font-sans text-sm font-medium text-black">Notifications</span>
         {loading && (
-          <span className="text-[11px] text-content-faint">Loading…</span>
+          <span className="text-[11px] text-grey-300">Loading…</span>
         )}
       </div>
 
       <div className="overflow-y-auto flex-1">
         {items.length === 0 && !loading ? (
-          <p className="px-4 py-8 text-center text-xs text-content-faint">No notifications yet</p>
+          <p className="px-4 py-8 text-center text-xs text-grey-300">No notifications yet</p>
         ) : (
           items.map((n) => <NotificationItem key={n.id} n={n} onDismiss={handleDismiss} />)
         )}
@@ -217,12 +217,12 @@ export function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={handleOpen}
-        className="flex items-center gap-2 pl-5 py-[14px] pr-5 border-l-4 border-transparent text-content-faint font-medium hover:text-content-secondary hover:bg-nav-hover transition-colors w-full"
+        className="flex items-center gap-2 pl-5 py-[14px] pr-5 border-l-4 border-transparent text-grey-300 font-medium hover:text-grey-600 hover:bg-grey-100 transition-colors w-full"
         title="Notifications"
       >
         <span className="font-sans text-[17px]">Notifications</span>
         {unreadCount > 0 && (
-          <span className="font-sans text-sm text-accent font-medium">
+          <span className="font-sans text-sm text-crimson font-medium">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}

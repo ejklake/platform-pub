@@ -41,16 +41,11 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
     <Link
       href={href}
       onClick={e => { e.stopPropagation(); if (href === '#') e.preventDefault() }}
-      className="block mt-2.5 hover:opacity-80 transition-opacity"
-      style={{
-        background: '#FFFAEF',
-        borderLeft: '2.5px solid #B5242A',
-        padding: '12px 16px',
-      }}
+      className="block mt-2.5 hover:opacity-80 transition-opacity ml-[38px] border-l-2 border-grey-200 pl-4 py-2"
     >
-      <p style={{ fontFamily: '"Literata", Georgia, serif', fontStyle: 'italic', fontSize: '13.5px', color: '#263D32', lineHeight: 1.5 }}>{note.quotedExcerpt}</p>
+      <p className="font-serif italic text-[14px] text-grey-600 leading-[1.5]">{note.quotedExcerpt}</p>
       {(note.quotedTitle || note.quotedAuthor) && (
-        <p style={{ fontFamily: '"Source Sans 3", system-ui, sans-serif', fontSize: '13px', fontWeight: 400, color: '#ACA69C', marginTop: '4px' }}>
+        <p className="font-mono text-[11px] uppercase tracking-[0.02em] text-grey-300 mt-1">
           {note.quotedTitle ?? ''}
           {note.quotedTitle && note.quotedAuthor ? ' · ' : ''}
           {note.quotedAuthor && authorUsername ? (
@@ -117,58 +112,51 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
   return (
     <div className="py-4">
       <div className="flex items-start gap-3">
-        {/* Avatar */}
+        {/* Avatar — 28px */}
         {writerInfo?.username ? (
           <Link href={`/${writerInfo.username}`} className="flex-shrink-0">
             {writerInfo.avatar ? (
-              <img src={writerInfo.avatar} alt="" className="h-[30px] w-[30px] rounded-full object-cover" />
+              <img src={writerInfo.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
             ) : (
-              <span
-                className="flex h-[30px] w-[30px] items-center justify-center text-xs font-medium rounded-full"
-                style={{ background: '#C2DBC9', color: '#4A6B5A' }}
-              >
+              <span className="flex h-7 w-7 items-center justify-center text-[10px] font-mono uppercase rounded-full bg-grey-100 text-grey-400">
                 {(writerInfo.displayName?.[0] ?? note.pubkey[0]).toUpperCase()}
               </span>
             )}
           </Link>
         ) : writerInfo?.avatar ? (
-          <img src={writerInfo.avatar} alt="" className="h-[30px] w-[30px] rounded-full object-cover flex-shrink-0" />
+          <img src={writerInfo.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
         ) : (
-          <span
-            className="flex h-[30px] w-[30px] items-center justify-center text-xs font-medium flex-shrink-0 rounded-full"
-            style={{ background: '#C2DBC9', color: '#4A6B5A' }}
-          >
+          <span className="flex h-7 w-7 items-center justify-center text-[10px] font-mono uppercase flex-shrink-0 rounded-full bg-grey-100 text-grey-400">
             {(writerInfo?.displayName?.[0] ?? note.pubkey[0]).toUpperCase()}
           </span>
         )}
 
         <div className="flex-1 min-w-0">
-          {/* Name + time */}
+          {/* Name (Instrument Sans semibold) + time (Plex Mono) */}
           <div className="flex items-center gap-2">
             {writerInfo?.username ? (
               <Link
                 href={`/${writerInfo.username}`}
-                style={{ fontSize: '14px', fontWeight: 600, color: '#0F1F18' }}
-                className="hover:opacity-80 transition-opacity"
+                className="font-sans text-[14px] font-semibold text-black hover:opacity-80 transition-opacity"
               >
                 {writerInfo.displayName ?? note.pubkey.slice(0, 12) + '...'}
               </Link>
             ) : (
-              <span style={{ fontSize: '14px', fontWeight: 600, color: '#0F1F18' }}>
+              <span className="font-sans text-[14px] font-semibold text-black">
                 {writerInfo?.displayName ?? note.pubkey.slice(0, 12) + '...'}
               </span>
             )}
-            <span style={{ fontSize: '13px', color: '#6B8E7A' }}>
+            <span className="font-mono text-[11px] uppercase text-grey-300">
               {formatDate(note.publishedAt)}
             </span>
             {isAuthor && (
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="ml-auto px-2.5 py-0.5 disabled:opacity-40 transition-colors"
+                className="ml-auto px-2.5 py-0.5 disabled:opacity-40 transition-colors font-mono text-[11px] uppercase"
                 style={confirmDelete
-                  ? { fontSize: '13px', color: '#B5242A', fontWeight: 500 }
-                  : { fontSize: '13px', color: '#6B8E7A' }
+                  ? { color: '#B5242A', fontWeight: 500 }
+                  : { color: '#BBBBBB' }
                 }
               >
                 {deleting ? '...' : confirmDelete ? 'Confirm?' : 'Delete'}
@@ -176,12 +164,9 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
             )}
           </div>
 
-          {/* Content */}
+          {/* Content — Instrument Sans */}
           {displayContent && (
-            <p
-              className="whitespace-pre-wrap mt-1"
-              style={{ fontSize: '16px', color: '#0F1F18', lineHeight: '1.55' }}
-            >
+            <p className="whitespace-pre-wrap mt-1 font-sans text-[15px] text-black leading-[1.55]">
               {displayContent}
             </p>
           )}
@@ -209,18 +194,18 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
             <QuoteCard eventId={note.quotedEventId} />
           ) : null}
 
-          {/* Action labels — plain text */}
-          <div className="mt-3 flex items-center gap-4" style={{ fontSize: '13px', color: '#6B8E7A' }}>
+          {/* Action labels — Plex Mono caps */}
+          <div className="mt-3 flex items-center gap-4 font-mono text-[11px] uppercase tracking-[0.02em] text-grey-300">
             <button
               onClick={() => setShowComposer(c => !c)}
-              className="hover:text-ink transition-colors"
+              className="hover:text-black transition-colors"
             >
               {replyCount > 0 ? `Replies (${replyCount})` : 'Reply'}
             </button>
             {user && onQuote && (
               <button
                 onClick={handleQuote}
-                className="hover:text-ink transition-colors"
+                className="hover:text-black transition-colors"
               >
                 Quote
               </button>
@@ -236,7 +221,7 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
         </div>
       </div>
 
-      {/* Replies — always show up to 3 most recent */}
+      {/* Replies — indented at 38px + 16px */}
       <div className="ml-[42px] mt-1">
         <ReplySection
           targetEventId={note.id}
@@ -257,8 +242,8 @@ function EmbedPreview({ url }: { url: string }) {
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
   if (yt) return <div className="relative overflow-hidden" style={{ paddingBottom: '56.25%' }}><iframe src={`https://www.youtube.com/embed/${yt[1]}`} className="absolute inset-0 w-full h-full" frameBorder="0" allowFullScreen loading="lazy" /></div>
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="block p-3 hover:opacity-80 transition-opacity" style={{ background: '#DDEEE4' }}>
-      <p className="text-ui-xs truncate" style={{ color: '#4A6B5A' }}>{url}</p>
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block p-3 hover:opacity-80 transition-opacity bg-grey-100">
+      <p className="text-[11px] font-mono truncate text-grey-400">{url}</p>
     </a>
   )
 }

@@ -54,7 +54,7 @@ export default function GoogleCallbackPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="text-mono-xs text-content-secondary">Signing in…</p>
+      <p className="text-mono-xs text-grey-600">Signing in…</p>
     </div>
   )
 }

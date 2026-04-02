@@ -73,29 +73,29 @@ export function ShareButton({ url, title }: ShareButtonProps) {
     <div ref={containerRef} className="relative">
       <button
         onClick={handleClick}
-        className="text-ui-xs transition-colors text-content-faint hover:text-content-primary"
+        className="text-ui-xs transition-colors text-grey-300 hover:text-black"
         aria-label="Share"
       >
         {copied ? 'Copied!' : 'Share'}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-6 z-20 w-44 border border-rule bg-card shadow-lg py-1">
+        <div className="absolute right-0 top-6 z-20 w-44 border border-grey-200 bg-white shadow-lg py-1">
           <button
             onClick={copyLink}
-            className="w-full text-left px-3 py-2 text-xs text-content-primary hover:bg-surface-deep transition-colors"
+            className="w-full text-left px-3 py-2 text-xs text-black hover:bg-grey-100 transition-colors"
           >
             Copy link
           </button>
           <button
             onClick={openX}
-            className="w-full text-left px-3 py-2 text-xs text-content-primary hover:bg-surface-deep transition-colors"
+            className="w-full text-left px-3 py-2 text-xs text-black hover:bg-grey-100 transition-colors"
           >
             Share on X
           </button>
           <button
             onClick={openEmail}
-            className="w-full text-left px-3 py-2 text-xs text-content-primary hover:bg-surface-deep transition-colors"
+            className="w-full text-left px-3 py-2 text-xs text-black hover:bg-grey-100 transition-colors"
           >
             Share via email
           </button>

@@ -57,7 +57,7 @@ export default function SearchPage() {
 
   return (
     <div className="mx-auto max-w-article px-6 py-12">
-      <h1 className="font-serif text-2xl font-light text-ink mb-8 tracking-tight">Search</h1>
+      <h1 className="font-serif text-2xl font-light text-black mb-8 tracking-tight">Search</h1>
 
       {/* Search input */}
       <div className="flex gap-2 mb-8">
@@ -99,23 +99,23 @@ export default function SearchPage() {
       {/* Loading skeleton */}
       {loading && (
         <div className="space-y-4">
-          {[1,2,3].map(i => <div key={i} className="h-14 animate-pulse bg-card" />)}
+          {[1,2,3].map(i => <div key={i} className="h-14 animate-pulse bg-white" />)}
         </div>
       )}
 
       {/* Article results */}
       {!loading && searched && activeTab === 'articles' && (
         articleResults.length === 0 ? (
-          <p className="text-ui-sm text-content-muted py-10 text-center">
+          <p className="text-ui-sm text-grey-400 py-10 text-center">
             No articles found for &ldquo;{query}&rdquo;.
           </p>
         ) : (
           <div className="space-y-1">
             {articleResults.map(a => (
-              <Link key={a.id} href={`/article/${a.dTag}`} className="block bg-card p-4 group">
-                <p className="label-ui text-content-muted mb-2">{a.writer.displayName ?? a.writer.username}</p>
-                <h3 className="font-serif text-base font-normal text-ink group-hover:opacity-70 transition-opacity mb-1 tracking-tight">{a.title}</h3>
-                {a.summary && <p className="font-serif text-sm text-content-muted line-clamp-2" style={{ lineHeight: '1.65' }}>{a.summary}</p>}
+              <Link key={a.id} href={`/article/${a.dTag}`} className="block bg-white p-4 group">
+                <p className="label-ui text-grey-400 mb-2">{a.writer.displayName ?? a.writer.username}</p>
+                <h3 className="font-serif text-base font-normal text-black group-hover:opacity-70 transition-opacity mb-1 tracking-tight">{a.title}</h3>
+                {a.summary && <p className="font-serif text-sm text-grey-400 line-clamp-2" style={{ lineHeight: '1.65' }}>{a.summary}</p>}
               </Link>
             ))}
           </div>
@@ -125,23 +125,23 @@ export default function SearchPage() {
       {/* Writer results */}
       {!loading && searched && activeTab === 'writers' && (
         writerResults.length === 0 ? (
-          <p className="text-ui-sm text-content-muted py-10 text-center">
+          <p className="text-ui-sm text-grey-400 py-10 text-center">
             No writers found for &ldquo;{query}&rdquo;.
           </p>
         ) : (
           <div className="space-y-1">
             {writerResults.map(w => (
-              <Link key={w.id} href={`/${w.username}`} className="flex items-center gap-4 bg-card p-4 group">
+              <Link key={w.id} href={`/${w.username}`} className="flex items-center gap-4 bg-white p-4 group">
                 {w.avatar ? (
                   <img src={w.avatar} alt="" className="h-9 w-9 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-9 w-9 items-center justify-center bg-surface-deep text-xs font-medium text-content-muted">
+                  <span className="flex h-9 w-9 items-center justify-center bg-grey-100 text-xs font-medium text-grey-400">
                     {(w.displayName ?? w.username)[0].toUpperCase()}
                   </span>
                 )}
                 <div>
-                  <p className="text-ui-sm text-ink group-hover:opacity-70 transition-opacity">{w.displayName ?? w.username}</p>
-                  <p className="text-ui-xs text-content-faint">@{w.username} / {w.articleCount} article{w.articleCount !== 1 ? 's' : ''}</p>
+                  <p className="text-ui-sm text-black group-hover:opacity-70 transition-opacity">{w.displayName ?? w.username}</p>
+                  <p className="text-ui-xs text-grey-300">@{w.username} / {w.articleCount} article{w.articleCount !== 1 ? 's' : ''}</p>
                 </div>
               </Link>
             ))}

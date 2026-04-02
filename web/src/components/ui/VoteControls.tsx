@@ -136,8 +136,8 @@ export function VoteControls({
           title={!user ? 'Log in to vote' : isOwnContent ? 'Cannot vote on own content' : 'Upvote'}
           className={`px-1.5 py-0.5 text-ui-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed
             ${myVotes.upCount > 0
-              ? 'text-accent font-medium'
-              : 'text-content-faint hover:text-content-primary hover:bg-surface-deep'
+              ? 'text-crimson font-medium'
+              : 'text-grey-300 hover:text-black hover:bg-grey-100'
             }`}
         >
           ▲
@@ -145,7 +145,7 @@ export function VoteControls({
 
         <div className="relative">
           <button
-            className="text-ui-xs min-w-[1.5rem] text-center transition-colors text-content-muted hover:text-content-primary"
+            className="text-ui-xs min-w-[1.5rem] text-center transition-colors text-grey-400 hover:text-black"
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
           >
@@ -153,7 +153,7 @@ export function VoteControls({
           </button>
 
           {showTooltip && (tally.upvoteCount > 0 || tally.downvoteCount > 0) && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 whitespace-nowrap bg-ink px-2 py-1.5 text-[10px] text-white shadow-lg" style={{ borderRadius: '2px' }}>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 whitespace-nowrap bg-black px-2 py-1.5 text-[10px] text-white shadow-lg" style={{ borderRadius: '2px' }}>
               <div>↑ {tally.upvoteCount} {tally.upvoteCount !== 1 ? 'upvotes' : 'upvote'}</div>
               <div>↓ {tally.downvoteCount} {tally.downvoteCount !== 1 ? 'downvotes' : 'downvote'}</div>
             </div>
@@ -166,8 +166,8 @@ export function VoteControls({
           title={!user ? 'Log in to vote' : isOwnContent ? 'Cannot vote on own content' : 'Downvote'}
           className={`px-1.5 py-0.5 text-ui-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed
             ${myVotes.downCount > 0
-              ? 'text-accent font-medium'
-              : 'text-content-faint hover:text-content-primary hover:bg-surface-deep'
+              ? 'text-crimson font-medium'
+              : 'text-grey-300 hover:text-black hover:bg-grey-100'
             }`}
         >
           ▼

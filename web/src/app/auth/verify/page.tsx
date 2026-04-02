@@ -57,11 +57,11 @@ export default function VerifyPage() {
     <div className="mx-auto max-w-sm px-6 py-24 text-center">
       {status === 'verifying' && (
         <>
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-rule border-t-content-secondary" />
-          <h1 className="font-serif text-xl font-bold text-ink mb-2">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-grey-200 border-t-grey-600" />
+          <h1 className="font-serif text-xl font-bold text-black mb-2">
             Logging you in...
           </h1>
-          <p className="text-sm text-content-muted">Verifying your login link.</p>
+          <p className="text-sm text-grey-400">Verifying your login link.</p>
         </>
       )}
 
@@ -72,19 +72,19 @@ export default function VerifyPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="font-serif text-xl font-bold text-ink mb-2">
+          <h1 className="font-serif text-xl font-bold text-black mb-2">
             You're in
           </h1>
-          <p className="text-sm text-content-muted">Redirecting to your feed...</p>
+          <p className="text-sm text-grey-400">Redirecting to your feed...</p>
         </>
       )}
 
       {status === 'error' && (
         <>
-          <h1 className="font-serif text-xl font-bold text-ink mb-2">
+          <h1 className="font-serif text-xl font-bold text-black mb-2">
             Login link didn't work
           </h1>
-          <p className="text-sm text-content-muted mb-6 leading-relaxed">
+          <p className="text-sm text-grey-400 mb-6 leading-relaxed">
             {errorMessage}
           </p>
           <a

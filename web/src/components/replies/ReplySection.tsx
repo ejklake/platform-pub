@@ -137,10 +137,10 @@ export function ReplySection({
 
   if (loading) {
     return (
-      <div className={compact ? '' : 'mt-8 pt-6 border-t border-rule'}>
+      <div className={compact ? '' : 'mt-8 pt-6 border-t border-grey-200'}>
         <div className="space-y-2 py-2">
           {[1, 2].map(i => (
-            <div key={i} className="h-10 animate-pulse bg-surface-deep" />
+            <div key={i} className="h-10 animate-pulse bg-grey-100" />
           ))}
         </div>
       </div>
@@ -148,9 +148,9 @@ export function ReplySection({
   }
 
   return (
-    <div className={compact ? '' : 'mt-8 pt-6 border-t border-rule'}>
+    <div className={compact ? '' : 'mt-8 pt-6 border-t border-grey-200'}>
       {!compact && (
-        <h3 className="text-sm font-medium text-content-secondary mb-4">
+        <h3 className="text-sm font-medium text-grey-600 mb-4">
           {totalCount > 0
             ? `${totalCount} ${totalCount !== 1 ? 'replies' : 'reply'}`
             : 'Replies'}
@@ -171,7 +171,7 @@ export function ReplySection({
                 voteTally={voteTallies[reply.nostrEventId]}
                 myVoteCounts={myVoteCounts[reply.nostrEventId]}
                 renderComposer={(replyId) => replyTarget?.replyId === replyId ? (
-                  <div className="ml-8 pl-4 border-l border-rule">
+                  <div className="ml-8 pl-4 border-l border-grey-200">
                     <ReplyComposer
                       targetEventId={targetEventId}
                       targetKind={targetKind}
@@ -186,7 +186,7 @@ export function ReplySection({
                 ) : null}
               />
               {replyTarget?.replyId === reply.id && (
-                <div className="ml-8 pl-4 border-l border-rule">
+                <div className="ml-8 pl-4 border-l border-grey-200">
                   <ReplyComposer
                     targetEventId={targetEventId}
                     targetKind={targetKind}
@@ -204,7 +204,7 @@ export function ReplySection({
           {previewLimit && !showAll && replies.length > previewLimit && (
             <button
               onClick={() => setShowAll(true)}
-              className="mt-2 px-3 py-1.5 text-ui-xs text-content-muted hover:text-white hover:bg-content-secondary transition-colors"
+              className="mt-2 px-3 py-1.5 text-ui-xs text-grey-400 hover:text-white hover:bg-grey-600 transition-colors"
             >
               Read more replies
             </button>
@@ -221,12 +221,12 @@ export function ReplySection({
             onPublished={(reply) => { handleNewReply(reply); onComposerClose?.() }}
           />
         ) : !repliesEnabled ? (
-          <p className="text-xs text-content-faint italic mb-4">
+          <p className="text-xs text-grey-300 italic mb-4">
             The author has closed replies on this piece.
           </p>
         ) : (
-          <p className="text-xs text-content-faint mb-4">
-            <a href="/auth?mode=login" className="text-accent hover:text-accent-dark">
+          <p className="text-xs text-grey-300 mb-4">
+            <a href="/auth?mode=login" className="text-crimson hover:text-crimson-dark">
               Log in
             </a>{' '}
             to leave a reply.

@@ -77,14 +77,11 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
   }
 
   return (
-    <div className="bg-card" style={{ border: '1.5px solid #B8D2C1', padding: '0.875rem 1.25rem' }}>
+    <div className="border border-grey-200 p-[0.875rem_1.25rem]">
       <div className="flex gap-3">
         {user.avatar
           ? <img src={user.avatar} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
-          : <span
-              className="flex h-9 w-9 items-center justify-center text-xs font-medium flex-shrink-0 rounded-full"
-              style={{ background: '#C2DBC9', color: '#4A6B5A' }}
-            >
+          : <span className="flex h-9 w-9 items-center justify-center text-[10px] font-mono uppercase flex-shrink-0 rounded-full bg-grey-100 text-grey-400">
               {initial}
             </span>
         }
@@ -96,47 +93,47 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost() } }}
             placeholder={activeQuote ? 'Add your thoughts...' : "What's on your mind?"}
             rows={2}
-            className="w-full resize-none bg-transparent text-[15px] text-content-primary placeholder:text-content-faint focus:outline-none leading-relaxed"
+            className="w-full resize-none bg-transparent text-[15px] font-sans text-black placeholder:text-grey-300 focus:outline-none leading-relaxed border-none"
           />
 
           {/* Quote preview */}
           {activeQuote && (
-            <div className="mt-2 bg-surface-deep/60 border-l-[2.5px] border-accent p-3 flex items-start gap-2">
+            <div className="mt-2 bg-grey-50 border-l-2 border-crimson p-3 flex items-start gap-2">
               <div className="flex-1 min-w-0">
                 {activeQuote.highlightedText ? (
                   <>
-                    <p className="font-serif italic text-sm text-content-secondary leading-relaxed line-clamp-3 mt-0.5">
+                    <p className="font-serif italic text-sm text-grey-600 leading-relaxed line-clamp-3 mt-0.5">
                       {activeQuote.highlightedText.trim().split(/\s+/).slice(0, 80).join(' ')}
                     </p>
-                    <p className="text-ui-xs text-content-faint mt-1">
-                      {activeQuote.previewTitle && <span className="font-medium">{activeQuote.previewTitle}</span>}
+                    <p className="font-mono text-[11px] uppercase tracking-[0.02em] text-grey-300 mt-1">
+                      {activeQuote.previewTitle && <span>{activeQuote.previewTitle}</span>}
                       {activeQuote.previewTitle && activeQuote.previewAuthorName && ' — '}
                       {activeQuote.previewAuthorName}
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-ui-xs font-medium text-content-muted">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.02em] text-grey-400">
                       {activeQuote.previewAuthorName ?? activeQuote.authorPubkey.slice(0, 10) + '…'}
                     </p>
                     {activeQuote.previewTitle && (
-                      <p className="text-ui-sm font-medium text-content-primary leading-snug mt-0.5 line-clamp-1">
+                      <p className="text-[13px] font-sans font-medium text-black leading-snug mt-0.5 line-clamp-1">
                         {activeQuote.previewTitle}
                       </p>
                     )}
                     {activeQuote.previewContent ? (
-                      <p className="text-ui-xs text-content-secondary leading-relaxed line-clamp-2 mt-0.5">
+                      <p className="text-[12px] font-sans text-grey-600 leading-relaxed line-clamp-2 mt-0.5">
                         {activeQuote.previewContent}
                       </p>
                     ) : (
-                      <p className="text-ui-xs text-content-faint italic mt-0.5">Note</p>
+                      <p className="text-[12px] font-sans text-grey-300 italic mt-0.5">Note</p>
                     )}
                   </>
                 )}
               </div>
               <button
                 onClick={handleClearQuote}
-                className="text-content-faint hover:text-content-muted text-sm transition-colors flex-shrink-0 leading-none mt-0.5"
+                className="text-grey-300 hover:text-grey-400 text-sm transition-colors flex-shrink-0 leading-none mt-0.5"
                 title="Remove quote"
               >
                 ×
@@ -145,14 +142,14 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
           )}
 
           {error && (
-            <div className="mt-2 bg-surface-deep text-accent px-3 py-2 text-ui-xs flex items-center justify-between">
+            <div className="mt-2 bg-grey-100 text-crimson px-3 py-2 text-[12px] font-sans flex items-center justify-between">
               <span>{error}</span>
-              <button onClick={() => setError(null)} className="ml-2 text-content-faint hover:text-accent">×</button>
+              <button onClick={() => setError(null)} className="ml-2 text-grey-300 hover:text-crimson">×</button>
             </div>
           )}
 
           <div className="mt-3 flex items-center justify-between">
-            <span className={`text-ui-xs transition-colors ${isOver ? 'text-accent font-medium' : charCount > NOTE_CHAR_LIMIT - 50 ? 'text-accent' : 'text-content-faint'}`}>
+            <span className={`font-mono text-[11px] transition-colors ${isOver ? 'text-crimson font-medium' : charCount > NOTE_CHAR_LIMIT - 50 ? 'text-crimson' : 'text-grey-300'}`}>
               {charCount > 0 && `${charCount}/${NOTE_CHAR_LIMIT}`}
             </span>
             <div className="flex items-center gap-2">
@@ -177,7 +174,7 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
                   input.click()
                 }}
                 disabled={uploading}
-                className="text-content-faint hover:text-content-muted disabled:opacity-40 transition-colors p-1.5 hover:bg-surface-deep"
+                className="text-grey-300 hover:text-grey-400 disabled:opacity-40 transition-colors p-1.5 hover:bg-grey-100"
                 title="Add image"
               >
                 <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -186,7 +183,7 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
                   <path d="M14.5 10.5L11 7L3.5 14.5" />
                 </svg>
               </button>
-              <button onClick={handlePost} disabled={!canPost} className="btn disabled:opacity-30 py-1.5 px-5 text-ui-xs font-medium">
+              <button onClick={handlePost} disabled={!canPost} className="btn disabled:opacity-30 py-1.5 px-5 text-[12px] font-sans font-semibold">
                 {publishing ? 'Posting...' : 'Post'}
               </button>
             </div>

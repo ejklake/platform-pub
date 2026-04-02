@@ -111,10 +111,10 @@ export function ReplyComposer({
   return (
     <div className="pt-2">
       {replyingToName && (
-        <p className="text-ui-xs text-content-faint mb-1.5 flex items-center gap-1">
-          Replying to <span className="font-medium text-content-muted">{replyingToName}</span>
+        <p className="text-ui-xs text-grey-300 mb-1.5 flex items-center gap-1">
+          Replying to <span className="font-medium text-grey-400">{replyingToName}</span>
           {onCancel && (
-            <button onClick={onCancel} className="text-content-faint hover:text-content-muted ml-1">×</button>
+            <button onClick={onCancel} className="text-grey-300 hover:text-grey-400 ml-1">×</button>
           )}
         </p>
       )}
@@ -130,10 +130,10 @@ export function ReplyComposer({
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost() } }}
             placeholder="Reply..."
             rows={1}
-            className={`w-full resize-none text-ui-sm text-content-primary placeholder:text-content-faint focus:outline-none leading-relaxed transition-all ${
+            className={`w-full resize-none text-ui-sm text-black placeholder:text-grey-300 focus:outline-none leading-relaxed transition-all ${
               isExpanded
-                ? 'bg-card px-3.5 py-2 border border-rule focus:border-content-muted'
-                : 'bg-surface-deep/60 px-3.5 py-2'
+                ? 'bg-white px-3.5 py-2 border border-grey-200 focus:border-grey-400'
+                : 'bg-grey-100/60 px-3.5 py-2'
             }`}
           />
         </div>
@@ -143,7 +143,7 @@ export function ReplyComposer({
             <button
               onClick={handleImageUpload}
               disabled={uploading}
-              className="text-content-faint hover:text-content-muted disabled:opacity-40 transition-colors p-1.5"
+              className="text-grey-300 hover:text-grey-400 disabled:opacity-40 transition-colors p-1.5"
               title="Add image"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -164,15 +164,15 @@ export function ReplyComposer({
       </div>
 
       {error && (
-        <div className="mt-1.5 bg-surface-deep text-accent px-3 py-1.5 text-ui-xs flex items-center justify-between">
+        <div className="mt-1.5 bg-grey-100 text-crimson px-3 py-1.5 text-ui-xs flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-2 text-content-faint hover:text-accent">×</button>
+          <button onClick={() => setError(null)} className="ml-2 text-grey-300 hover:text-crimson">×</button>
         </div>
       )}
 
       {isExpanded && charCount > REPLY_CHAR_LIMIT - 200 && (
         <p className={`text-ui-xs mt-1 transition-colors ${
-          isOverLimit ? 'text-accent font-medium' : 'text-content-faint'
+          isOverLimit ? 'text-crimson font-medium' : 'text-grey-300'
         }`}>
           {charCount}/{REPLY_CHAR_LIMIT}
         </p>

@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.31.0
+# platform.pub — Deployment Reference v4.0.0
 
 **Date:** 2 April 2026
-**Replaces:** v3.30.0 (see bottom for change log)
+**Replaces:** v3.31.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -204,6 +204,127 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.31.0
+
+No schema changes. No new migrations. Services changed: **web** only. Deploy order: **rebuild web**.
+
+This is a major frontend redesign — the entire visual language has been overhauled. No backend services are affected. The release includes:
+
+- **Navigation**: fixed left sidebar replaced with horizontal top bar (4 mono-caps links: FEED, WRITE, DASHBOARD, ABOUT) + avatar dropdown ("me" menu) + mobile hamburger sheet
+- **Two layout registers**: `useLayoutMode()` hook returns `'platform'` or `'canvas'` based on route. Canvas mode (article reader, writer profiles) shows a minimal grey wordmark and back link. Platform mode shows full branded nav
+- **LayoutShell**: new context provider wrapping all content, exposing layout mode via `useLayoutModeContext()`
+- **Typography system**: three fonts with distinct roles — Literata (serif, literary content: headlines, body, excerpts), Instrument Sans (sans, social/UI: notes, replies, buttons, forms), IBM Plex Mono (mono, infrastructure: nav, bylines, metadata, timestamps, action labels). Replaces Source Sans 3 everywhere
+- **Colour palette**: green/cream palette (`#EDF5F0`, `#DDEEE4`, `#FFFAEF`, `#0F1F18`) replaced with white/grey/crimson. White background everywhere. Grey scale (50–600) for text hierarchy. Crimson only on logo, paywalled borders, prices, and CTAs. Canvas mode is fully neutral except paywall gate
+- **Buttons**: no border-radius, no 3D bottom-border effect. `opacity: 0.85` hover. New `btn-ghost` variant (replaces `btn-soft`)
+- **Drop cap**: black, not crimson (writer's neutral space)
+- **Article reader**: roman title (not italic), black links, `grey-200` blockquote borders
+- **Feed cards**: no background colour, thin `grey-100` bottom rules, 3px crimson left border on paywalled articles only
+
+**New files:**
+- `web/src/hooks/useLayoutMode.ts`
+- `web/src/components/layout/LayoutShell.tsx`
+
+**Significantly modified files:**
+- `web/tailwind.config.js` — new colour tokens (grey scale, crimson, white, black), Instrument Sans as default sans, legacy tokens preserved
+- `web/src/app/globals.css` — complete rewrite of component classes, Instrument Sans font import added
+- `web/src/app/layout.tsx` — sidebar offset removed, LayoutShell wrapper added
+- `web/src/components/layout/Nav.tsx` — complete rewrite (sidebar → top bar + avatar dropdown)
+- All feed, article, home, and page components — migrated from old tokens to v2 design system
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migration needed — rebuild web only
+docker compose build web
+docker compose up -d web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# web should show (healthy) after ~30s
+
+# Visual check: open the site in a browser
+# - Homepage should have white background, Literata hero text, crimson accent rule
+# - Navigation should be a horizontal top bar, not a left sidebar
+# - Feed should show article cards with no background, thin rules between them
+# - Article reader should have neutral white canvas, roman (not italic) title
+```
+
+Changes:
+
+```
+# v4.0.0 — Frontend redesign: navigation, typography, and colour system
+#
+# ── Layout system ──
+# New useLayoutMode() hook returns 'platform' | 'canvas' based on pathname.
+# Canvas routes: /article/* and /:username. All other routes are platform.
+# LayoutShell component provides mode via React context.
+# Files: web/src/hooks/useLayoutMode.ts, web/src/components/layout/LayoutShell.tsx,
+#        web/src/app/layout.tsx
+#
+# ── Navigation rewrite ──
+# Fixed 240px left sidebar replaced with 56px horizontal top bar.
+# Platform mode: logo (Literata italic crimson 20px), 4 Plex Mono uppercase
+# nav links, search input, avatar with dropdown menu.
+# Canvas mode: grey 16px logo, "← FEED" back link, avatar only.
+# Mobile: hamburger toggles a sheet below the top bar.
+# Avatar dropdown: 3 sections (identity, money/content, meta).
+# Files: web/src/components/layout/Nav.tsx, web/src/app/layout.tsx
+#
+# ── Typography system ──
+# Three fonts with distinct roles:
+#   Literata (serif): article headlines, standfirsts, body, reader, profile names
+#   Instrument Sans (sans): notes, replies, buttons, forms, UI chrome
+#   IBM Plex Mono (mono): nav, tabs, bylines, metadata, timestamps, action labels
+# Source Sans 3 removed from all components. Preserved in font import for
+# any custom content that may reference it.
+# Files: web/tailwind.config.js, web/src/app/globals.css, all components
+#
+# ── Colour palette ──
+# Green/cream tokens replaced with white/grey/crimson:
+#   bg-surface (#EDF5F0) → bg-white
+#   bg-card (#FFFAEF) → bg-white (no card backgrounds)
+#   text-ink (#0F1F18) → text-black (#1A1A1A)
+#   text-content-secondary (#263D32) → text-grey-600 (#666666)
+#   text-content-muted (#3D5E4D) → text-grey-400 (#999999)
+#   text-content-faint (#6B8E7A) → text-grey-300 (#BBBBBB)
+#   border-rule (#B8D2C1) → border-grey-200 (#E5E5E5)
+#   accent (#B5242A) → crimson (#B5242A) (same value, new token name)
+# Legacy Tailwind tokens preserved in config for any missed references.
+# Files: web/tailwind.config.js, web/src/app/globals.css, all .tsx files
+#
+# ── Button redesign ──
+# No border-radius. No 3D bottom-border. Hover is opacity: 0.85.
+# New btn-ghost variant (transparent bg, grey-200 border).
+# btn-soft kept as legacy alias mapping to btn-ghost.
+# File: web/src/app/globals.css
+#
+# ── Article reader (canvas mode) ──
+# White background, no platform branding. Title is Literata roman (not italic).
+# Links are black underlined (not crimson). Blockquotes have grey-200 border.
+# Drop cap is black (#1A1A1A), not crimson. Paywall gate is the one exception
+# where crimson appears in canvas mode.
+# Files: web/src/components/article/ArticleReader.tsx,
+#        web/src/components/article/PaywallGate.tsx
+#
+# ── Feed components ──
+# Article cards: no background, thin grey-100 bottom rule. 3px crimson left
+# border on paywalled articles (always visible, not hover state). Bylines in
+# Plex Mono caps, headlines in Literata italic, standfirsts in Literata roman.
+# Note cards: 28px avatar, Instrument Sans body, Plex Mono timestamps.
+# Quote cards: grey-50 background, grey-200 or crimson left border.
+# Files: web/src/components/feed/ArticleCard.tsx, NoteCard.tsx, QuoteCard.tsx,
+#        FeedView.tsx, NoteComposer.tsx
+#
+# ── Homepage ──
+# 48px Literata hero, Plex Mono section labels, grey-50 how-it-works section.
+# Files: web/src/app/page.tsx, web/src/components/home/FeaturedWriters.tsx
+```
+
+---
 
 ### From v3.30.0
 

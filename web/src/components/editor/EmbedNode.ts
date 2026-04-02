@@ -51,12 +51,12 @@ export const EmbedNode = Node.create<EmbedNodeOptions>({
   renderHTML({ HTMLAttributes }) {
     return ['div', mergeAttributes(HTMLAttributes, {
       'data-embed': '',
-      class: 'border border-rule p-4 my-4 bg-surface-deep',
+      class: 'border border-grey-200 p-4 my-4 bg-grey-100',
     }), ['a', {
       href: HTMLAttributes.src,
       target: '_blank',
       rel: 'noopener noreferrer',
-      class: 'text-sm text-accent hover:text-accent-dark break-all',
+      class: 'text-sm text-crimson hover:text-crimson-dark break-all',
     }, HTMLAttributes.src]]
   },
 

@@ -108,7 +108,7 @@ export function CommentComposer({
   return (
     <div className={compact ? 'mt-2' : 'mb-6'}>
       {replyingToName && (
-        <p className="text-xs text-content-faint mb-1">
+        <p className="text-xs text-grey-300 mb-1">
           Replying to {replyingToName}
         </p>
       )}
@@ -120,7 +120,7 @@ export function CommentComposer({
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost() } }}
         placeholder={compact ? 'Write a reply...' : 'Write a comment...'}
         rows={compact ? 1 : 2}
-        className="w-full resize-none border border-rule bg-card px-3 py-2 text-sm text-ink placeholder:text-content-faint focus:outline-none focus:border-content-muted leading-relaxed"
+        className="w-full resize-none border border-grey-200 bg-white px-3 py-2 text-sm text-black placeholder:text-grey-300 focus:outline-none focus:border-grey-400 leading-relaxed"
       />
 
       {error && (
@@ -134,7 +134,7 @@ export function CommentComposer({
               ? 'text-red-600 font-medium'
               : charCount > COMMENT_CHAR_LIMIT - 100
                 ? 'text-red-500'
-                : 'text-content-faint'
+                : 'text-grey-300'
           }`}
         >
           {charCount > 0 && `${charCount}/${COMMENT_CHAR_LIMIT}`}
@@ -144,7 +144,7 @@ export function CommentComposer({
           {onCancel && (
             <button
               onClick={onCancel}
-              className="text-xs text-content-faint hover:text-content-muted transition-colors"
+              className="text-xs text-grey-300 hover:text-grey-400 transition-colors"
             >
               Cancel
             </button>

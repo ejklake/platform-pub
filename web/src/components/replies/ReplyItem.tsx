@@ -72,7 +72,7 @@ export function ReplyItem({
   }
 
   return (
-    <div id={`reply-${reply.id}`} className={`${depth > 0 ? 'ml-8 pl-3 border-l border-rule' : ''}`}>
+    <div id={`reply-${reply.id}`} className={`${depth > 0 ? 'ml-8 pl-3 border-l border-grey-200' : ''}`}>
       <div className={compact ? 'py-1.5' : 'py-2'}>
         <div className="flex items-start gap-2.5">
           {reply.author.avatar ? (
@@ -84,38 +84,38 @@ export function ReplyItem({
           ) : (
             <span
               className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-medium flex-shrink-0 mt-0.5"
-              style={{ background: '#C2DBC9', color: '#4A6B5A' }}
+              style={{ background: '#F0F0F0', color: '#999999' }}
             >
               {initial}
             </span>
           )}
           <div className="flex-1 min-w-0">
             <p className={`text-sm leading-relaxed ${
-              reply.isDeleted ? 'text-content-faint italic' : ''
+              reply.isDeleted ? 'text-grey-300 italic' : ''
             }`}>
               {reply.author.username ? (
-                <Link href={`/${reply.author.username}`} className="font-medium text-content-secondary text-ui-xs hover:text-content-primary transition-colors">
+                <Link href={`/${reply.author.username}`} className="font-medium text-grey-600 text-ui-xs hover:text-black transition-colors">
                   {authorName}
                 </Link>
               ) : (
-                <span className="font-medium text-content-secondary text-ui-xs">
+                <span className="font-medium text-grey-600 text-ui-xs">
                   {authorName}
                 </span>
               )}{' '}
-              <span className={reply.isDeleted ? 'text-content-faint' : 'text-content-primary'}>
+              <span className={reply.isDeleted ? 'text-grey-300' : 'text-black'}>
                 {reply.content}
               </span>
             </p>
 
             {!reply.isDeleted && (
-              <div className="mt-0.5 flex items-center gap-2 text-ui-xs text-content-faint">
+              <div className="mt-0.5 flex items-center gap-2 text-ui-xs text-grey-300">
                 <time dateTime={reply.publishedAt}>
                   {formatRelativeTime(reply.publishedAt)}
                 </time>
                 {currentUserId && onReply && depth < 2 && (
                   <button
                     onClick={() => onReply(reply.id, reply.nostrEventId, authorName)}
-                    className="hover:text-content-muted transition-colors"
+                    className="hover:text-grey-400 transition-colors"
                   >
                     Reply
                   </button>
@@ -125,8 +125,8 @@ export function ReplyItem({
                     onClick={handleDelete}
                     className={`transition-colors ${
                       confirmDelete
-                        ? 'text-accent font-medium'
-                        : 'hover:text-accent'
+                        ? 'text-crimson font-medium'
+                        : 'hover:text-crimson'
                     }`}
                   >
                     {confirmDelete ? 'Confirm?' : 'Delete'}

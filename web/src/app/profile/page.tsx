@@ -39,7 +39,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-article px-6 py-12">
-        <div className="h-6 w-32 animate-pulse bg-card mb-8" />
+        <div className="h-6 w-32 animate-pulse bg-white mb-8" />
       </div>
     )
   }
@@ -89,14 +89,14 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-article px-6 py-12">
-      <h1 className="font-serif text-2xl font-light text-content-primary tracking-tight mb-8">
+      <h1 className="font-serif text-2xl font-light text-black tracking-tight mb-8">
         Profile
       </h1>
 
       <form onSubmit={handleSave} className="space-y-8 max-w-md">
         {/* Avatar */}
         <div>
-          <label className="block text-ui-xs text-content-faint mb-3 uppercase tracking-wider">
+          <label className="block text-ui-xs text-grey-300 mb-3 uppercase tracking-wider">
             Photo
           </label>
           <div className="flex items-center gap-4">
@@ -104,7 +104,7 @@ export default function ProfilePage() {
               <img src={avatar} alt="" className="h-16 w-16 rounded-full object-cover flex-shrink-0" />
             ) : (
               <span
-                className="flex h-16 w-16 items-center justify-center rounded-full text-xl font-medium text-content-primary flex-shrink-0"
+                className="flex h-16 w-16 items-center justify-center rounded-full text-xl font-medium text-black flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg, #F5D5D6, #E8A5A7)' }}
               >
                 {initial}
@@ -130,7 +130,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setAvatar(null)}
-                  className="text-ui-xs text-content-faint hover:text-content-muted transition-colors"
+                  className="text-ui-xs text-grey-300 hover:text-grey-400 transition-colors"
                 >
                   Remove
                 </button>
@@ -141,7 +141,7 @@ export default function ProfilePage() {
 
         {/* Display name */}
         <div>
-          <label htmlFor="displayName" className="block text-ui-xs text-content-faint mb-2 uppercase tracking-wider">
+          <label htmlFor="displayName" className="block text-ui-xs text-grey-300 mb-2 uppercase tracking-wider">
             Display name
           </label>
           <input
@@ -151,13 +151,13 @@ export default function ProfilePage() {
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={100}
             placeholder={user.username ?? ''}
-            className="w-full bg-card border border-rule px-4 py-2.5 text-sm text-content-primary placeholder-content-faint focus:outline-none focus:ring-1 focus:ring-accent/50"
+            className="w-full bg-white border border-grey-200 px-4 py-2.5 text-sm text-black placeholder-grey-300 focus:outline-none focus:ring-1 focus:ring-crimson/50"
           />
         </div>
 
         {/* Bio */}
         <div>
-          <label htmlFor="bio" className="block text-ui-xs text-content-faint mb-2 uppercase tracking-wider">
+          <label htmlFor="bio" className="block text-ui-xs text-grey-300 mb-2 uppercase tracking-wider">
             Bio
           </label>
           <textarea
@@ -167,18 +167,18 @@ export default function ProfilePage() {
             maxLength={500}
             rows={4}
             placeholder="A few words about yourself"
-            className="w-full bg-card border border-rule px-4 py-2.5 text-sm text-content-primary placeholder-content-faint focus:outline-none focus:ring-1 focus:ring-accent/50 resize-none"
+            className="w-full bg-white border border-grey-200 px-4 py-2.5 text-sm text-black placeholder-grey-300 focus:outline-none focus:ring-1 focus:ring-crimson/50 resize-none"
           />
-          <p className="text-[11px] text-content-faint mt-1 text-right">{bio.length}/500</p>
+          <p className="text-[11px] text-grey-300 mt-1 text-right">{bio.length}/500</p>
         </div>
 
         {/* Username (read-only) */}
         <div>
-          <label className="block text-ui-xs text-content-faint mb-2 uppercase tracking-wider">
+          <label className="block text-ui-xs text-grey-300 mb-2 uppercase tracking-wider">
             Username
           </label>
-          <p className="text-sm text-content-secondary">@{user.username}</p>
-          <p className="text-[11px] text-content-faint mt-1">Username cannot be changed.</p>
+          <p className="text-sm text-grey-600">@{user.username}</p>
+          <p className="text-[11px] text-grey-300 mt-1">Username cannot be changed.</p>
         </div>
 
         {/* Error */}
