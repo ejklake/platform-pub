@@ -207,6 +207,9 @@ export const articles = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  togglePin: (articleId: string) =>
+    request<{ pinned: boolean }>(`/articles/${articleId}/pin`, { method: 'POST' }),
 }
 
 // =============================================================================
@@ -309,6 +312,35 @@ export interface WriterProfile {
   subscriptionPricePence: number
   annualDiscountPct: number
   articleCount: number
+  followerCount: number
+  followingCount: number
+}
+
+export interface ProfileFollower {
+  id: string
+  username: string
+  displayName: string | null
+  avatar: string | null
+  pubkey: string
+  isWriter: boolean
+  followedAt: string
+}
+
+export interface ProfileFollowing {
+  id: string
+  username: string
+  displayName: string | null
+  avatar: string | null
+  pubkey: string
+  followedAt: string
+}
+
+export interface PublicSubscription {
+  writerId: string
+  writerUsername: string
+  writerDisplayName: string | null
+  writerAvatar: string | null
+  startedAt: string
 }
 
 export const writers = {
@@ -318,6 +350,21 @@ export const writers = {
   getArticles: (username: string, limit = 20, offset = 0) =>
     request<{ articles: any[]; limit: number; offset: number }>(
       `/writers/${username}/articles?limit=${limit}&offset=${offset}`
+    ),
+
+  getFollowers: (username: string, limit = 20, offset = 0) =>
+    request<{ followers: ProfileFollower[]; total: number; limit: number; offset: number }>(
+      `/writers/${username}/followers?limit=${limit}&offset=${offset}`
+    ),
+
+  getFollowing: (username: string, limit = 20, offset = 0) =>
+    request<{ following: ProfileFollowing[]; total: number; limit: number; offset: number }>(
+      `/writers/${username}/following?limit=${limit}&offset=${offset}`
+    ),
+
+  getSubscriptions: (username: string, limit = 20, offset = 0) =>
+    request<{ subscriptions: PublicSubscription[]; limit: number; offset: number }>(
+      `/writers/${username}/subscriptions?limit=${limit}&offset=${offset}`
     ),
 }
 
@@ -709,6 +756,7 @@ export interface MySubscription {
   currentPeriodEnd: string
   startedAt: string
   cancelledAt: string | null
+  hidden: boolean
 }
 
 export const account = {
@@ -728,5 +776,11 @@ export const account = {
     request<{ ok: boolean }>('/settings/subscription-price', {
       method: 'PATCH',
       body: JSON.stringify({ pricePence, ...(annualDiscountPct !== undefined ? { annualDiscountPct } : {}) }),
+    }),
+
+  toggleSubscriptionVisibility: (writerId: string, hidden: boolean) =>
+    request<{ ok: boolean; hidden: boolean }>(`/subscriptions/${writerId}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ hidden }),
     }),
 }

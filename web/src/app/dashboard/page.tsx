@@ -44,9 +44,12 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-content px-6 py-10">
       <div className="flex items-center justify-between mb-10">
         <div className="flex gap-2">
-          {tabs.map(tab => (
-            <button key={tab} onClick={() => switchTab(tab)} className={`tab-pill ${activeTab === tab ? 'tab-pill-active' : 'tab-pill-inactive'}`}>{tab.charAt(0).toUpperCase() + tab.slice(1)}</button>
-          ))}
+          {tabs.map(tab => {
+            const label = tab === 'drives' ? 'Pledge drives' : tab.charAt(0).toUpperCase() + tab.slice(1)
+            return (
+              <button key={tab} onClick={() => switchTab(tab)} className={`tab-pill ${activeTab === tab ? 'tab-pill-active' : 'tab-pill-inactive'}`}>{label}</button>
+            )
+          })}
         </div>
         <div className="flex items-center gap-4">
           <Link href="/account" className="text-ui-xs text-grey-400 hover:text-black underline underline-offset-4">View account</Link>

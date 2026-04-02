@@ -8,6 +8,7 @@ export function SubscriptionsSection() {
   const [subs, setSubs] = useState<MySubscription[]>([])
   const [loading, setLoading] = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [togglingVisibility, setTogglingVisibility] = useState<string | null>(null)
 
   useEffect(() => {
     (async () => {
@@ -62,6 +63,21 @@ export function SubscriptionsSection() {
             </div>
             <div className="flex items-center gap-4 flex-shrink-0">
               <span className="font-mono text-[12px] text-black tabular-nums">£{(s.pricePence / 100).toFixed(2)}/mo</span>
+              <button
+                onClick={async () => {
+                  setTogglingVisibility(s.writerId)
+                  try {
+                    await accountApi.toggleSubscriptionVisibility(s.writerId, !s.hidden)
+                    setSubs(prev => prev.map(sub => sub.writerId === s.writerId ? { ...sub, hidden: !sub.hidden } : sub))
+                  } catch { alert('Failed to update visibility.') }
+                  finally { setTogglingVisibility(null) }
+                }}
+                disabled={togglingVisibility === s.writerId}
+                className="text-[13px] font-sans text-grey-300 hover:text-black disabled:opacity-50"
+                title={s.hidden ? 'Hidden from your public profile' : 'Visible on your public profile'}
+              >
+                {togglingVisibility === s.writerId ? '...' : s.hidden ? 'Hidden' : 'Public'}
+              </button>
               {s.status === 'active' ? (
                 <button
                   onClick={() => handleCancel(s.writerId)}

@@ -51,7 +51,7 @@ export function DrivesTab({ userId }: { userId: string }) {
         <div />
         {!showCreate && (
           <button onClick={() => setShowCreate(true)} className="btn text-sm">
-            New drive
+            New pledge drive
           </button>
         )}
       </div>
@@ -75,7 +75,7 @@ export function DrivesTab({ userId }: { userId: string }) {
       {/* Active drives */}
       {activeDrives.length > 0 && (
         <div className="mb-8">
-          <p className="label-ui text-grey-400 mb-4">Active drives</p>
+          <p className="label-ui text-grey-400 mb-4">Active pledge drives</p>
           <div className="space-y-2">
             {activeDrives.map(d => <DriveCard key={d.id} drive={d} onUpdate={fetchDrives} />)}
           </div>
@@ -96,7 +96,7 @@ export function DrivesTab({ userId }: { userId: string }) {
         <div className="py-20 text-center">
           <p className="text-ui-sm text-grey-400 mb-4">No pledge drives yet.</p>
           <button onClick={() => setShowCreate(true)} className="text-ui-xs text-black underline underline-offset-4">
-            Create your first drive
+            Create your first pledge drive
           </button>
         </div>
       )}

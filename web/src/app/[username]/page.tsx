@@ -53,6 +53,10 @@ export default async function WriterProfilePage({ params }: { params: { username
         )}
         <p className="mt-4 text-ui-xs text-grey-300">
           {writer.articleCount} article{writer.articleCount !== 1 ? 's' : ''}
+          {' · '}
+          {writer.followerCount} follower{writer.followerCount !== 1 ? 's' : ''}
+          {' · '}
+          {writer.followingCount} following
         </p>
       </div>
 

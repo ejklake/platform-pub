@@ -47,7 +47,7 @@ export function DriveCard({ drive, onUpdate }: { drive: PledgeDrive; onUpdate: (
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-[12px] uppercase tracking-[0.06em] text-grey-300">
-              {isCommission ? 'Commission' : 'Crowdfund'}
+              {isCommission ? 'Commission' : 'Pledge drive'}
             </span>
             {drive.pinnedOnProfile && (
               <span className="font-mono text-[12px] uppercase tracking-[0.06em] text-crimson">Pinned</span>

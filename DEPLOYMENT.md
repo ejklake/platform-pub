@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v4.6.0
+# platform.pub — Deployment Reference v4.7.0
 
 **Date:** 2 April 2026
-**Replaces:** v4.5.0 (see bottom for change log)
+**Replaces:** v4.6.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -158,7 +158,7 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.5.0, `schema.sql` includes the subscription auto-renewal, annual pricing, and comp subscription columns. Migrations 018–025 must be run separately on existing databases.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.7.0, `schema.sql` includes article profile pinning and subscription visibility columns. Migrations 018–027 must be run separately on existing databases.
 
 Migrations still need to be run for **existing** databases that were initialised with an earlier `schema.sql`:
 
@@ -3524,6 +3524,14 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 | 017_pledge_drives.sql | `pledge_drives` and `pledges` tables for crowdfunding/commissions |
 | 018_add_on_delete_clauses.sql | ON DELETE CASCADE/SET NULL clauses for FKs in migrations 016–017 |
 | 019_fix_notification_dedup.sql | Fix dedup index: partial unique index (`WHERE read = false`) so repeat notifications work |
+| 020_notification_routing_columns.sql | Notification routing columns |
+| 021_missing_on_delete_clauses.sql | Missing ON DELETE clauses for FKs |
+| 022_composite_index_read_events.sql | Composite index on read_events |
+| 023_subscription_auto_renew.sql | `auto_renew` boolean on subscriptions |
+| 024_annual_subscriptions.sql | `subscription_period` column on subscriptions |
+| 025_comp_subscriptions.sql | `is_comp` boolean on subscriptions |
+| 026_article_profile_pins.sql | `pinned_on_profile` and `profile_pin_order` on articles |
+| 027_subscription_visibility.sql | `hidden` boolean on subscriptions |
 
 Run all pending migrations (requires Node on the host — substitute your `POSTGRES_PASSWORD`):
 ```bash
@@ -3568,6 +3576,7 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | POST | /api/v1/articles/:eventId/gate-pass | session | Paywall gate pass |
 | PATCH | /api/v1/articles/:id | session | Update article metadata (replies toggle) |
 | DELETE | /api/v1/articles/:id | session | Delete article (soft-delete + kind 5 to relay) |
+| POST | /api/v1/articles/:id/pin | session | Toggle article pin on writer's profile |
 | GET | /api/v1/articles/deleted?pubkeys= | session | Recently deleted article event IDs + coordinates for given Nostr pubkeys (used by feed to cross-reference DB deletions) |
 | POST | /api/v1/notes | session | Index published note |
 | DELETE | /api/v1/notes/:nostrEventId | session | Delete note (hard-delete + kind 5 to relay) |
@@ -3617,6 +3626,7 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | GET | /api/v1/subscriptions/mine | session | List my subscriptions |
 | GET | /api/v1/subscriptions/check/:writerId | session | Check subscription status |
 | GET | /api/v1/subscribers | session | List my subscribers (writer) |
+| PATCH | /api/v1/subscriptions/:writerId/visibility | session | Toggle subscription visibility on public profile |
 | PATCH | /api/v1/settings/subscription-price | session | Set subscription price |
 
 ### Reader account
@@ -3638,7 +3648,10 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | GET | /api/v1/writers/:username | optional | User profile (any active account, not just writers) |
 | GET | /api/v1/writers/:username/articles | optional | User's published articles |
 | GET | /api/v1/writers/:username/notes | optional | User's published notes |
-| GET | /api/v1/writers/:username/replies | optional | User's published replies |
+| GET | /api/v1/writers/:username/replies | optional | User's published replies (includes article author info) |
+| GET | /api/v1/writers/:username/followers | optional | Public paginated follower list |
+| GET | /api/v1/writers/:username/following | optional | Public paginated following list |
+| GET | /api/v1/writers/:username/subscriptions | optional | Public subscription list (non-hidden only) |
 | GET | /api/v1/search?q=&type= | optional | Search articles + writers |
 | GET | /rss | — | Platform-wide RSS |
 | GET | /rss/:username | — | Writer RSS |
@@ -3840,6 +3853,73 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v4.7.0 — 2 April 2026
+
+**Tabbed profile pages, article pinning, subscription visibility, "Pledge drives" rename**
+
+New migrations (026, 027). Services changed: **gateway**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+**Profile page redesign:**
+
+- Profile page split into four tabs: **Work** | **Social** | **Followers** | **Following**
+- Work tab: articles and pledge drives with a pinned section at top (pinned items shown first, manually orderable), followed by chronological feed
+- Social tab: notes section + replies section with enhanced contextual headers — "[User] replied to [Parent Author] on [Article Title] by [Article Author]" with all names/titles hyperlinked
+- Followers/Following tabs: public paginated lists visible on any user's profile
+- Following tab includes a "Subscribes to" section showing the user's non-hidden subscriptions
+- Profile header now displays follower and following counts alongside article count
+- Tab deep-linking via `?tab=work|social|followers|following` URL params (matches dashboard pattern)
+
+**Article profile pinning:**
+
+- Writers can pin articles to the top of their profile's Work tab
+- New endpoint: `POST /articles/:id/pin` (toggle)
+- `GET /writers/:username/articles` now returns `pinnedOnProfile` and `profilePinOrder`, sorted pinned-first
+
+**Subscription visibility:**
+
+- Readers can hide individual subscriptions from their public profile (default: visible)
+- New endpoint: `PATCH /subscriptions/:writerId/visibility` with `{ hidden: boolean }`
+- New public endpoint: `GET /writers/:username/subscriptions` (returns non-hidden active subscriptions only)
+- `GET /subscriptions/mine` now includes `hidden` field
+- SubscriptionsSection gains a Public/Hidden visibility toggle per subscription
+
+**Public profile endpoints:**
+
+- `GET /writers/:username/followers` — paginated follower list (public)
+- `GET /writers/:username/following` — paginated following list (public)
+- `GET /writers/:username/subscriptions` — paginated subscription list (public, non-hidden only)
+- `GET /writers/:username` now returns `followerCount` and `followingCount`
+- `GET /writers/:username/replies` now returns `articleAuthorUsername` and `articleAuthorDisplayName`
+
+**Terminology:**
+
+- "Drives" renamed to "Pledge drives" throughout UI — dashboard tab label, DriveCard badge, DrivesTab section headers, DriveCreateForm header
+
+**New files:**
+- `migrations/026_article_profile_pins.sql`
+- `migrations/027_subscription_visibility.sql`
+- `web/src/components/profile/WorkTab.tsx`
+- `web/src/components/profile/SocialTab.tsx`
+- `web/src/components/profile/FollowersTab.tsx`
+- `web/src/components/profile/FollowingTab.tsx`
+- `web/src/components/profile/ProfileDriveCard.tsx`
+
+**Modified files:**
+- `schema.sql` — `pinned_on_profile`, `profile_pin_order` on articles; `hidden` on subscriptions
+- `gateway/src/routes/writers.ts` — follower/following counts on profile, pin data in articles query, article author data in replies query, 4 new public endpoints (followers, following, subscriptions, profile counts)
+- `gateway/src/routes/subscriptions.ts` — visibility toggle endpoint, `hidden` in subscriptions/mine response
+- `gateway/src/routes/articles.ts` — article pin toggle endpoint
+- `web/src/lib/api.ts` — new types (ProfileFollower, ProfileFollowing, PublicSubscription), updated WriterProfile (followerCount, followingCount), updated MySubscription (hidden), new API functions
+- `web/src/components/profile/WriterActivity.tsx` — refactored from single activity stream into tab shell with Work | Social | Followers | Following tabs
+- `web/src/app/[username]/page.tsx` — follower/following counts in profile header
+- `web/src/components/account/SubscriptionsSection.tsx` — visibility toggle per subscription
+- `web/src/components/dashboard/DrivesTab.tsx` — "Pledge drives" terminology
+- `web/src/components/dashboard/DriveCard.tsx` — "Pledge drive" badge label
+- `web/src/components/dashboard/DriveCreateForm.tsx` — "New pledge drive" header
+- `web/src/app/dashboard/page.tsx` — "Pledge drives" tab label
+
+---
 
 ### v4.6.0 — 2 April 2026
 

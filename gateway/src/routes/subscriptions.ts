@@ -297,12 +297,13 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         current_period_end: Date
         started_at: Date
         cancelled_at: Date | null
+        hidden: boolean
       }>(
         `SELECT s.id, s.writer_id, w.username AS writer_username,
                 w.display_name AS writer_display_name,
                 w.avatar_blossom_url AS writer_avatar,
                 s.price_pence, s.status, s.auto_renew, s.current_period_end,
-                s.started_at, s.cancelled_at
+                s.started_at, s.cancelled_at, s.hidden
          FROM subscriptions s
          JOIN accounts w ON w.id = s.writer_id
          WHERE s.reader_id = $1 AND s.status IN ('active', 'cancelled')
@@ -323,6 +324,7 @@ export async function subscriptionRoutes(app: FastifyInstance) {
           currentPeriodEnd: s.current_period_end.toISOString(),
           startedAt: s.started_at.toISOString(),
           cancelledAt: s.cancelled_at?.toISOString() ?? null,
+          hidden: s.hidden,
         })),
       })
     }
@@ -373,6 +375,43 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         currentPeriodEnd: sub.current_period_end.toISOString(),
         pricePence: sub.price_pence,
       })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // PATCH /subscriptions/:writerId/visibility — toggle subscription visibility
+  //
+  // Readers can hide or show individual subscriptions on their public profile.
+  // ---------------------------------------------------------------------------
+
+  const VisibilitySchema = z.object({
+    hidden: z.boolean(),
+  })
+
+  app.patch<{ Params: { writerId: string } }>(
+    '/subscriptions/:writerId/visibility',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const readerId = req.session!.sub!
+      const { writerId } = req.params
+
+      const parsed = VisibilitySchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() })
+      }
+
+      const result = await pool.query(
+        `UPDATE subscriptions SET hidden = $1, updated_at = now()
+         WHERE reader_id = $2 AND writer_id = $3 AND status IN ('active', 'cancelled')
+         RETURNING id`,
+        [parsed.data.hidden, readerId, writerId]
+      )
+
+      if ((result.rowCount ?? 0) === 0) {
+        return reply.status(404).send({ error: 'Subscription not found' })
+      }
+
+      return reply.status(200).send({ ok: true, hidden: parsed.data.hidden })
     }
   )
 

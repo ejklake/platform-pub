@@ -52,12 +52,22 @@ export async function writerRoutes(app: FastifyInstance) {
 
       const writer = rows[0]
 
-      // Count published articles
-      const countResult = await pool.query<{ count: string }>(
-        `SELECT COUNT(*) AS count FROM articles
-         WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL`,
-        [writer.id]
-      )
+      // Count published articles, followers, and following
+      const [countResult, followerResult, followingResult] = await Promise.all([
+        pool.query<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM articles
+           WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL`,
+          [writer.id]
+        ),
+        pool.query<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM follows WHERE followee_id = $1`,
+          [writer.id]
+        ),
+        pool.query<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM follows WHERE follower_id = $1`,
+          [writer.id]
+        ),
+      ])
 
       return reply.status(200).send({
         id: writer.id,
@@ -70,6 +80,8 @@ export async function writerRoutes(app: FastifyInstance) {
         subscriptionPricePence: writer.subscription_price_pence,
         annualDiscountPct: writer.annual_discount_pct,
         articleCount: parseInt(countResult.rows[0].count, 10),
+        followerCount: parseInt(followerResult.rows[0].count, 10),
+        followingCount: parseInt(followingResult.rows[0].count, 10),
       })
     }
   )
@@ -118,13 +130,16 @@ export async function writerRoutes(app: FastifyInstance) {
         price_pence: number | null
         gate_position_pct: number | null
         published_at: Date | null
+        pinned_on_profile: boolean
+        profile_pin_order: number
       }>(
         `SELECT id, nostr_event_id, nostr_d_tag, title, slug, summary,
                 content_free, word_count, access_mode, price_pence,
-                gate_position_pct, published_at
+                gate_position_pct, published_at,
+                pinned_on_profile, profile_pin_order
          FROM articles
          WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL
-         ORDER BY published_at DESC
+         ORDER BY pinned_on_profile DESC, profile_pin_order ASC, published_at DESC
          LIMIT $2 OFFSET $3`,
         [writerId, limit, offset]
       )
@@ -140,6 +155,8 @@ export async function writerRoutes(app: FastifyInstance) {
         accessMode: r.access_mode,
         isPaywalled: r.access_mode === 'paywalled',
         publishedAt: r.published_at?.toISOString() ?? null,
+        pinnedOnProfile: r.pinned_on_profile,
+        profilePinOrder: r.profile_pin_order,
       }))
 
       return reply.status(200).send({ articles, limit, offset })
@@ -245,6 +262,8 @@ export async function writerRoutes(app: FastifyInstance) {
         target_event_id: string
         article_slug: string | null
         article_title: string | null
+        article_author_username: string | null
+        article_author_display_name: string | null
         parent_event_id: string | null
         parent_author_username: string | null
         parent_author_display_name: string | null
@@ -253,6 +272,8 @@ export async function writerRoutes(app: FastifyInstance) {
                 c.target_kind, c.target_event_id,
                 ar.nostr_d_tag AS article_slug,
                 ar.title AS article_title,
+                aw.username AS article_author_username,
+                aw.display_name AS article_author_display_name,
                 pc.nostr_event_id AS parent_event_id,
                 pa.username AS parent_author_username,
                 pa.display_name AS parent_author_display_name
@@ -261,6 +282,7 @@ export async function writerRoutes(app: FastifyInstance) {
            ON ar.nostr_event_id = c.target_event_id
            AND c.target_kind = 30023
            AND ar.deleted_at IS NULL
+         LEFT JOIN accounts aw ON aw.id = ar.writer_id
          LEFT JOIN comments pc ON pc.id = c.parent_comment_id
          LEFT JOIN accounts pa ON pa.id = pc.author_id
          WHERE c.author_id = $1
@@ -279,6 +301,8 @@ export async function writerRoutes(app: FastifyInstance) {
         targetEventId: r.target_event_id,
         articleSlug: r.article_slug ?? null,
         articleTitle: r.article_title ?? null,
+        articleAuthorUsername: r.article_author_username ?? null,
+        articleAuthorDisplayName: r.article_author_display_name ?? null,
         parentEventId: r.parent_event_id ?? null,
         parentAuthorUsername: r.parent_author_username ?? null,
         parentAuthorDisplayName: r.parent_author_display_name ?? null,
@@ -326,6 +350,209 @@ export async function writerRoutes(app: FastifyInstance) {
         username: w.username,
         displayName: w.display_name,
         avatar: w.avatar_blossom_url,
+      })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // GET /writers/:username/followers — public follower list
+  //
+  // Returns a paginated list of accounts that follow this writer.
+  // ---------------------------------------------------------------------------
+
+  app.get<{
+    Params: { username: string }
+    Querystring: { limit?: string; offset?: string }
+  }>(
+    '/writers/:username/followers',
+    { preHandler: optionalAuth },
+    async (req, reply) => {
+      const { username } = req.params
+      const limit = Math.min(parseInt(req.query.limit ?? '20', 10), 50)
+      const offset = parseInt(req.query.offset ?? '0', 10)
+
+      const accountResult = await pool.query<{ id: string }>(
+        `SELECT id FROM accounts WHERE username = $1 AND status = 'active'`,
+        [username]
+      )
+
+      if (accountResult.rows.length === 0) {
+        return reply.status(404).send({ error: 'User not found' })
+      }
+
+      const userId = accountResult.rows[0].id
+
+      const [{ rows }, totalResult] = await Promise.all([
+        pool.query<{
+          id: string
+          username: string
+          display_name: string | null
+          avatar_blossom_url: string | null
+          nostr_pubkey: string
+          is_writer: boolean
+          followed_at: Date
+        }>(
+          `SELECT a.id, a.username, a.display_name, a.avatar_blossom_url,
+                  a.nostr_pubkey, a.is_writer, f.followed_at
+           FROM follows f
+           JOIN accounts a ON a.id = f.follower_id
+           WHERE f.followee_id = $1 AND a.status = 'active'
+           ORDER BY f.followed_at DESC
+           LIMIT $2 OFFSET $3`,
+          [userId, limit, offset]
+        ),
+        pool.query<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM follows f
+           JOIN accounts a ON a.id = f.follower_id
+           WHERE f.followee_id = $1 AND a.status = 'active'`,
+          [userId]
+        ),
+      ])
+
+      return reply.status(200).send({
+        followers: rows.map((r) => ({
+          id: r.id,
+          username: r.username,
+          displayName: r.display_name,
+          avatar: r.avatar_blossom_url,
+          pubkey: r.nostr_pubkey,
+          isWriter: r.is_writer,
+          followedAt: r.followed_at.toISOString(),
+        })),
+        total: parseInt(totalResult.rows[0].count, 10),
+        limit,
+        offset,
+      })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // GET /writers/:username/following — public following list
+  //
+  // Returns a paginated list of accounts this user follows.
+  // ---------------------------------------------------------------------------
+
+  app.get<{
+    Params: { username: string }
+    Querystring: { limit?: string; offset?: string }
+  }>(
+    '/writers/:username/following',
+    { preHandler: optionalAuth },
+    async (req, reply) => {
+      const { username } = req.params
+      const limit = Math.min(parseInt(req.query.limit ?? '20', 10), 50)
+      const offset = parseInt(req.query.offset ?? '0', 10)
+
+      const accountResult = await pool.query<{ id: string }>(
+        `SELECT id FROM accounts WHERE username = $1 AND status = 'active'`,
+        [username]
+      )
+
+      if (accountResult.rows.length === 0) {
+        return reply.status(404).send({ error: 'User not found' })
+      }
+
+      const userId = accountResult.rows[0].id
+
+      const [{ rows }, totalResult] = await Promise.all([
+        pool.query<{
+          id: string
+          username: string
+          display_name: string | null
+          avatar_blossom_url: string | null
+          nostr_pubkey: string
+          followed_at: Date
+        }>(
+          `SELECT a.id, a.username, a.display_name, a.avatar_blossom_url,
+                  a.nostr_pubkey, f.followed_at
+           FROM follows f
+           JOIN accounts a ON a.id = f.followee_id
+           WHERE f.follower_id = $1 AND a.status = 'active'
+           ORDER BY f.followed_at DESC
+           LIMIT $2 OFFSET $3`,
+          [userId, limit, offset]
+        ),
+        pool.query<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM follows f
+           JOIN accounts a ON a.id = f.followee_id
+           WHERE f.follower_id = $1 AND a.status = 'active'`,
+          [userId]
+        ),
+      ])
+
+      return reply.status(200).send({
+        following: rows.map((r) => ({
+          id: r.id,
+          username: r.username,
+          displayName: r.display_name,
+          avatar: r.avatar_blossom_url,
+          pubkey: r.nostr_pubkey,
+          followedAt: r.followed_at.toISOString(),
+        })),
+        total: parseInt(totalResult.rows[0].count, 10),
+        limit,
+        offset,
+      })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // GET /writers/:username/subscriptions — public subscription list
+  //
+  // Returns subscriptions this user has to other writers (non-hidden only).
+  // ---------------------------------------------------------------------------
+
+  app.get<{
+    Params: { username: string }
+    Querystring: { limit?: string; offset?: string }
+  }>(
+    '/writers/:username/subscriptions',
+    { preHandler: optionalAuth },
+    async (req, reply) => {
+      const { username } = req.params
+      const limit = Math.min(parseInt(req.query.limit ?? '20', 10), 50)
+      const offset = parseInt(req.query.offset ?? '0', 10)
+
+      const accountResult = await pool.query<{ id: string }>(
+        `SELECT id FROM accounts WHERE username = $1 AND status = 'active'`,
+        [username]
+      )
+
+      if (accountResult.rows.length === 0) {
+        return reply.status(404).send({ error: 'User not found' })
+      }
+
+      const userId = accountResult.rows[0].id
+
+      const { rows } = await pool.query<{
+        writer_id: string
+        writer_username: string
+        writer_display_name: string | null
+        writer_avatar: string | null
+        started_at: Date
+      }>(
+        `SELECT s.writer_id, w.username AS writer_username,
+                w.display_name AS writer_display_name,
+                w.avatar_blossom_url AS writer_avatar,
+                s.started_at
+         FROM subscriptions s
+         JOIN accounts w ON w.id = s.writer_id
+         WHERE s.reader_id = $1 AND s.status = 'active' AND s.hidden = FALSE
+         ORDER BY s.started_at DESC
+         LIMIT $2 OFFSET $3`,
+        [userId, limit, offset]
+      )
+
+      return reply.status(200).send({
+        subscriptions: rows.map((r) => ({
+          writerId: r.writer_id,
+          writerUsername: r.writer_username,
+          writerDisplayName: r.writer_display_name,
+          writerAvatar: r.writer_avatar,
+          startedAt: r.started_at.toISOString(),
+        })),
+        limit,
+        offset,
       })
     }
   )

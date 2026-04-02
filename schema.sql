@@ -162,6 +162,10 @@ CREATE TABLE articles (
   -- Comments
   comments_enabled      BOOLEAN NOT NULL DEFAULT TRUE,
 
+  -- Profile pinning (migration 026)
+  pinned_on_profile     BOOLEAN NOT NULL DEFAULT FALSE,
+  profile_pin_order     INTEGER NOT NULL DEFAULT 0,
+
   -- Publishing state
   published_at          TIMESTAMPTZ,
   deleted_at            TIMESTAMPTZ,            -- soft-delete; NULL if live
@@ -262,6 +266,7 @@ CREATE TABLE subscriptions (
   auto_renew BOOLEAN NOT NULL DEFAULT TRUE,      -- (migration 023) FALSE = expires at period end
   subscription_period TEXT NOT NULL DEFAULT 'monthly' CHECK (subscription_period IN ('monthly', 'annual')), -- (migration 024)
   is_comp BOOLEAN NOT NULL DEFAULT FALSE,        -- (migration 025) complimentary sub granted by writer
+  hidden BOOLEAN NOT NULL DEFAULT FALSE,          -- (migration 027) hide from public profile
   nostr_event_id TEXT,                           -- kind 7003 subscription attestation (migration 007)
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   current_period_start TIMESTAMPTZ NOT NULL DEFAULT now(),

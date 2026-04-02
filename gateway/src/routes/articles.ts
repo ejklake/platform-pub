@@ -728,6 +728,40 @@ export async function articleRoutes(app: FastifyInstance) {
   )
 
   // ---------------------------------------------------------------------------
+  // POST /articles/:id/pin — toggle pin on writer's profile
+  //
+  // Writers can pin articles to the top of their profile's Work tab.
+  // Follows the same toggle pattern as POST /drives/:id/pin.
+  // ---------------------------------------------------------------------------
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+  app.post<{ Params: { id: string } }>(
+    '/articles/:id/pin',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      if (!req.params.id.match(UUID_RE)) {
+        return reply.status(400).send({ error: 'Invalid article ID' })
+      }
+
+      const writerId = req.session!.sub!
+
+      const result = await pool.query<{ id: string; pinned_on_profile: boolean }>(
+        `UPDATE articles SET pinned_on_profile = NOT pinned_on_profile, updated_at = now()
+         WHERE id = $1 AND writer_id = $2 AND deleted_at IS NULL
+         RETURNING id, pinned_on_profile`,
+        [req.params.id, writerId]
+      )
+
+      if (result.rowCount === 0) {
+        return reply.status(404).send({ error: 'Article not found' })
+      }
+
+      return reply.status(200).send({ pinned: result.rows[0].pinned_on_profile })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
   // GET /articles/deleted?pubkeys=<hex>,<hex>,…
   //
   // Returns recently deleted article identifiers for the given Nostr pubkeys.
