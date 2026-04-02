@@ -178,6 +178,7 @@ export interface ArticleMetadata {
     displayName: string | null
     avatar: string | null
     pubkey: string
+    subscriptionPricePence?: number
   }
 }
 
@@ -306,6 +307,7 @@ export interface WriterProfile {
   avatar: string | null
   hostingType: string
   subscriptionPricePence: number
+  annualDiscountPct: number
   articleCount: number
 }
 
@@ -697,12 +699,16 @@ export interface TabOverview {
 
 export interface MySubscription {
   id: string
+  writerId: string
   writerUsername: string
   writerDisplayName: string | null
   writerAvatar: string | null
   pricePence: number
   status: string
+  autoRenew: boolean
+  currentPeriodEnd: string
   startedAt: string
+  cancelledAt: string | null
 }
 
 export const account = {
@@ -718,9 +724,9 @@ export const account = {
   exportAccount: () =>
     request<Blob>('/account/export'),
 
-  updateSubscriptionPrice: (pricePence: number) =>
+  updateSubscriptionPrice: (pricePence: number, annualDiscountPct?: number) =>
     request<{ ok: boolean }>('/settings/subscription-price', {
       method: 'PATCH',
-      body: JSON.stringify({ pricePence }),
+      body: JSON.stringify({ pricePence, ...(annualDiscountPct !== undefined ? { annualDiscountPct } : {}) }),
     }),
 }

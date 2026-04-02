@@ -19,12 +19,12 @@ export function SubscriptionsSection() {
     })()
   }, [])
 
-  async function handleCancel(subId: string) {
-    if (!confirm('Cancel this subscription?')) return
-    setCancellingId(subId)
+  async function handleCancel(writerId: string) {
+    if (!confirm('Cancel this subscription? You\'ll keep access until the end of your current period.')) return
+    setCancellingId(writerId)
     try {
-      await fetch(`/api/v1/subscriptions/${subId}`, { method: 'DELETE', credentials: 'include' })
-      setSubs(prev => prev.filter(s => s.id !== subId))
+      await fetch(`/api/v1/subscriptions/${writerId}`, { method: 'DELETE', credentials: 'include' })
+      setSubs(prev => prev.map(s => s.writerId === writerId ? { ...s, status: 'cancelled', autoRenew: false } : s))
     } catch { alert('Failed to cancel subscription.') }
     finally { setCancellingId(null) }
   }
@@ -50,18 +50,29 @@ export function SubscriptionsSection() {
                 <Link href={`/${s.writerUsername}`} className="text-[14px] font-sans font-medium text-black hover:opacity-70 truncate block">
                   {s.writerDisplayName ?? s.writerUsername}
                 </Link>
-                <p className="font-mono text-[12px] text-grey-300 uppercase tracking-[0.06em]">@{s.writerUsername}</p>
+                <p className="font-mono text-[12px] text-grey-300 uppercase tracking-[0.06em]">
+                  {s.status === 'cancelled'
+                    ? `Access until ${new Date(s.currentPeriodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                    : s.autoRenew
+                      ? `Renews ${new Date(s.currentPeriodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                      : `Expires ${new Date(s.currentPeriodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                  }
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4 flex-shrink-0">
               <span className="font-mono text-[12px] text-black tabular-nums">£{(s.pricePence / 100).toFixed(2)}/mo</span>
-              <button
-                onClick={() => handleCancel(s.id)}
-                disabled={cancellingId === s.id}
-                className="text-[13px] font-sans text-grey-300 hover:text-black disabled:opacity-50"
-              >
-                {cancellingId === s.id ? '…' : 'Cancel'}
-              </button>
+              {s.status === 'active' ? (
+                <button
+                  onClick={() => handleCancel(s.writerId)}
+                  disabled={cancellingId === s.writerId}
+                  className="text-[13px] font-sans text-grey-300 hover:text-black disabled:opacity-50"
+                >
+                  {cancellingId === s.writerId ? '...' : 'Cancel'}
+                </button>
+              ) : (
+                <span className="text-[13px] font-sans text-grey-300">Cancelled</span>
+              )}
             </div>
           </div>
         ))}

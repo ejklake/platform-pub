@@ -1,0 +1,190 @@
+import { sendEmail } from './email.js'
+import { pool } from '../db/client.js'
+import logger from './logger.js'
+
+// =============================================================================
+// Subscription Email Templates
+//
+// All subscription lifecycle emails: renewal, cancellation, expiry warning,
+// and new subscriber notification to writer.
+// =============================================================================
+
+const APP_URL = process.env.APP_URL ?? 'http://localhost:3010'
+
+// Shared email wrapper
+function emailHtml(heading: string, body: string): string {
+  return `
+    <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 0;">
+      <h2 style="font-size: 20px; font-weight: 600; color: #1c1917; margin-bottom: 16px;">
+        ${heading}
+      </h2>
+      ${body}
+      <p style="font-size: 12px; color: #d6d3d1; margin-top: 32px;">
+        platform.pub — writing worth reading
+      </p>
+    </div>
+  `.trim()
+}
+
+function paragraph(text: string): string {
+  return `<p style="font-size: 15px; color: #57534e; line-height: 1.6; margin-bottom: 16px;">${text}</p>`
+}
+
+function button(href: string, label: string): string {
+  return `<a href="${href}" style="display: inline-block; background: #1c1917; color: #ffffff; font-size: 14px; font-weight: 500; padding: 12px 28px; border-radius: 6px; text-decoration: none; margin-bottom: 16px;">${label}</a>`
+}
+
+function formatPounds(pence: number): string {
+  return `£${(pence / 100).toFixed(2)}`
+}
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+// ---------------------------------------------------------------------------
+// Helper: look up email + display name for an account
+// ---------------------------------------------------------------------------
+
+async function getAccountInfo(accountId: string): Promise<{ email: string; displayName: string; username: string } | null> {
+  const { rows } = await pool.query<{ email: string | null; display_name: string | null; username: string }>(
+    `SELECT email, display_name, username FROM accounts WHERE id = $1`,
+    [accountId]
+  )
+  if (rows.length === 0 || !rows[0].email) return null
+  return {
+    email: rows[0].email,
+    displayName: rows[0].display_name ?? rows[0].username,
+    username: rows[0].username,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Renewal confirmation — sent to reader after auto-renewal
+// ---------------------------------------------------------------------------
+
+export async function sendSubscriptionRenewedEmail(
+  readerId: string,
+  writerId: string,
+  pricePence: number,
+  nextPeriodEnd: Date,
+): Promise<void> {
+  const reader = await getAccountInfo(readerId)
+  const writer = await getAccountInfo(writerId)
+  if (!reader || !writer) return
+
+  const writerName = writer.displayName
+
+  await sendEmail({
+    to: reader.email,
+    subject: `Your subscription to ${writerName} renewed`,
+    textBody: [
+      `Your subscription to ${writerName} has renewed.`,
+      `${formatPounds(pricePence)} has been added to your reading tab.`,
+      `Next renewal: ${formatDate(nextPeriodEnd)}.`,
+      '',
+      `Manage your subscriptions: ${APP_URL}/account`,
+    ].join('\n'),
+    htmlBody: emailHtml(
+      'Subscription renewed',
+      paragraph(`Your subscription to <strong>${writerName}</strong> has renewed. ${formatPounds(pricePence)} has been added to your reading tab.`) +
+      paragraph(`Next renewal: ${formatDate(nextPeriodEnd)}.`) +
+      button(`${APP_URL}/account`, 'Manage subscriptions')
+    ),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Cancellation confirmation — sent to reader after they cancel
+// ---------------------------------------------------------------------------
+
+export async function sendSubscriptionCancelledEmail(
+  readerId: string,
+  writerId: string,
+  accessUntil: Date,
+): Promise<void> {
+  const reader = await getAccountInfo(readerId)
+  const writer = await getAccountInfo(writerId)
+  if (!reader || !writer) return
+
+  const writerName = writer.displayName
+
+  await sendEmail({
+    to: reader.email,
+    subject: `Subscription to ${writerName} cancelled`,
+    textBody: [
+      `You've cancelled your subscription to ${writerName}.`,
+      `You'll have access until ${formatDate(accessUntil)}.`,
+      '',
+      `You can resubscribe anytime from their profile: ${APP_URL}/${writer.username}`,
+    ].join('\n'),
+    htmlBody: emailHtml(
+      'Subscription cancelled',
+      paragraph(`You've cancelled your subscription to <strong>${writerName}</strong>.`) +
+      paragraph(`You'll still have access until <strong>${formatDate(accessUntil)}</strong>. Articles you've already read remain permanently unlocked.`) +
+      button(`${APP_URL}/${writer.username}`, 'Resubscribe')
+    ),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Expiry warning — sent 3 days before period end for non-auto-renewing subs
+// ---------------------------------------------------------------------------
+
+export async function sendSubscriptionExpiryWarningEmail(
+  readerId: string,
+  writerId: string,
+  expiresAt: Date,
+): Promise<void> {
+  const reader = await getAccountInfo(readerId)
+  const writer = await getAccountInfo(writerId)
+  if (!reader || !writer) return
+
+  const writerName = writer.displayName
+
+  await sendEmail({
+    to: reader.email,
+    subject: `Your subscription to ${writerName} expires soon`,
+    textBody: [
+      `Your subscription to ${writerName} expires on ${formatDate(expiresAt)}.`,
+      `Resubscribe to keep reading: ${APP_URL}/${writer.username}`,
+    ].join('\n'),
+    htmlBody: emailHtml(
+      'Subscription expiring soon',
+      paragraph(`Your subscription to <strong>${writerName}</strong> expires on <strong>${formatDate(expiresAt)}</strong>.`) +
+      paragraph('Articles you\'ve already read remain permanently unlocked, but you won\'t be able to read new paywalled content.') +
+      button(`${APP_URL}/${writer.username}`, 'Resubscribe')
+    ),
+  })
+}
+
+// ---------------------------------------------------------------------------
+// New subscriber notification — sent to writer when someone subscribes
+// ---------------------------------------------------------------------------
+
+export async function sendNewSubscriberEmail(
+  writerId: string,
+  readerId: string,
+  pricePence: number,
+): Promise<void> {
+  const writer = await getAccountInfo(writerId)
+  const reader = await getAccountInfo(readerId)
+  if (!writer || !reader) return
+
+  const readerName = reader.displayName
+
+  await sendEmail({
+    to: writer.email,
+    subject: `New subscriber: ${readerName}`,
+    textBody: [
+      `${readerName} just subscribed to your writing for ${formatPounds(pricePence)}/mo.`,
+      '',
+      `View your subscribers: ${APP_URL}/dashboard?tab=settings`,
+    ].join('\n'),
+    htmlBody: emailHtml(
+      'New subscriber',
+      paragraph(`<strong>${readerName}</strong> just subscribed to your writing for ${formatPounds(pricePence)}/mo.`) +
+      button(`${APP_URL}/dashboard?tab=settings`, 'View subscribers')
+    ),
+  })
+}

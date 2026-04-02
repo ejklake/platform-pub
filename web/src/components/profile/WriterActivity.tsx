@@ -169,13 +169,15 @@ export function WriterActivity({ username, writer }: WriterActivityProps) {
     finally { setFollowLoading(false) }
   }
 
-  async function handleSubscribe() {
+  async function handleSubscribe(period: 'monthly' | 'annual' = 'monthly') {
     if (!user || !writer) return
     setSubLoading(true)
     try {
       const res = await fetch(`/api/v1/subscriptions/${writer.id}`, {
         method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -237,15 +239,31 @@ export function WriterActivity({ username, writer }: WriterActivityProps) {
                   ? `Access until ${new Date(subStatus.currentPeriodEnd!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
                   : 'Subscribed'}
               </button>
-            ) : (
-              <button
-                onClick={handleSubscribe}
-                disabled={subLoading}
-                className="btn-accent py-1.5 px-4 text-ui-xs disabled:opacity-50 transition-colors"
-              >
-                {subLoading ? '...' : `Subscribe £${((subStatus.pricePence ?? writer.subscriptionPricePence ?? 500) / 100).toFixed(2)}/mo`}
-              </button>
-            )
+            ) : (() => {
+              const monthlyPence = subStatus.pricePence ?? writer.subscriptionPricePence ?? 500
+              const discount = writer.annualDiscountPct ?? 15
+              const annualPence = Math.round(monthlyPence * 12 * (1 - discount / 100))
+              return (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSubscribe('monthly')}
+                    disabled={subLoading}
+                    className="btn-accent py-1.5 px-4 text-ui-xs disabled:opacity-50 transition-colors"
+                  >
+                    {subLoading ? '...' : `Subscribe £${(monthlyPence / 100).toFixed(2)}/mo`}
+                  </button>
+                  {discount > 0 && (
+                    <button
+                      onClick={() => handleSubscribe('annual')}
+                      disabled={subLoading}
+                      className="btn-soft py-1.5 px-4 text-ui-xs disabled:opacity-50 transition-colors"
+                    >
+                      {subLoading ? '...' : `£${(annualPence / 100).toFixed(2)}/yr`}
+                    </button>
+                  )}
+                </div>
+              )
+            })()
           )}
         </div>
       )}

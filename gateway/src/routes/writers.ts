@@ -36,9 +36,11 @@ export async function writerRoutes(app: FastifyInstance) {
         avatar_blossom_url: string | null
         hosting_type: string
         subscription_price_pence: number
+        annual_discount_pct: number
       }>(
         `SELECT id, nostr_pubkey, username, display_name, bio,
-                avatar_blossom_url, hosting_type, subscription_price_pence
+                avatar_blossom_url, hosting_type, subscription_price_pence,
+                annual_discount_pct
          FROM accounts
          WHERE username = $1 AND status = 'active'`,
         [username]
@@ -66,6 +68,7 @@ export async function writerRoutes(app: FastifyInstance) {
         avatar: writer.avatar_blossom_url,
         hostingType: writer.hosting_type,
         subscriptionPricePence: writer.subscription_price_pence,
+        annualDiscountPct: writer.annual_discount_pct,
         articleCount: parseInt(countResult.rows[0].count, 10),
       })
     }

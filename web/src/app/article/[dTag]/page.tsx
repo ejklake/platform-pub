@@ -53,6 +53,8 @@ export default async function ArticlePage({ params }: { params: { dTag: string }
       writerName={article.writer.displayName ?? article.writer.username}
       writerUsername={article.writer.username}
       writerAvatar={article.writer.avatar ?? undefined}
+      writerId={article.writer.id}
+      subscriptionPricePence={article.writer.subscriptionPricePence}
       preRenderedFreeHtml={freeHtml}
     />
   )

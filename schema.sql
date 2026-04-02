@@ -103,6 +103,7 @@ CREATE TABLE accounts (
   self_hosted_relay_url TEXT,                   -- populated for self-hosted writers
   free_allowance_remaining_pence INT NOT NULL DEFAULT 500,  -- £5.00 in pence
   subscription_price_pence INTEGER NOT NULL DEFAULT 500,    -- writer-configurable (migration 005)
+  annual_discount_pct INTEGER NOT NULL DEFAULT 15 CHECK (annual_discount_pct BETWEEN 0 AND 30), -- (migration 024)
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -258,6 +259,9 @@ CREATE TABLE subscriptions (
   writer_id UUID NOT NULL REFERENCES accounts(id),
   price_pence INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired')),
+  auto_renew BOOLEAN NOT NULL DEFAULT TRUE,      -- (migration 023) FALSE = expires at period end
+  subscription_period TEXT NOT NULL DEFAULT 'monthly' CHECK (subscription_period IN ('monthly', 'annual')), -- (migration 024)
+  is_comp BOOLEAN NOT NULL DEFAULT FALSE,        -- (migration 025) complimentary sub granted by writer
   nostr_event_id TEXT,                           -- kind 7003 subscription attestation (migration 007)
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   current_period_start TIMESTAMPTZ NOT NULL DEFAULT now(),

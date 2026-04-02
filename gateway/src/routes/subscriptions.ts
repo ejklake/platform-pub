@@ -3,6 +3,12 @@ import { z } from 'zod'
 import { pool, withTransaction } from '../../shared/src/db/client.js'
 import { requireAuth } from '../middleware/auth.js'
 import { publishSubscriptionEvent } from '../lib/nostr-publisher.js'
+import {
+  sendSubscriptionRenewedEmail,
+  sendSubscriptionCancelledEmail,
+  sendSubscriptionExpiryWarningEmail,
+  sendNewSubscriberEmail,
+} from '../../shared/src/lib/subscription-emails.js'
 import logger from '../../shared/src/lib/logger.js'
 
 // =============================================================================
@@ -25,12 +31,13 @@ export async function subscriptionRoutes(app: FastifyInstance) {
   // and logs a subscription_charge (debit) and subscription_earning (credit).
   // ---------------------------------------------------------------------------
 
-  app.post<{ Params: { writerId: string } }>(
+  app.post<{ Params: { writerId: string }; Body: { period?: string } }>(
     '/subscriptions/:writerId',
     { preHandler: requireAuth },
     async (req, reply) => {
       const readerId = req.session!.sub!
       const { writerId } = req.params
+      const period = (req.body as any)?.period === 'annual' ? 'annual' : 'monthly'
 
       if (readerId === writerId) {
         return reply.status(400).send({ error: 'Cannot subscribe to yourself' })
@@ -41,11 +48,12 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         const writerResult = await client.query<{
           id: string
           subscription_price_pence: number
+          annual_discount_pct: number
           display_name: string | null
           username: string
           nostr_pubkey: string
         }>(
-          `SELECT id, subscription_price_pence, display_name, username, nostr_pubkey
+          `SELECT id, subscription_price_pence, annual_discount_pct, display_name, username, nostr_pubkey
            FROM accounts WHERE id = $1 AND status = 'active'`,
           [writerId]
         )
@@ -55,12 +63,15 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         }
 
         const writer = writerResult.rows[0]
-        const pricePence = writer.subscription_price_pence
+        const monthlyPrice = writer.subscription_price_pence
+        const pricePence = period === 'annual'
+          ? Math.round(monthlyPrice * 12 * (1 - writer.annual_discount_pct / 100))
+          : monthlyPrice
 
-        // Check for existing active/cancelled subscription
+        // Check for existing subscription (any status — unique constraint on reader+writer)
         const existing = await client.query<{ id: string; status: string }>(
           `SELECT id, status FROM subscriptions
-           WHERE reader_id = $1 AND writer_id = $2 AND status IN ('active', 'cancelled')`,
+           WHERE reader_id = $1 AND writer_id = $2`,
           [readerId, writerId]
         )
 
@@ -69,17 +80,18 @@ export async function subscriptionRoutes(app: FastifyInstance) {
           if (sub.status === 'active') {
             return reply.status(409).send({ error: 'Already subscribed' })
           }
-          // Re-activate a cancelled subscription
+          // Re-activate a cancelled or expired subscription
           const now = new Date()
-          const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+          const periodDays = period === 'annual' ? 365 : 30
+          const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000)
 
           await client.query(
             `UPDATE subscriptions
-             SET status = 'active', cancelled_at = NULL,
+             SET status = 'active', auto_renew = TRUE, cancelled_at = NULL,
                  current_period_start = $1, current_period_end = $2,
-                 price_pence = $3, updated_at = now()
+                 price_pence = $3, subscription_period = $5, updated_at = now()
              WHERE id = $4`,
-            [now, periodEnd, pricePence, sub.id]
+            [now, periodEnd, pricePence, sub.id, period]
           )
 
           // Deduct from free allowance (can go negative)
@@ -119,19 +131,25 @@ export async function subscriptionRoutes(app: FastifyInstance) {
             logger.error({ err, subscriptionId: sub.id }, 'Subscription reactivation Nostr event failed')
           )
 
+          // Notify writer of new subscriber — non-blocking
+          sendNewSubscriberEmail(writerId, readerId, pricePence).catch(err =>
+            logger.warn({ err, subscriptionId: sub.id }, 'New subscriber email failed')
+          )
+
           return reply.status(200).send({ subscriptionId: sub.id, status: 'active', pricePence })
         }
 
         // Create new subscription
         const now = new Date()
-        const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+        const periodDays = period === 'annual' ? 365 : 30
+        const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000)
 
         const subResult = await client.query<{ id: string }>(
           `INSERT INTO subscriptions (reader_id, writer_id, price_pence, status,
-             current_period_start, current_period_end)
-           VALUES ($1, $2, $3, 'active', $4, $5)
+             current_period_start, current_period_end, subscription_period)
+           VALUES ($1, $2, $3, 'active', $4, $5, $6)
            RETURNING id`,
-          [readerId, writerId, pricePence, now, periodEnd]
+          [readerId, writerId, pricePence, now, periodEnd, period]
         )
 
         const subscriptionId = subResult.rows[0].id
@@ -173,6 +191,11 @@ export async function subscriptionRoutes(app: FastifyInstance) {
           logger.error({ err, subscriptionId }, 'Subscription create Nostr event failed')
         )
 
+        // Notify writer of new subscriber — non-blocking
+        sendNewSubscriberEmail(writerId, readerId, pricePence).catch(err =>
+          logger.warn({ err, subscriptionId }, 'New subscriber email failed')
+        )
+
         return reply.status(201).send({
           subscriptionId,
           status: 'active',
@@ -187,7 +210,8 @@ export async function subscriptionRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
   // DELETE /subscriptions/:writerId — cancel subscription
   //
-  // Sets status to 'cancelled'. Access continues until current_period_end.
+  // Sets auto_renew to false and status to 'cancelled'. Access continues
+  // until current_period_end, then the subscription expires instead of renewing.
   // ---------------------------------------------------------------------------
 
   app.delete<{ Params: { writerId: string } }>(
@@ -205,7 +229,7 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         writer_pubkey: string
       }>(
         `UPDATE subscriptions
-         SET status = 'cancelled', cancelled_at = now(), updated_at = now()
+         SET status = 'cancelled', auto_renew = FALSE, cancelled_at = now(), updated_at = now()
          WHERE reader_id = $1 AND writer_id = $2 AND status = 'active'
          RETURNING id, current_period_end, current_period_start, price_pence,
                    (SELECT nostr_pubkey FROM accounts WHERE id = $2) AS writer_pubkey`,
@@ -238,6 +262,11 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         logger.error({ err, subscriptionId: sub.id }, 'Subscription cancel Nostr event failed')
       )
 
+      // Send cancellation email asynchronously
+      sendSubscriptionCancelledEmail(readerId, writerId, sub.current_period_end).catch(err =>
+        logger.warn({ err, subscriptionId: sub.id }, 'Cancellation email failed')
+      )
+
       return reply.status(200).send({
         subscriptionId: sub.id,
         status: 'cancelled',
@@ -264,6 +293,7 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         writer_avatar: string | null
         price_pence: number
         status: string
+        auto_renew: boolean
         current_period_end: Date
         started_at: Date
         cancelled_at: Date | null
@@ -271,7 +301,7 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         `SELECT s.id, s.writer_id, w.username AS writer_username,
                 w.display_name AS writer_display_name,
                 w.avatar_blossom_url AS writer_avatar,
-                s.price_pence, s.status, s.current_period_end,
+                s.price_pence, s.status, s.auto_renew, s.current_period_end,
                 s.started_at, s.cancelled_at
          FROM subscriptions s
          JOIN accounts w ON w.id = s.writer_id
@@ -289,6 +319,7 @@ export async function subscriptionRoutes(app: FastifyInstance) {
           writerAvatar: s.writer_avatar,
           pricePence: s.price_pence,
           status: s.status,
+          autoRenew: s.auto_renew,
           currentPeriodEnd: s.current_period_end.toISOString(),
           startedAt: s.started_at.toISOString(),
           cancelledAt: s.cancelled_at?.toISOString() ?? null,
@@ -365,6 +396,9 @@ export async function subscriptionRoutes(app: FastifyInstance) {
         reader_avatar: string | null
         price_pence: number
         status: string
+        is_comp: boolean
+        auto_renew: boolean
+        subscription_period: string
         started_at: Date
         current_period_end: Date
         cancelled_at: Date | null
@@ -375,8 +409,9 @@ export async function subscriptionRoutes(app: FastifyInstance) {
                 r.username AS reader_username,
                 r.display_name AS reader_display_name,
                 r.avatar_blossom_url AS reader_avatar,
-                s.price_pence, s.status, s.started_at,
-                s.current_period_end, s.cancelled_at,
+                s.price_pence, s.status, s.is_comp, s.auto_renew,
+                COALESCE(s.subscription_period, 'monthly') AS subscription_period,
+                s.started_at, s.current_period_end, s.cancelled_at,
                 COUNT(se.id) FILTER (WHERE se.event_type = 'subscription_read') AS articles_read,
                 COALESCE(SUM(
                   CASE WHEN se.event_type = 'subscription_read' AND se.article_id IS NOT NULL
@@ -388,7 +423,8 @@ export async function subscriptionRoutes(app: FastifyInstance) {
          LEFT JOIN subscription_events se ON se.subscription_id = s.id
          WHERE s.writer_id = $1 AND s.status IN ('active', 'cancelled')
          GROUP BY s.id, s.reader_id, r.username, r.display_name,
-                  r.avatar_blossom_url, s.price_pence, s.status,
+                  r.avatar_blossom_url, s.price_pence, s.status, s.is_comp,
+                  s.auto_renew, s.subscription_period,
                   s.started_at, s.current_period_end, s.cancelled_at
          ORDER BY s.started_at DESC`,
         [writerId]
@@ -407,6 +443,9 @@ export async function subscriptionRoutes(app: FastifyInstance) {
           readerAvatar: s.reader_avatar,
           pricePence: s.price_pence,
           status: s.status,
+          isComp: s.is_comp,
+          autoRenew: s.auto_renew,
+          subscriptionPeriod: s.subscription_period,
           startedAt: s.started_at.toISOString(),
           currentPeriodEnd: s.current_period_end.toISOString(),
           cancelledAt: s.cancelled_at?.toISOString() ?? null,
@@ -421,11 +460,185 @@ export async function subscriptionRoutes(app: FastifyInstance) {
   )
 
   // ---------------------------------------------------------------------------
+  // POST /subscriptions/:readerId/comp — grant a comp (free) subscription
+  //
+  // Writer grants a complimentary subscription to a reader. No charge.
+  // ---------------------------------------------------------------------------
+
+  app.post<{ Params: { readerId: string } }>(
+    '/subscriptions/:readerId/comp',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const writerId = req.session!.sub!
+      const { readerId } = req.params
+
+      if (readerId === writerId) {
+        return reply.status(400).send({ error: 'Cannot comp yourself' })
+      }
+
+      // Verify reader exists
+      const readerResult = await pool.query<{ id: string; nostr_pubkey: string }>(
+        `SELECT id, nostr_pubkey FROM accounts WHERE id = $1 AND status = 'active'`,
+        [readerId]
+      )
+      if (readerResult.rows.length === 0) {
+        return reply.status(404).send({ error: 'Reader not found' })
+      }
+
+      // Check for existing subscription
+      const existing = await pool.query<{ id: string; status: string }>(
+        `SELECT id, status FROM subscriptions WHERE reader_id = $1 AND writer_id = $2`,
+        [readerId, writerId]
+      )
+
+      const now = new Date()
+      const periodEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // 1 year comp
+
+      if (existing.rows.length > 0) {
+        const sub = existing.rows[0]
+        if (sub.status === 'active') {
+          return reply.status(409).send({ error: 'Reader already has an active subscription' })
+        }
+        // Reactivate as comp
+        await pool.query(
+          `UPDATE subscriptions
+           SET status = 'active', auto_renew = FALSE, is_comp = TRUE, price_pence = 0,
+               cancelled_at = NULL, current_period_start = $1, current_period_end = $2,
+               updated_at = now()
+           WHERE id = $3`,
+          [now, periodEnd, sub.id]
+        )
+        logger.info({ writerId, readerId, subscriptionId: sub.id }, 'Comp subscription granted (reactivated)')
+        return reply.status(200).send({ subscriptionId: sub.id, status: 'active', isComp: true })
+      }
+
+      // Create new comp subscription
+      const result = await pool.query<{ id: string }>(
+        `INSERT INTO subscriptions (reader_id, writer_id, price_pence, status, is_comp, auto_renew,
+           current_period_start, current_period_end)
+         VALUES ($1, $2, 0, 'active', TRUE, FALSE, $3, $4)
+         RETURNING id`,
+        [readerId, writerId, now, periodEnd]
+      )
+
+      const subscriptionId = result.rows[0].id
+      logger.info({ writerId, readerId, subscriptionId }, 'Comp subscription granted')
+
+      // Notification
+      pool.query(
+        `INSERT INTO notifications (recipient_id, actor_id, type)
+         VALUES ($1, $2, 'new_subscriber')
+         ON CONFLICT DO NOTHING`,
+        [writerId, readerId]
+      ).catch(() => {})
+
+      return reply.status(201).send({ subscriptionId, status: 'active', isComp: true })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // DELETE /subscriptions/:readerId/comp — revoke a comp subscription (writer)
+  // ---------------------------------------------------------------------------
+
+  app.delete<{ Params: { readerId: string } }>(
+    '/subscriptions/:readerId/comp',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const writerId = req.session!.sub!
+      const { readerId } = req.params
+
+      const result = await pool.query(
+        `UPDATE subscriptions
+         SET status = 'expired', updated_at = now()
+         WHERE reader_id = $1 AND writer_id = $2 AND is_comp = TRUE AND status = 'active'
+         RETURNING id`,
+        [readerId, writerId]
+      )
+
+      if ((result.rowCount ?? 0) === 0) {
+        return reply.status(404).send({ error: 'No active comp subscription found' })
+      }
+
+      logger.info({ writerId, readerId }, 'Comp subscription revoked')
+      return reply.status(200).send({ ok: true })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // GET /subscription-events — paginated subscription event history
+  //
+  // Returns subscription_charge and subscription_earning events for the
+  // authenticated user (as reader or writer), most recent first.
+  // ---------------------------------------------------------------------------
+
+  app.get<{ Querystring: { limit?: string; offset?: string } }>(
+    '/subscription-events',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const userId = req.session!.sub!
+      const limit = Math.min(parseInt(req.query.limit ?? '50', 10) || 50, 100)
+      const offset = parseInt(req.query.offset ?? '0', 10) || 0
+
+      const { rows } = await pool.query<{
+        id: string
+        subscription_id: string
+        event_type: string
+        reader_id: string
+        writer_id: string
+        amount_pence: number
+        period_start: Date | null
+        period_end: Date | null
+        description: string | null
+        created_at: Date
+        counterparty_name: string | null
+        counterparty_username: string
+      }>(
+        `SELECT se.id, se.subscription_id, se.event_type,
+                se.reader_id, se.writer_id, se.amount_pence,
+                se.period_start, se.period_end, se.description, se.created_at,
+                CASE
+                  WHEN se.reader_id = $1 THEN w.display_name
+                  ELSE r.display_name
+                END AS counterparty_name,
+                CASE
+                  WHEN se.reader_id = $1 THEN w.username
+                  ELSE r.username
+                END AS counterparty_username
+         FROM subscription_events se
+         JOIN accounts r ON r.id = se.reader_id
+         JOIN accounts w ON w.id = se.writer_id
+         WHERE (se.reader_id = $1 OR se.writer_id = $1)
+           AND se.event_type IN ('subscription_charge', 'subscription_earning')
+           AND se.description != 'Expiry warning sent'
+         ORDER BY se.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [userId, limit, offset]
+      )
+
+      return reply.status(200).send({
+        events: rows.map(e => ({
+          id: e.id,
+          subscriptionId: e.subscription_id,
+          eventType: e.event_type,
+          amountPence: e.amount_pence,
+          periodStart: e.period_start?.toISOString() ?? null,
+          periodEnd: e.period_end?.toISOString() ?? null,
+          description: e.description,
+          counterpartyName: e.counterparty_name ?? e.counterparty_username,
+          counterpartyUsername: e.counterparty_username,
+          createdAt: e.created_at.toISOString(),
+        })),
+      })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
   // PATCH /settings/subscription-price — set writer's subscription price
   // ---------------------------------------------------------------------------
 
   const PriceSchema = z.object({
     pricePence: z.number().int().min(100).max(10000), // £1 to £100
+    annualDiscountPct: z.number().int().min(0).max(30).optional(),
   })
 
   app.patch(
@@ -438,15 +651,23 @@ export async function subscriptionRoutes(app: FastifyInstance) {
       }
 
       const accountId = req.session!.sub!
+      const { pricePence, annualDiscountPct } = parsed.data
 
-      await pool.query(
-        `UPDATE accounts SET subscription_price_pence = $1, updated_at = now() WHERE id = $2`,
-        [parsed.data.pricePence, accountId]
-      )
+      if (annualDiscountPct !== undefined) {
+        await pool.query(
+          `UPDATE accounts SET subscription_price_pence = $1, annual_discount_pct = $3, updated_at = now() WHERE id = $2`,
+          [pricePence, accountId, annualDiscountPct]
+        )
+      } else {
+        await pool.query(
+          `UPDATE accounts SET subscription_price_pence = $1, updated_at = now() WHERE id = $2`,
+          [pricePence, accountId]
+        )
+      }
 
-      logger.info({ accountId, pricePence: parsed.data.pricePence }, 'Subscription price updated')
+      logger.info({ accountId, pricePence, annualDiscountPct }, 'Subscription price updated')
 
-      return reply.status(200).send({ ok: true, pricePence: parsed.data.pricePence })
+      return reply.status(200).send({ ok: true, pricePence, annualDiscountPct })
     }
   )
 }
@@ -456,28 +677,150 @@ export async function subscriptionRoutes(app: FastifyInstance) {
 // =============================================================================
 
 // =============================================================================
-// Subscription expiry — call from a timer or cron job
+// Subscription renewal and expiry — runs hourly from gateway index
 //
-// Transitions active subscriptions past their period end to 'expired'.
-// Stripe recurring billing can be layered on later — for now, subscriptions
-// simply expire and require manual renewal.
+// 1. Auto-renew: active subscriptions past period end with auto_renew = true
+//    → charge reader, roll period forward, log events, publish Nostr attestation
+// 2. Expire: active/cancelled subscriptions past period end with auto_renew = false
+//    → set status to 'expired'
+// 3. Expiry warnings: send email 3 days before period end for non-auto-renewing
 // =============================================================================
 
 export async function expireAndRenewSubscriptions(): Promise<number> {
-  const result = await pool.query(
+  let processed = 0
+
+  // --- Phase 1: Auto-renew subscriptions ---
+  const renewable = await pool.query<{
+    id: string
+    reader_id: string
+    writer_id: string
+    price_pence: number
+    current_period_end: Date
+    reader_pubkey: string
+    writer_pubkey: string
+    subscription_period: string
+  }>(
+    `SELECT s.id, s.reader_id, s.writer_id, s.price_pence,
+            s.current_period_end,
+            r.nostr_pubkey AS reader_pubkey,
+            w.nostr_pubkey AS writer_pubkey,
+            COALESCE(s.subscription_period, 'monthly') AS subscription_period
+     FROM subscriptions s
+     JOIN accounts r ON r.id = s.reader_id
+     JOIN accounts w ON w.id = s.writer_id
+     WHERE s.status = 'active'
+       AND s.auto_renew = TRUE
+       AND s.current_period_end < now()`
+  )
+
+  for (const sub of renewable.rows) {
+    try {
+      const periodDays = sub.subscription_period === 'annual' ? 365 : 30
+      const newPeriodStart = sub.current_period_end
+      const newPeriodEnd = new Date(newPeriodStart.getTime() + periodDays * 24 * 60 * 60 * 1000)
+
+      await withTransaction(async (client) => {
+        // Deduct from reader's free allowance (same mechanism as initial subscribe)
+        await client.query(
+          `UPDATE accounts SET free_allowance_remaining_pence = free_allowance_remaining_pence - $1, updated_at = now() WHERE id = $2`,
+          [sub.price_pence, sub.reader_id]
+        )
+
+        // Roll the period forward
+        await client.query(
+          `UPDATE subscriptions
+           SET current_period_start = $1, current_period_end = $2, updated_at = now()
+           WHERE id = $3`,
+          [newPeriodStart, newPeriodEnd, sub.id]
+        )
+
+        // Log charge and earning events
+        await logSubscriptionCharge(client, sub.id, sub.reader_id, sub.writer_id, sub.price_pence, newPeriodStart, newPeriodEnd)
+      })
+
+      // Publish renewed Nostr attestation — non-blocking
+      publishSubscriptionEvent({
+        subscriptionId: sub.id,
+        readerPubkey: sub.reader_pubkey,
+        writerPubkey: sub.writer_pubkey,
+        status: 'active',
+        pricePence: sub.price_pence,
+        periodStart: sub.current_period_end,
+        periodEnd: new Date(sub.current_period_end.getTime() + (sub.subscription_period === 'annual' ? 365 : 30) * 24 * 60 * 60 * 1000),
+      }).then(nostrEventId =>
+        pool.query(`UPDATE subscriptions SET nostr_event_id = $1 WHERE id = $2`, [nostrEventId, sub.id])
+      ).catch(err =>
+        logger.error({ err, subscriptionId: sub.id }, 'Renewal Nostr event failed')
+      )
+
+      // Send renewal email — non-blocking
+      sendSubscriptionRenewedEmail(sub.reader_id, sub.writer_id, sub.price_pence, newPeriodEnd).catch(err =>
+        logger.warn({ err, subscriptionId: sub.id }, 'Renewal email failed')
+      )
+
+      logger.info({ subscriptionId: sub.id, readerId: sub.reader_id, writerId: sub.writer_id }, 'Subscription renewed')
+      processed++
+    } catch (err) {
+      // Renewal failed (e.g. DB error) — expire the subscription
+      logger.error({ err, subscriptionId: sub.id }, 'Subscription renewal failed, expiring')
+      await pool.query(
+        `UPDATE subscriptions SET status = 'expired', auto_renew = FALSE, updated_at = now() WHERE id = $1`,
+        [sub.id]
+      ).catch(expErr => logger.error({ err: expErr, subscriptionId: sub.id }, 'Failed to expire after renewal failure'))
+      processed++
+    }
+  }
+
+  // --- Phase 2: Expire non-renewing subscriptions past period end ---
+  const expired = await pool.query(
     `UPDATE subscriptions
      SET status = 'expired', updated_at = now()
-     WHERE status = 'active'
+     WHERE status IN ('active', 'cancelled')
+       AND auto_renew = FALSE
        AND current_period_end < now()
      RETURNING id`
   )
 
-  const count = result.rowCount ?? 0
-  if (count > 0) {
-    logger.info({ count }, 'Expired past-due subscriptions')
+  const expiredCount = expired.rowCount ?? 0
+  if (expiredCount > 0) {
+    logger.info({ count: expiredCount }, 'Expired non-renewing subscriptions')
+    processed += expiredCount
   }
 
-  return count
+  // --- Phase 3: Send expiry warning emails (3 days before period end) ---
+  const expiringSoon = await pool.query<{
+    id: string
+    reader_id: string
+    writer_id: string
+    current_period_end: Date
+  }>(
+    `SELECT s.id, s.reader_id, s.writer_id, s.current_period_end
+     FROM subscriptions s
+     WHERE s.status IN ('active', 'cancelled')
+       AND s.auto_renew = FALSE
+       AND s.current_period_end BETWEEN now() AND now() + INTERVAL '3 days'
+       AND NOT EXISTS (
+         SELECT 1 FROM subscription_events se
+         WHERE se.subscription_id = s.id
+           AND se.event_type = 'subscription_charge'
+           AND se.description = 'Expiry warning sent'
+           AND se.created_at > now() - INTERVAL '4 days'
+       )`
+  )
+
+  for (const sub of expiringSoon.rows) {
+    sendSubscriptionExpiryWarningEmail(sub.reader_id, sub.writer_id, sub.current_period_end).catch(err =>
+      logger.warn({ err, subscriptionId: sub.id }, 'Expiry warning email failed')
+    )
+    // Mark that we sent the warning (prevents re-sending)
+    pool.query(
+      `INSERT INTO subscription_events (subscription_id, event_type, reader_id, writer_id, amount_pence, description)
+       VALUES ($1, 'subscription_charge', $2, $3, 0, 'Expiry warning sent')`,
+      [sub.id, sub.reader_id, sub.writer_id]
+    ).catch(() => {})
+  }
+
+  return processed
 }
 
 async function logSubscriptionCharge(

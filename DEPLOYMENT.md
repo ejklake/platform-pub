@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v4.4.0
+# platform.pub — Deployment Reference v4.5.0
 
 **Date:** 2 April 2026
-**Replaces:** v4.3.1 (see bottom for change log)
+**Replaces:** v4.4.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -158,7 +158,7 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.2.0, `schema.sql` includes the notification routing columns (`conversation_id`, `drive_id` on notifications table). Migrations 018–022 must be run separately on existing databases.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.5.0, `schema.sql` includes the subscription auto-renewal, annual pricing, and comp subscription columns. Migrations 018–025 must be run separately on existing databases.
 
 Migrations still need to be run for **existing** databases that were initialised with an earlier `schema.sql`:
 
@@ -206,6 +206,136 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v4.4.0
+
+New migrations (023, 024, 025). Services changed: **gateway**, **shared**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+This release implements the Subscriptions Phase 1 MVP — the subscription system now auto-renews, supports annual pricing, comp subscriptions, and is properly surfaced in the paywall and settings UI.
+
+**Database migrations:**
+
+- Migration 023: Adds `auto_renew BOOLEAN DEFAULT TRUE` to `subscriptions` table. Existing cancelled subscriptions are set to `auto_renew = FALSE`.
+- Migration 024: Adds `subscription_period TEXT DEFAULT 'monthly'` to `subscriptions` and `annual_discount_pct INTEGER DEFAULT 15` to `accounts`.
+- Migration 025: Adds `is_comp BOOLEAN DEFAULT FALSE` to `subscriptions`.
+
+**Backend changes:**
+
+1. **Auto-renewal** — `expireAndRenewSubscriptions()` now auto-renews active subscriptions at period end (charges reader, rolls period forward, logs events, publishes Nostr attestation). Failed renewals expire the subscription. Non-renewing subs get expiry warning emails 3 days before period end.
+2. **Cancel flow** — Cancellation now sets `auto_renew = FALSE` and `status = 'cancelled'`. Access continues until period end, then expires instead of renewing.
+3. **Annual pricing** — `POST /subscriptions/:writerId` accepts `{ period: 'monthly' | 'annual' }`. Annual price is `monthlyPrice * 12 * (1 - annualDiscountPct / 100)`. Writers configure discount via `PATCH /settings/subscription-price` with `annualDiscountPct` (0–30%).
+4. **Comp subscriptions** — `POST /subscriptions/:readerId/comp` (writer grants 1-year free sub), `DELETE /subscriptions/:readerId/comp` (revoke). No charge, `is_comp = TRUE`.
+5. **Subscription events endpoint** — `GET /subscription-events` returns paginated subscription charge/earning events.
+6. **Subscription emails** — New templates in `shared/src/lib/subscription-emails.ts`: renewal confirmation, cancellation confirmation, expiry warning, new subscriber notification. Uses existing `EMAIL_PROVIDER` infrastructure.
+7. **Writer profile + article API** — Now return `annualDiscountPct` and `subscriptionPricePence` respectively.
+8. **Subscriber list** — Now includes `isComp`, `autoRenew`, `subscriptionPeriod` per subscriber.
+
+**Frontend changes:**
+
+1. **PaywallGate** — Now shows "Subscribe to [writer] for £X/mo to read everything" alongside the per-read unlock button. Footer changed from "No subscription" to "Subscribe for more / Cancel anytime".
+2. **ArticleReader** — Checks subscription status and passes subscribe handler to PaywallGate. Readers can subscribe directly from the paywall.
+3. **Writer profile subscribe button** — Shows both monthly and annual pricing options.
+4. **Dashboard settings** — Subscription pricing section now includes annual discount % input with live price preview.
+5. **SubscriptionsSection** — Shows renewal/expiry dates, auto-renew status, and cancellation state.
+6. **MySubscription type** — Added `writerId`, `autoRenew`, `currentPeriodEnd`, `cancelledAt` fields.
+
+**No new env vars required.** Subscription emails use the existing `EMAIL_PROVIDER` and `APP_URL` configuration.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply new migrations
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/023_subscription_auto_renew.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/024_annual_subscriptions.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/025_comp_subscriptions.sql
+
+# 2. Rebuild gateway and web (shared is built into gateway)
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Verify migrations applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'auto_renew';"
+# Should return 1 row
+
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name = 'accounts' AND column_name = 'annual_discount_pct';"
+# Should return 1 row
+```
+
+Changes:
+
+```
+# v4.5.0 — Subscriptions Phase 1 MVP
+#
+# ── Auto-renewal ──
+# expireAndRenewSubscriptions() now renews active subs at period end.
+# Charges reader, rolls period forward, logs events, publishes Nostr attestation.
+# Cancel sets auto_renew=false; sub expires at period end instead of renewing.
+# File: gateway/src/routes/subscriptions.ts
+#
+# ── Annual pricing ──
+# Subscribe API accepts period: 'monthly' | 'annual'.
+# Annual price = monthly * 12 * (1 - discount%). Writers set discount 0-30%.
+# Files: gateway/src/routes/subscriptions.ts, gateway/src/routes/writers.ts
+#
+# ── Comp subscriptions ──
+# POST /subscriptions/:readerId/comp — writer grants free 1-year sub.
+# DELETE /subscriptions/:readerId/comp — writer revokes comp.
+# File: gateway/src/routes/subscriptions.ts
+#
+# ── Subscription events endpoint ──
+# GET /subscription-events — paginated charge/earning events.
+# File: gateway/src/routes/subscriptions.ts
+#
+# ── Subscription emails ──
+# Renewal, cancellation, expiry warning, new subscriber notification.
+# File: shared/src/lib/subscription-emails.ts (new)
+#
+# ── PaywallGate subscribe option ──
+# Paywall now shows "Subscribe for £X/mo" alongside per-read unlock.
+# Files: web/src/components/article/PaywallGate.tsx,
+#        web/src/components/article/ArticleReader.tsx
+#
+# ── Annual pricing in UI ──
+# Dashboard settings: annual discount input with live preview.
+# Profile: monthly + annual subscribe buttons.
+# Files: web/src/app/dashboard/page.tsx,
+#        web/src/components/profile/WriterActivity.tsx
+#
+# ── SubscriptionsSection improvements ──
+# Shows renewal dates, auto-renew status, cancellation state.
+# File: web/src/components/account/SubscriptionsSection.tsx
+#
+# ── Schema changes ──
+# Migration 023: subscriptions.auto_renew BOOLEAN DEFAULT TRUE
+# Migration 024: subscriptions.subscription_period, accounts.annual_discount_pct
+# Migration 025: subscriptions.is_comp BOOLEAN DEFAULT FALSE
+# File: schema.sql, migrations/023-025
+#
+# ── API type updates ──
+# ArticleMetadata.writer.subscriptionPricePence, WriterProfile.annualDiscountPct,
+# MySubscription: +writerId, +autoRenew, +currentPeriodEnd, +cancelledAt
+# File: web/src/lib/api.ts
+#
+# ── Article metadata ──
+# GET /articles/:dTag now returns writer.subscriptionPricePence
+# File: gateway/src/routes/articles.ts
+```
+
+---
 
 ### From v4.3.1
 
@@ -3710,6 +3840,47 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v4.5.0 — 2 April 2026
+
+**Subscriptions Phase 1 MVP — auto-renewal, annual pricing, comp subs, paywall subscribe prompt, emails**
+
+New migrations (023, 024, 025). Services changed: **gateway**, **shared**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+- Subscription auto-renewal: `expireAndRenewSubscriptions()` renews active subs, charges reader, publishes Nostr attestation. Failed renewals expire. Expiry warnings sent 3 days before period end.
+- Cancel flow: sets `auto_renew = FALSE`, access until period end, then expires
+- Annual pricing: `period: 'monthly' | 'annual'` on subscribe, writer-configurable discount 0–30%
+- Comp subscriptions: `POST /subscriptions/:readerId/comp` (grant), `DELETE` (revoke)
+- `GET /subscription-events`: paginated subscription charge/earning history
+- Subscription email templates: renewal, cancellation, expiry warning, new subscriber notification
+- PaywallGate: subscribe prompt alongside per-read unlock
+- Writer profile: monthly + annual subscribe buttons
+- Dashboard: subscription pricing with annual discount input + live preview
+- SubscriptionsSection: renewal/expiry dates, auto-renew status
+- Articles API: returns `writer.subscriptionPricePence`
+- Writers API: returns `annualDiscountPct`
+- Subscriber list: includes `isComp`, `autoRenew`, `subscriptionPeriod`
+
+**New files:**
+- `shared/src/lib/subscription-emails.ts`
+- `migrations/023_subscription_auto_renew.sql`
+- `migrations/024_annual_subscriptions.sql`
+- `migrations/025_comp_subscriptions.sql`
+
+**Modified files:**
+- `gateway/src/routes/subscriptions.ts` — auto-renewal, annual pricing, comp routes, subscription-events endpoint, cancel flow, subscriber list
+- `gateway/src/routes/articles.ts` — `writer.subscriptionPricePence` in article metadata
+- `gateway/src/routes/writers.ts` — `annualDiscountPct` in writer profile
+- `web/src/components/article/PaywallGate.tsx` — subscribe prompt, new props
+- `web/src/components/article/ArticleReader.tsx` — subscription check, subscribe handler
+- `web/src/components/profile/WriterActivity.tsx` — monthly + annual subscribe buttons
+- `web/src/components/account/SubscriptionsSection.tsx` — renewal dates, auto-renew status
+- `web/src/app/dashboard/page.tsx` — annual discount settings
+- `web/src/app/article/[dTag]/page.tsx` — pass writerId + subscriptionPricePence
+- `web/src/lib/api.ts` — updated types (MySubscription, WriterProfile, ArticleMetadata)
+- `schema.sql` — new columns on subscriptions and accounts
+
+---
 
 ### v4.3.0 — 2 April 2026
 

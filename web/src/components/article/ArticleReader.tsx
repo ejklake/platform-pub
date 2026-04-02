@@ -20,6 +20,8 @@ interface ArticleReaderProps {
   writerName: string
   writerUsername: string
   writerAvatar?: string
+  writerId?: string
+  subscriptionPricePence?: number
   preRenderedFreeHtml?: string
 }
 
@@ -42,7 +44,7 @@ function stripHeroImage(content: string, heroUrl: string): string {
     .trim()
 }
 
-export function ArticleReader({ article, writerName, writerUsername, writerAvatar, preRenderedFreeHtml }: ArticleReaderProps) {
+export function ArticleReader({ article, writerName, writerUsername, writerAvatar, writerId, subscriptionPricePence, preRenderedFreeHtml }: ArticleReaderProps) {
   const { user } = useAuth()
   const [paywallBody, setPaywallBody] = useState<string | null>(null)
   const [unlocking, setUnlocking] = useState(false)
@@ -50,6 +52,8 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
   const [showAllowanceModal, setShowAllowanceModal] = useState(false)
   const [freeHtml, setFreeHtml] = useState<string>(preRenderedFreeHtml ?? '')
   const [paywallHtml, setPaywallHtml] = useState<string>('')
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
 
   // Text-selection quote flow
   const articleBodyRef = useRef<HTMLDivElement>(null)
@@ -87,6 +91,27 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
     const cached = sessionStorage.getItem(`unlocked:${article.id}`)
     if (cached) setPaywallBody(cached)
   }, [article.id, article.isPaywalled])
+
+  // Check subscription status for paywall gate
+  useEffect(() => {
+    if (!user || !writerId || !article.isPaywalled) return
+    fetch(`/api/v1/subscriptions/check/${writerId}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => { if (data.subscribed) setIsSubscribed(true) })
+      .catch(() => {})
+  }, [user, writerId, article.isPaywalled])
+
+  async function handleSubscribe() {
+    if (!user || !writerId) return
+    setSubscribing(true)
+    try {
+      await fetch(`/api/v1/subscriptions/${writerId}`, { method: 'POST', credentials: 'include' })
+      setIsSubscribed(true)
+      // After subscribing, unlock the article
+      handleUnlock()
+    } catch { setUnlockError('Failed to subscribe. Try again.') }
+    finally { setSubscribing(false) }
+  }
 
   async function handleUnlock() {
     if (!user) { window.location.href = '/auth?mode=signup'; return }
@@ -227,7 +252,21 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
               <div ref={articleBodyRef} className="prose prose-lg prose-dropcap" dangerouslySetInnerHTML={{ __html: freeHtml }} />
 
               {article.isPaywalled && !isUnlocked && (
-                <PaywallGate pricePounds={pricePounds} freeAllowanceRemaining={user?.freeAllowanceRemainingPence ?? 0} hasPaymentMethod={user?.hasPaymentMethod ?? false} isLoggedIn={!!user} onUnlock={handleUnlock} unlocking={unlocking} error={unlockError} />
+                <PaywallGate
+                  pricePounds={pricePounds}
+                  freeAllowanceRemaining={user?.freeAllowanceRemainingPence ?? 0}
+                  hasPaymentMethod={user?.hasPaymentMethod ?? false}
+                  isLoggedIn={!!user}
+                  onUnlock={handleUnlock}
+                  unlocking={unlocking}
+                  error={unlockError}
+                  writerUsername={writerUsername}
+                  writerName={writerName}
+                  subscriptionPricePence={subscriptionPricePence}
+                  isSubscribed={isSubscribed}
+                  onSubscribe={handleSubscribe}
+                  subscribing={subscribing}
+                />
               )}
 
               {paywallBody && <div className="prose prose-lg mt-10" dangerouslySetInnerHTML={{ __html: paywallHtml }} />}

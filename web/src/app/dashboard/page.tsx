@@ -164,41 +164,69 @@ function DraftsTab() {
 function WriterSettingsTab({ stripeReady }: { stripeReady: boolean }) {
   const { user, fetchMe } = useAuth()
   const [subPrice, setSubPrice] = useState('')
+  const [annualDiscount, setAnnualDiscount] = useState('15')
   const [savingPrice, setSavingPrice] = useState(false)
   const [priceMsg, setPriceMsg] = useState<string | null>(null)
 
   async function handleSavePrice(e: React.FormEvent) {
     e.preventDefault()
     const pence = Math.round(parseFloat(subPrice) * 100)
+    const discount = parseInt(annualDiscount, 10)
     if (isNaN(pence) || pence < 0) { setPriceMsg('Enter a valid price.'); return }
+    if (isNaN(discount) || discount < 0 || discount > 30) { setPriceMsg('Discount must be 0–30%.'); return }
     setSavingPrice(true); setPriceMsg(null)
     try {
-      await accountApi.updateSubscriptionPrice(pence)
+      await accountApi.updateSubscriptionPrice(pence, discount)
       setPriceMsg('Subscription price updated.')
     } catch { setPriceMsg('Failed to update.') }
     finally { setSavingPrice(false) }
   }
 
+  const monthlyPence = Math.round(parseFloat(subPrice || '0') * 100)
+  const discountPct = parseInt(annualDiscount || '0', 10)
+  const annualPence = Math.round(monthlyPence * 12 * (1 - discountPct / 100))
+  const annualPounds = (annualPence / 100).toFixed(2)
+
   return (
     <div className="space-y-8">
       {/* Subscription price */}
       <div className="bg-white px-6 py-5">
-        <p className="label-ui text-grey-400 mb-4">Subscription price</p>
+        <p className="label-ui text-grey-400 mb-4">Subscription pricing</p>
         <p className="text-ui-xs text-grey-600 leading-relaxed mb-4">
-          Set the monthly price readers pay to subscribe to your content. Set to £0 to disable subscriptions.
+          Set the monthly price readers pay to subscribe to your content. Readers can also choose an annual plan at a discount you configure.
         </p>
-        <form onSubmit={handleSavePrice} className="flex items-center gap-3">
-          <span className="text-[14px] font-sans text-grey-400">£</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={subPrice}
-            onChange={(e) => setSubPrice(e.target.value)}
-            className="w-28 border border-grey-200 px-3 py-1.5 text-[14px] font-sans text-black placeholder-grey-300"
-            placeholder="3.00"
-          />
-          <span className="text-[13px] font-sans text-grey-300">/month</span>
+        <form onSubmit={handleSavePrice} className="space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="text-[14px] font-sans text-grey-400">£</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={subPrice}
+              onChange={(e) => setSubPrice(e.target.value)}
+              className="w-28 border border-grey-200 px-3 py-1.5 text-[14px] font-sans text-black placeholder-grey-300"
+              placeholder="3.00"
+            />
+            <span className="text-[13px] font-sans text-grey-300">/month</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[14px] font-sans text-grey-400 w-[13px]">%</span>
+            <input
+              type="number"
+              min="0"
+              max="30"
+              value={annualDiscount}
+              onChange={(e) => setAnnualDiscount(e.target.value)}
+              className="w-28 border border-grey-200 px-3 py-1.5 text-[14px] font-sans text-black placeholder-grey-300"
+              placeholder="15"
+            />
+            <span className="text-[13px] font-sans text-grey-300">annual discount</span>
+          </div>
+          {monthlyPence > 0 && (
+            <p className="text-[13px] font-sans text-grey-400">
+              Readers pay £{subPrice}/mo or £{annualPounds}/year{discountPct > 0 ? ` (save ${discountPct}%)` : ''}
+            </p>
+          )}
           <button type="submit" disabled={savingPrice} className="btn text-sm disabled:opacity-50">
             {savingPrice ? 'Saving…' : 'Save'}
           </button>
