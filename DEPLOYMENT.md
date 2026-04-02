@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v4.7.0
+# platform.pub — Deployment Reference v4.7.1
 
 **Date:** 2 April 2026
-**Replaces:** v4.6.0 (see bottom for change log)
+**Replaces:** v4.7.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -158,9 +158,24 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.7.0, `schema.sql` includes article profile pinning and subscription visibility columns. Migrations 018–027 must be run separately on existing databases.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.7.1, `schema.sql` includes all structural changes through migration 025; the `_migrations` table is pre-seeded accordingly. Migrations 026–027 must be run separately on existing databases.
 
-Migrations still need to be run for **existing** databases that were initialised with an earlier `schema.sql`:
+For **fresh** databases: no action needed — the schema and `_migrations` seed handle everything.
+
+For **existing** databases that were initialised with an earlier `schema.sql`, use the migration runner:
+
+```bash
+# From the host (with DATABASE_URL set):
+DATABASE_URL=postgres://platformpub:$POSTGRES_PASSWORD@localhost:5432/platformpub \
+  npx tsx shared/src/db/migrate.ts
+
+# Or via Docker:
+docker compose exec gateway npx tsx /app/shared/src/db/migrate.ts
+```
+
+The runner reads `migrations/` in order, checks the `_migrations` table, and applies only pending files inside transactions.
+
+Alternatively, apply migrations manually:
 
 ```bash
 for f in migrations/*.sql; do
@@ -201,11 +216,142 @@ bash scripts/harden-server.sh
 
 Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-renewal.
 
+### 8. Seed data (staging / development only)
+
+The seed script (`scripts/seed.ts`) populates the database with realistic fake users, articles, follows, subscriptions, DMs, votes, pledge drives, and reading activity. **Do not run on production.**
+
+```bash
+# Default: 200 writers, 800 readers (~1000 users), dense relationships
+DATABASE_URL=postgres://platformpub:$POSTGRES_PASSWORD@localhost:5432/platformpub \
+  npx tsx scripts/seed.ts --clean
+
+# Small dataset: 15 writers, 25 readers (fast, for quick testing)
+npx tsx scripts/seed.ts --clean --small
+
+# Custom sizes:
+npx tsx scripts/seed.ts --clean --writers 50 --readers 200 --articles 10
+```
+
+Options:
+- `--clean` — wipe all seeded data before re-seeding (preserves the `billyisland` account)
+- `--writers N` — number of writer accounts (default 200, or 15 with `--small`)
+- `--readers N` — number of reader-only accounts (default 800, or 25 with `--small`)
+- `--articles N` — max articles per writer (default 8, or 6 with `--small`)
+- `--small` — use small defaults (equivalent to `--writers 15 --readers 25 --articles 6`)
+
+The script generates: accounts, articles, notes, follows, subscriptions (monthly/annual/cancelled/comp), comments, reading tabs + read events, feed engagement, votes + tallies, DM conversations + messages, notifications, pledge drives + pledges, blocks, and mutes.
+
 ---
 
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v4.7.0
+
+No new migrations. Services changed: **key-service**, **payment-service**. Deploy order: **rebuild key-service + payment-service**.
+
+This is a fix release. The `key-service/Dockerfile` and `payment-service/Dockerfile` had `ENV NODE_ENV=production` set before `npm install`, which caused npm to skip devDependencies. Since `tsx` is a devDependency used as the runtime entrypoint, both services crashed on startup with `Cannot find module 'tsx'`. This is the same class of bug fixed in v4.3.1 for the web Dockerfile.
+
+**Fix:** `ENV NODE_ENV=production` moved from before `npm install` to after, matching the gateway and key-custody Dockerfiles.
+
+**Also in this release:** The seed script (`scripts/seed.ts`) has been expanded to support large-scale staging data generation (1000 users with dense relationships, DMs, subscriptions, votes, pledge drives, etc.). See [Seed data](#8-seed-data-staging--development-only) above.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# Rebuild the two fixed services
+docker compose build keyservice payment
+docker compose up -d keyservice payment
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# keyservice and payment should show (healthy) after ~30s
+
+docker logs platform-pub-keyservice-1 --tail 5
+# Should show "Key service started" with port 3002
+
+docker logs platform-pub-payment-1 --tail 5
+# Should show "Payment service started" with port 3001
+```
+
+> **Note:** The `key-service/.env` file must include `INTERNAL_SECRET` (shared with gateway and key-custody). If key-service crashes with `Missing required environment variable: INTERNAL_SECRET`, copy the value from `gateway/.env` or `key-custody/.env`.
+
+---
+
+### From v4.6.0
+
+New migrations (026, 027). Services changed: **gateway**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+This release adds tabbed profile pages, article pinning, subscription visibility, and renames "Drives" to "Pledge drives" across the UI.
+
+**Database migrations:**
+
+- Migration 026: Adds `pinned_on_profile BOOLEAN DEFAULT FALSE` and `profile_pin_order INTEGER DEFAULT 0` to `articles`.
+- Migration 027: Adds `hidden BOOLEAN DEFAULT FALSE` to `subscriptions`.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply new migrations
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/026_article_profile_pins.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/027_subscription_visibility.sql
+
+# 2. Rebuild gateway and web
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Verify migrations applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name = 'articles' AND column_name = 'pinned_on_profile';"
+# Should return 1 row
+
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name = 'subscriptions' AND column_name = 'hidden';"
+# Should return 1 row
+```
+
+---
+
+### From v4.5.0
+
+No new migrations. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
+
+This release adds the Therefore mark (∴) logo system, fixes broken quoted-article links, and removes unreachable payment method prompts from the paywall.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# Rebuild gateway and web
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Verify favicon is served
+curl -sI http://localhost:3010/favicon.svg | head -3
+# Should return 200
+```
+
+---
 
 ### From v4.4.0
 
@@ -3841,18 +3987,30 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 
 ---
 
-## Known limitations (v3.1)
+## Known limitations (v4.7.1)
 
-- Subscription renewal is not yet automated (requires a scheduled worker)
 - RSS feed ingestion not yet built
 - NIP-07 browser extension support not yet built
 - Cash-out-at-will (writer-initiated payout) not yet implemented
 - Stripe payment collection not yet live — free allowance goes negative as a testing workaround
 - Email sending requires configuring `EMAIL_PROVIDER` — defaults to console logging
+- Docker healthchecks on some Alpine containers report "unhealthy" due to missing `wget`/`curl` in the image, despite services running correctly
 
 ---
 
 ## Change log
+
+### v4.7.1 — 2 April 2026
+
+**Dockerfile fix for key-service and payment-service; expanded seed script**
+
+No new migrations. Services changed: **key-service**, **payment-service**. Deploy order: **rebuild key-service + payment-service**.
+
+- `key-service/Dockerfile`: moved `ENV NODE_ENV=production` from before `npm install` to after. Same bug class as the v4.3.1 web Dockerfile fix — `tsx` is a devDependency and was being skipped, causing the container to crash on startup.
+- `payment-service/Dockerfile`: identical fix.
+- `scripts/seed.ts`: expanded from 15+25 users to 1000 users (200 writers, 800 readers) with dense relationships, DMs, subscriptions, votes, pledge drives, notifications. Added `--small` flag for the original small dataset. Uses batch inserts for performance.
+
+---
 
 ### v4.7.0 — 2 April 2026
 
