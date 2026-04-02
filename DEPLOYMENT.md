@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v3.30.0
+# platform.pub — Deployment Reference v3.31.0
 
-**Date:** 1 April 2026
-**Replaces:** v3.29.0 (see bottom for change log)
+**Date:** 2 April 2026
+**Replaces:** v3.30.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -156,7 +156,7 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v3.27.0, `schema.sql` includes all tables and columns from migrations 001–017, so a fresh install gets the complete database schema immediately. Migration 018 (v3.29.0) adds ON DELETE clauses and must be run separately.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v3.31.0, `schema.sql` includes the corrected notification dedup index (partial index on `read = false`). Migrations 018 (v3.29.0, ON DELETE clauses) and 019 (v3.31.0, notification dedup fix) must be run separately on existing databases.
 
 Migrations still need to be run for **existing** databases that were initialised with an earlier `schema.sql`:
 
@@ -204,6 +204,53 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v3.30.0
+
+New migration (019). No service rebuilds needed. Deploy order: **migrate only**.
+
+This release fixes a bug where the notification deduplication index (`idx_notifications_dedup`) prevented repeat notifications from ever being created. Once a notification was marked as read, the old unique index still occupied the slot, so `ON CONFLICT DO NOTHING` silently dropped new events of the same type from the same actor. The fix converts the unique index to a **partial index** (`WHERE read = false`) so only unread rows are constrained. It also wraps `actor_id` in `COALESCE` for consistent NULL handling.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# Apply migration (019 — fix notification dedup index)
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub < migrations/019_fix_notification_dedup.sql
+```
+
+Verify:
+```bash
+# Confirm the index is now partial (should show WHERE clause)
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "\di+ idx_notifications_dedup"
+
+# Confirm migration recorded
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT filename FROM _migrations ORDER BY id DESC LIMIT 5;"
+```
+
+Changes:
+
+```
+# v3.31.0 — Fix notification dedup index blocking repeat notifications
+#
+# The unique index idx_notifications_dedup covered all rows (read and unread),
+# so once a notification was read, new events of the same (recipient, actor,
+# type, targets) combination were silently dropped by ON CONFLICT DO NOTHING.
+# Repeat events (re-follow, second reply from same user, etc.) never created
+# new notifications.
+#
+# Fix: convert to a partial unique index (WHERE read = false). Only unread
+# rows are constrained — once marked read, the slot opens for new events.
+# Also wraps actor_id in COALESCE for consistent NULL handling.
+#
+# Files:
+#   migrations/019_fix_notification_dedup.sql — drops old index, creates partial index
+#   schema.sql                                — updated to reflect corrected index
+```
+
+---
 
 ### From v3.29.0
 
@@ -2518,6 +2565,15 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 | 008_deduplicate_articles.sql | Deduplicate articles rows; add partial unique index on `(writer_id, nostr_d_tag) WHERE deleted_at IS NULL` |
 | 009_notifications.sql | `notifications` table: new_follower and new_reply events, with actor/article/comment FK refs |
 | 010_votes.sql | `votes`, `vote_tallies`, `vote_charges` tables for the upvote/downvote system |
+| 011_store_ciphertext.sql | `ciphertext` column on `vault_keys` for storing encrypted content |
+| 012_notification_note_id.sql | `note_id` column on `notifications` for note-related notifications |
+| 013_note_excerpt_fields.sql | `quoted_excerpt`, `quoted_title`, `quoted_author_display_name` on `notes` |
+| 014_notification_dedup.sql | Deduplicate notification rows; add unique index (superseded by 019) |
+| 015_access_mode_and_unlock_types.sql | `access_mode` column on articles, `unlock_type` expansion on `article_unlocks` |
+| 016_direct_messages.sql | `direct_messages` table for NIP-17 encrypted DMs |
+| 017_pledge_drives.sql | `pledge_drives` and `pledges` tables for crowdfunding/commissions |
+| 018_add_on_delete_clauses.sql | ON DELETE CASCADE/SET NULL clauses for FKs in migrations 016–017 |
+| 019_fix_notification_dedup.sql | Fix dedup index: partial unique index (`WHERE read = false`) so repeat notifications work |
 
 Run all pending migrations (requires Node on the host — substitute your `POSTGRES_PASSWORD`):
 ```bash
@@ -2834,6 +2890,90 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v3.31.0 — 2 April 2026
+
+**Fix: notification dedup index blocking repeat notifications**
+
+Schema change: new migration (019). No service rebuilds needed. Deploy order: **migrate only**.
+
+The notification deduplication unique index (`idx_notifications_dedup`, added in migration 014 / v3.21.0) covered all rows regardless of read status. Once a notification was marked as read, the old row still occupied the unique slot in the index. Any subsequent event of the same `(recipient_id, actor_id, type, article_id, note_id, comment_id)` combination was silently dropped by `ON CONFLICT DO NOTHING`. This meant:
+
+- A user who unfollowed and re-followed never triggered a second `new_follower` notification
+- A second reply from the same user to the same article never triggered a new `new_reply` notification
+- Same for `new_subscriber`, `new_quote`, `new_mention`, and all other notification types
+
+**Fix:** Migration 019 drops the old index and recreates it as a **partial unique index** with `WHERE read = false`. Only unread rows are constrained — once a notification is marked as read, the unique slot is released and new events of the same kind can insert fresh rows. The migration also wraps `actor_id` in `COALESCE` (matching the other nullable FK columns) for consistent NULL handling.
+
+**Files changed:**
+- `migrations/019_fix_notification_dedup.sql` — drops old index, creates partial index on `read = false`
+- `schema.sql` — updated to reflect corrected index definition
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub < migrations/019_fix_notification_dedup.sql`
+
+No service rebuilds required — the change is index-only.
+
+---
+
+### v3.30.0 — 1 April 2026
+
+**Dev-mode instant login and local Docker networking fixes**
+
+No schema changes. Services changed: **gateway**, **web**. Deploy order: **rebuild changed services**.
+
+Added `POST /auth/dev-login` endpoint (gateway, development only) that accepts an email and creates a session directly — no magic link needed. Guarded by `NODE_ENV=development`; the route is not registered in production. Frontend adds an "Instant dev login" button on `/auth` (development builds only). Docker networking fixes: gateway `.env` service URLs now use Docker service names; `web/.env` separates server-side `GATEWAY_URL` from client-side `NEXT_PUBLIC_GATEWAY_URL`.
+
+**Files changed:** `gateway/src/routes/auth.ts`, `web/src/app/auth/page.tsx`, `web/src/lib/api.ts`, `gateway/.env`, `web/.env`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose build gateway web && docker compose up -d gateway web`
+
+No migrations required.
+
+---
+
+### v3.29.0 — 1 April 2026
+
+**Medium-priority audit fixes — subscriptions, XSS, search, notifications, health checks**
+
+New migration (018). Services changed: **gateway**, **payment-service**, **web**, plus **docker-compose.yml**. Deploy order: **migrate → rebuild changed services**.
+
+Implements all medium-priority fixes from the codebase audit (`FIXES.md` items 13–22): subscription expiry lifecycle, XSS sanitisation of markdown links, LIKE metacharacter escaping in search, config cache TTL in AccrualService, notification type sync (frontend union expanded from 5→12 types), drive update truthiness fix, Docker health checks for all 7 services, auth hydration guard (loading spinner until `fetchMe()` resolves), and FK ON DELETE clauses via migration 018.
+
+**Files changed:** `gateway/src/routes/subscriptions.ts`, `gateway/src/index.ts`, `gateway/src/routes/search.ts`, `gateway/src/routes/drives.ts`, `payment-service/src/services/accrual.ts`, `web/src/lib/markdown.ts`, `web/src/lib/api.ts`, `web/src/components/ui/NotificationBell.tsx`, `web/src/app/notifications/page.tsx`, `web/src/components/layout/AuthProvider.tsx`, `docker-compose.yml`, `migrations/018_add_on_delete_clauses.sql`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub < migrations/018_add_on_delete_clauses.sql`
+3. `docker compose build gateway payment web && docker compose up -d`
+
+---
+
+### v3.28.0 — 1 April 2026
+
+**High-priority audit fixes — auth, payments, security hardening**
+
+No schema changes. No new migrations. Services changed: **gateway**, **payment-service**, **nginx**, plus all Dockerfiles and **docker-compose.yml**. Deploy order: **rebuild all services**.
+
+Implements all high-priority fixes from the codebase audit (`FIXES.md` items 5–12): account status check in auth middleware (suspended users rejected immediately), settlement confirmation idempotency guard (duplicate Stripe webhooks no longer double-debit), DM sender visibility fix, nginx security headers (HSTS, CSP, X-Frame-Options, etc.), gateway rate limiting via `@fastify/rate-limit`, `requireAdmin` return statement fix, non-root Docker containers, and internal service ports removed from host bindings.
+
+**Files changed:** `gateway/src/middleware/auth.ts`, `payment-service/src/services/settlement.ts`, `gateway/src/routes/messages.ts`, `nginx.conf`, `gateway/package.json`, `gateway/src/index.ts`, `gateway/src/routes/auth.ts`, `gateway/src/routes/articles.ts`, `gateway/src/routes/search.ts`, `gateway/src/routes/moderation.ts`, `gateway/Dockerfile`, `payment-service/Dockerfile`, `key-service/Dockerfile`, `key-custody/Dockerfile`, `web/Dockerfile`, `docker-compose.yml`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `cd gateway && npm install && cd ..`
+3. `docker compose build --no-cache && docker compose up -d`
+
+No migrations required.
+
+---
 
 ### v3.27.2 — 1 April 2026
 

@@ -632,16 +632,19 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notifications_recipient ON notifications(recipient_id, created_at DESC);
 CREATE INDEX idx_notifications_note ON notifications(note_id) WHERE note_id IS NOT NULL;
 
--- Prevent duplicate notifications (migration 014)
+-- Prevent duplicate *unread* notifications (migration 014 → fixed in 019)
+-- Partial index: only unread rows are constrained, so once a notification is
+-- read a new event of the same kind can insert a fresh row.
 CREATE UNIQUE INDEX idx_notifications_dedup
   ON notifications (
     recipient_id,
-    actor_id,
+    COALESCE(actor_id, '00000000-0000-0000-0000-000000000000'),
     type,
     COALESCE(article_id, '00000000-0000-0000-0000-000000000000'),
     COALESCE(note_id, '00000000-0000-0000-0000-000000000000'),
     COALESCE(comment_id, '00000000-0000-0000-0000-000000000000')
-  );
+  )
+  WHERE read = false;
 
 -- =============================================================================
 -- VOTES (migration 010)
