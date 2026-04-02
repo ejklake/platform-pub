@@ -1,9 +1,7 @@
-import { getNdk, KIND_ARTICLE, KIND_DELETION } from './ndk'
-import { signViaGateway } from './sign'
+import { KIND_ARTICLE, KIND_DELETION } from './ndk'
+import { signAndPublish, signViaGateway } from './sign'
 import { articles as articlesApi } from './api'
 import type { PublishData } from '../components/editor/ArticleEditor'
-import type NDK from '@nostr-dev-kit/ndk'
-import { NDKEvent } from '@nostr-dev-kit/ndk'
 
 // =============================================================================
 // Publishing Service
@@ -11,30 +9,19 @@ import { NDKEvent } from '@nostr-dev-kit/ndk'
 // Orchestrates the full article publishing pipeline:
 //
 //   1. Build and sign the NIP-23 article event v1 (free content only)
-//   2. Publish v1 to the relay
+//   2. Publish v1 to the relay via gateway
 //   3. Index v1 in the platform database → get back the article UUID
 //   4. If paywalled:
 //      a. Call key service to encrypt the paywall body (needs real article UUID)
 //      b. Build NIP-23 event v2 with ['payload', ciphertext, algorithm] tag
-//      c. Sign and publish v2 — replaces v1 on relay (same d-tag, kind 30023
-//         is a replaceable event, relay keeps only the latest)
-//      d. Re-index with v2 event ID (upsert — same d-tag, updates nostr_event_id)
-//
-// No separate kind 39701 vault event is produced. The encrypted body lives
-// entirely inside the NIP-23 event, keeping the article self-contained per
-// spec §III.2.
-//
-// The double-publish (v1 then v2) is necessary because the key service needs
-// the article UUID (from step 3) before it can create the vault key, and the
-// article UUID is only available after indexing, which requires v1's event ID.
-// v1 is invisible to readers in practice — v2 replaces it in the same relay
-// round-trip before any reader could fetch v1.
+//      c. Sign and publish v2 via gateway
+//      d. Re-index with v2 event ID
 // =============================================================================
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? ''
 
 interface PublishResult {
-  articleEventId: string   // final NIP-23 event ID (v2 if paywalled, v1 otherwise)
+  articleEventId: string
   dTag: string
   articleId: string
 }
@@ -44,15 +31,11 @@ export async function publishArticle(
   writerPubkey: string,
   existingDTag?: string
 ): Promise<PublishResult> {
-  const ndk = getNdk()
-  await ndk.connect()
-
   const dTag = existingDTag ?? generateDTag(data.title)
 
   // Step 1: Build and publish NIP-23 v1 (free content only — no payload yet)
-  const v1 = buildNip23Event(ndk, data, dTag, null)
-  const signedV1 = await signViaGateway(v1)
-  await signedV1.publish()
+  const v1 = buildNip23Event(data, dTag, null)
+  const signedV1 = await signAndPublish(v1)
 
   // Step 2: Index v1 → get article UUID
   let articleId!: string
@@ -71,14 +54,14 @@ export async function publishArticle(
   } catch (indexErr) {
     // Retract v1 from relay so it doesn't become a dead link
     try {
-      const retract = new NDKEvent(ndk)
-      retract.kind = KIND_DELETION
-      retract.content = ''
-      retract.tags = [
-        ['e', signedV1.id!],
-        ['a', `30023:${writerPubkey}:${dTag}`],
-      ]
-      await (await signViaGateway(retract)).publish()
+      await signAndPublish({
+        kind: KIND_DELETION,
+        content: '',
+        tags: [
+          ['e', signedV1.id!],
+          ['a', `30023:${writerPubkey}:${dTag}`],
+        ],
+      })
     } catch { /* best-effort */ }
     throw indexErr
   }
@@ -96,40 +79,10 @@ export async function publishArticle(
   )
 
   // Step 4: Build NIP-23 v2 with embedded payload tag, sign and publish
-  // Kind 30023 is replaceable by [pubkey, d-tag] — v2 atomically replaces v1
-  const v2 = buildNip23Event(ndk, data, dTag, { ciphertext, algorithm })
-  const signedV2 = await signViaGateway(v2)
-
-  // FIX: The NDK WebSocket connection may have gone stale during the vault
-  // encryption round-trip (Steps 2–3 involve multiple HTTP calls to the
-  // gateway and key service). Re-connect before publishing v2 to avoid the
-  // "no relays available" error. If the first attempt still fails, retry
-  // once with a fresh connection.
-  try {
-    await ndk.connect()
-    await signedV2.publish()
-  } catch (publishErr) {
-    // Second attempt with a forced reconnect
-    try {
-      await ndk.connect()
-      await signedV2.publish()
-    } catch (retryErr) {
-      // v2 failed to reach the relay. v1 (free-content-only, no payload tag)
-      // is still live. Do NOT re-index with v2's event ID — that would create
-      // an ID mismatch where the DB points to v2 but the relay only has v1,
-      // causing "Could not find the encrypted content" on unlock attempts.
-      //
-      // Throw so the caller knows publishing the paywalled version failed.
-      // The article is live as free-only (v1). The writer can retry.
-      throw new Error(
-        `Article published as free-only (relay did not accept the paywalled version). ` +
-        `Please try editing and re-publishing. Original error: ${retryErr}`
-      )
-    }
-  }
+  const v2 = buildNip23Event(data, dTag, { ciphertext, algorithm })
+  const signedV2 = await signAndPublish(v2)
 
   // Step 5: Re-index with v2 event ID (upsert on nostr_event_id)
-  // Only reached if v2 was successfully published to the relay above.
   await articlesApi.index({
     nostrEventId: signedV2.id,
     dTag,
@@ -149,38 +102,36 @@ export async function publishArticle(
 // =============================================================================
 
 function buildNip23Event(
-  ndk: NDK,
   data: PublishData,
   dTag: string,
   payload: { ciphertext: string; algorithm: string } | null
-): NDKEvent {
-  const event = new NDKEvent(ndk)
-  event.kind = KIND_ARTICLE
-  event.content = data.isPaywalled ? data.freeContent : data.content
-  event.tags = [
+) {
+  const tags: string[][] = [
     ['d', dTag],
     ['title', data.title],
     ['published_at', String(Math.floor(Date.now() / 1000))],
   ]
 
   if (data.dek?.trim()) {
-    event.tags.push(['summary', data.dek.trim()])
+    tags.push(['summary', data.dek.trim()])
   }
 
   if (data.isPaywalled) {
-    event.tags.push(
+    tags.push(
       ['price', String(data.pricePence), 'GBP'],
       ['gate', String(data.gatePositionPct)]
     )
   }
 
   if (payload) {
-    // Embed the encrypted paywall body directly in the NIP-23 event.
-    // Readers extract this tag after paying; no separate vault event needed.
-    event.tags.push(['payload', payload.ciphertext, payload.algorithm])
+    tags.push(['payload', payload.ciphertext, payload.algorithm])
   }
 
-  return event
+  return {
+    kind: KIND_ARTICLE,
+    content: data.isPaywalled ? data.freeContent : data.content,
+    tags,
+  }
 }
 
 async function encryptPaywallBody(

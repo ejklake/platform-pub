@@ -41,7 +41,7 @@ export function CardSetup({ onSuccess }: CardSetupProps) {
           variables: {
             colorPrimary: '#1A1A1A',
             colorText: '#1A1A1A',
-            fontFamily: '"Instrument Sans", system-ui, sans-serif',
+            fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             borderRadius: '2px',
           },
         },

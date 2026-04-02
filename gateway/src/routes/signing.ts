@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/auth.js'
 import { signEvent, unwrapKey } from '../lib/key-custody-client.js'
+import { publishToRelay } from '../lib/nostr-publisher.js'
 import logger from '../../shared/src/lib/logger.js'
 
 // =============================================================================
@@ -51,6 +52,39 @@ export async function signingRoutes(app: FastifyInstance) {
     } catch (err) {
       logger.error({ err, accountId }, 'Event signing failed')
       return reply.status(500).send({ error: 'Signing failed' })
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // POST /sign-and-publish — sign a Nostr event and publish it to the relay
+  //
+  // Combines signing and relay publishing into a single call so the web client
+  // does not need direct relay access. Returns the signed event data.
+  // ---------------------------------------------------------------------------
+
+  app.post('/sign-and-publish', { preHandler: requireAuth }, async (req, reply) => {
+    const parsed = SignEventSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.flatten() })
+    }
+
+    const accountId = req.session!.sub!
+
+    try {
+      const signed = await signEvent(accountId, {
+        kind: parsed.data.kind,
+        content: parsed.data.content,
+        tags: parsed.data.tags,
+        created_at: parsed.data.created_at ?? Math.floor(Date.now() / 1000),
+      })
+
+      await publishToRelay(signed as any)
+
+      logger.info({ accountId, eventKind: parsed.data.kind, eventId: signed.id }, 'Event signed and published')
+      return reply.status(200).send(signed)
+    } catch (err) {
+      logger.error({ err, accountId }, 'Sign-and-publish failed')
+      return reply.status(500).send({ error: 'Sign-and-publish failed' })
     }
   })
 

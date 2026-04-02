@@ -6,9 +6,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
-        serif: ['"Literata"', 'Georgia', 'serif'],
-        mono: ['"IBM Plex Mono"', '"Courier New"', 'monospace'],
+        sans: ['system-ui', '-apple-system', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        serif: ['"Literata"', 'Georgia', '"Times New Roman"', 'serif'],
+        mono: ['ui-monospace', '"SF Mono"', 'SFMono-Regular', 'Menlo', 'Consolas', '"Liberation Mono"', 'monospace'],
         // Legacy alias — remove once all components are migrated
         'source': ['"Source Sans 3"', '"Source Sans Pro"', 'system-ui', 'sans-serif'],
       },
@@ -75,7 +75,7 @@ module.exports = {
             h3: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', fontSize: '1.35rem', lineHeight: '1.3' },
             a: { color: '#1A1A1A', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationThickness: '1px', '&:hover': { color: '#666666' } },
             blockquote: { borderLeftColor: '#E5E5E5', borderLeftWidth: '2px', fontStyle: 'italic', color: '#666666' },
-            code: { fontFamily: '"IBM Plex Mono", monospace', fontSize: '0.875em' },
+            code: { fontFamily: 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace', fontSize: '0.875em' },
             p: { marginTop: '1.5em', marginBottom: '1.5em' },
           },
         },

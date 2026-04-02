@@ -20,9 +20,7 @@ const ArticleEditor = dynamic(
 )
 import { publishArticle } from '../../lib/publish'
 import { loadDraft } from '../../lib/drafts'
-import { getNdk, fetchArticleByDTag, KIND_ARTICLE } from '../../lib/ndk'
 import { articles as articlesApi } from '../../lib/api'
-import type { NDKFilter, NDKKind } from '@nostr-dev-kit/ndk'
 
 // =============================================================================
 // Write Page
@@ -67,32 +65,25 @@ export default function WritePage() {
     async function loadEditData() {
       if (editEventId) {
         try {
-          // Fetch article metadata from gateway
-          const ndk = getNdk()
-          await ndk.connect()
-
-          // Find the article event on the relay by event ID
-          const event = await ndk.fetchEvent(editEventId)
-          if (!event) {
+          // Fetch article data from gateway by event ID
+          // The gateway stores the free content which is enough to populate the editor
+          const res = await fetch(`/api/v1/articles/by-event/${editEventId}`, { credentials: 'include' })
+          if (!res.ok) {
+            // Fallback: try to find by searching my articles
             setLoadError('Could not find the article to edit.')
             return
           }
-
-          const dTag = event.tagValue('d') ?? ''
-          const title = event.tagValue('title') ?? ''
-          const summary = event.tagValue('summary') ?? ''
-          const priceTag = event.tags.find(t => t[0] === 'price')
-          const gateTag = event.tags.find(t => t[0] === 'gate')
+          const meta = await res.json()
 
           setInitialData({
-            title,
-            dek: summary,
-            content: event.content,
-            gatePosition: gateTag ? parseInt(gateTag[1], 10) : 50,
-            price: priceTag ? parseInt(priceTag[1], 10) : 0,
-            commentsEnabled: true, // Will be overridden by DB data if available
+            title: meta.title ?? '',
+            dek: meta.summary ?? '',
+            content: meta.contentFree ?? '',
+            gatePosition: meta.gatePositionPct ?? 50,
+            price: meta.pricePence ?? 0,
+            commentsEnabled: true,
             editingEventId: editEventId,
-            editingDTag: dTag,
+            editingDTag: meta.dTag ?? '',
           })
         } catch (err) {
           console.error('Failed to load article for editing:', err)

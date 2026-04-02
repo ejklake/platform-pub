@@ -1,5 +1,6 @@
 FROM node:20-alpine
 WORKDIR /app
+ENV NODE_ENV=production
 COPY tsconfig.base.json ./
 COPY shared/ shared/
 COPY payment-service/ payment-service/

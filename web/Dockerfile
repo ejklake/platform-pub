@@ -1,5 +1,6 @@
 FROM node:20-alpine
 WORKDIR /app
+ENV NODE_ENV=production
 COPY web/ .
 RUN npm install
 ARG NEXT_PUBLIC_RELAY_URL

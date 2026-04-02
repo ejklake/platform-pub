@@ -71,9 +71,11 @@ export async function withTransaction<T>(
 // =============================================================================
 
 let cachedConfig: PlatformConfig | null = null
+let cachedConfigAt = 0
+const CONFIG_TTL_MS = 30_000
 
 export async function loadConfig(forceRefresh = false): Promise<PlatformConfig> {
-  if (cachedConfig && !forceRefresh) return cachedConfig
+  if (cachedConfig && !forceRefresh && Date.now() - cachedConfigAt < CONFIG_TTL_MS) return cachedConfig
 
   const { rows } = await pool.query<{ key: string; value: string }>(
     'SELECT key, value FROM platform_config'
@@ -90,6 +92,7 @@ export async function loadConfig(forceRefresh = false): Promise<PlatformConfig> 
   }
 
   cachedConfig = config
+  cachedConfigAt = Date.now()
   return config
 }
 

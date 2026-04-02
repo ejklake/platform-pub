@@ -40,6 +40,9 @@ export const useAuth = create<AuthState>((set) => ({
     try {
       await auth.logout()
     } finally {
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith('unlocked:')) sessionStorage.removeItem(key)
+      }
       set({ user: null })
     }
   },

@@ -14,8 +14,6 @@
     "react-dom": "^18.3.0",
 
     "@noble/ciphers": "^1.0.0",
-    "@nostr-dev-kit/ndk": "^2.8.0",
-    "@nostr-dev-kit/ndk-cache-dexie": "^2.3.0",
 
     "@tiptap/react": "^2.3.0",
     "@tiptap/starter-kit": "^2.3.0",

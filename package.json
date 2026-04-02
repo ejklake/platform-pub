@@ -1,7 +1,15 @@
 {
+  "scripts": {
+    "seed": "npx tsx scripts/seed.ts",
+    "seed:clean": "npx tsx scripts/seed.ts --clean"
+  },
   "dependencies": {
     "dotenv": "^17.3.1",
     "pg": "^8.20.0",
     "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.4.0",
+    "@types/pg": "^8.20.0"
   }
 }

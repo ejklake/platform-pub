@@ -8,9 +8,7 @@ import { ArticleCard } from '../feed/ArticleCard'
 import { NoteCard } from '../feed/NoteCard'
 import { NoteComposer } from '../feed/NoteComposer'
 import type { FeedItem, NoteEvent } from '../../lib/ndk'
-import { getNdk, parseArticleEvent, parseNoteEvent, KIND_ARTICLE, KIND_NOTE, KIND_DELETION } from '../../lib/ndk'
 import type { QuoteTarget } from '../../lib/publishNote'
-import type { NDKKind } from '@nostr-dev-kit/ndk'
 import { feed as feedApi, votes as votesApi, follows as followsApi, search as searchApi, type VoteTally, type MyVoteCount } from '../../lib/api'
 
 type FeedTab = 'for-you' | 'following' | 'add'
@@ -114,46 +112,48 @@ export function FeedView() {
     async function loadFeed() {
       setFeedLoading(true)
       try {
-        const ndk = getNdk(); await ndk.connect()
-        if (activeTab === 'following') {
-          const pks = await fetchFollowedPubkeys(user!.id)
-          pks.push(user!.pubkey)
-          const af = { authors: pks }
-          const [articleEvents, noteEvents, deletionEvents, dbDeleted] = await Promise.all([
-            ndk.fetchEvents({ kinds: [KIND_ARTICLE as NDKKind], limit: 30, ...af }),
-            ndk.fetchEvents({ kinds: [KIND_NOTE as NDKKind], limit: 30, ...af }),
-            ndk.fetchEvents({ kinds: [KIND_DELETION as NDKKind], limit: 100, ...af }),
-            fetch(`/api/v1/articles/deleted?pubkeys=${pks.join(',')}`, { credentials: 'include' })
-              .then(r => r.ok ? r.json() : { deletedEventIds: [], deletedCoords: [] })
-              .catch(() => ({ deletedEventIds: [], deletedCoords: [] })),
-          ])
-          const deletedIds = new Set<string>(dbDeleted.deletedEventIds)
-          const deletedCoords = new Set<string>(dbDeleted.deletedCoords)
-          for (const d of deletionEvents) for (const t of d.tags) {
-            if (t[0] === 'e') deletedIds.add(t[1])
-            if (t[0] === 'a') deletedCoords.add(t[1])
+        const data = await feedApi.following()
+        const items: FeedItem[] = (data.items ?? []).map((item: any) => {
+          if (item.type === 'article') {
+            return {
+              type: 'article' as const,
+              id: item.nostrEventId,
+              pubkey: item.pubkey,
+              dTag: item.dTag,
+              title: item.title,
+              summary: item.summary,
+              content: item.contentFree,
+              isPaywalled: item.isPaywalled,
+              pricePence: item.pricePence,
+              gatePositionPct: item.gatePositionPct,
+              publishedAt: item.publishedAt,
+              tags: [],
+            }
+          } else {
+            return {
+              type: 'note' as const,
+              id: item.nostrEventId,
+              pubkey: item.pubkey,
+              content: item.content,
+              publishedAt: item.publishedAt,
+              quotedEventId: item.quotedEventId,
+              quotedEventKind: item.quotedEventKind,
+              quotedExcerpt: item.quotedExcerpt,
+              quotedTitle: item.quotedTitle,
+              quotedAuthor: item.quotedAuthor,
+            }
           }
-          const isArticleDeleted = (e: { id: string; pubkey: string; tags: string[][] }) => {
-            if (deletedIds.has(e.id)) return true
-            const dTag = e.tags.find(t => t[0] === 'd')?.[1]
-            return dTag != null && deletedCoords.has(`30023:${e.pubkey}:${dTag}`)
-          }
-          const articles: FeedItem[] = Array.from(articleEvents).filter(e => !isArticleDeleted(e)).map(e => ({ ...parseArticleEvent(e), type: 'article' as const }))
-          const notes: FeedItem[] = Array.from(noteEvents).filter(e => !e.tags.find(t => t[0] === 'e')).filter(e => !deletedIds.has(e.id)).map(e => parseNoteEvent(e))
-          const allItems = [...articles, ...notes].sort((a, b) => b.publishedAt - a.publishedAt)
-          setFeedItems(allItems)
+        })
+        setFeedItems(items)
 
-          const eventIds = allItems.map(i => i.id)
-          if (eventIds.length > 0) {
-            const [talliesRes, myVotesRes] = await Promise.all([
-              votesApi.getTallies(eventIds).catch(() => ({ tallies: {} })),
-              user
-                ? votesApi.getMyVotes(eventIds).catch(() => ({ voteCounts: {} }))
-                : Promise.resolve({ voteCounts: {} as Record<string, MyVoteCount> }),
-            ])
-            setVoteTallies(talliesRes.tallies ?? {})
-            setMyVoteCounts(myVotesRes.voteCounts ?? {})
-          }
+        const eventIds = items.map(i => i.id)
+        if (eventIds.length > 0) {
+          const [talliesRes, myVotesRes] = await Promise.all([
+            votesApi.getTallies(eventIds).catch(() => ({ tallies: {} })),
+            votesApi.getMyVotes(eventIds).catch(() => ({ voteCounts: {} })),
+          ])
+          setVoteTallies(talliesRes.tallies ?? {})
+          setMyVoteCounts(myVotesRes.voteCounts ?? {})
         }
       } catch (err) { console.error('Feed load error:', err) }
       finally { setFeedLoading(false) }
@@ -462,9 +462,3 @@ function InlineSkeleton() {
   )
 }
 
-async function fetchFollowedPubkeys(readerId: string): Promise<string[]> {
-  try {
-    const data = await followsApi.pubkeys()
-    return data.pubkeys ?? []
-  } catch { return [] }
-}

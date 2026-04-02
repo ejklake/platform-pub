@@ -32,7 +32,7 @@ const IndexArticleSchema = z.object({
   summary: z.string().optional(),
   content: z.string(),                // free section content
   accessMode: z.enum(['public', 'paywalled', 'invitation_only']).default('public'),
-  pricePence: z.number().int().min(0),
+  pricePence: z.number().int().min(0).max(999999),
   gatePositionPct: z.number().int().min(0).max(99),
   vaultEventId: z.string().optional(),
   draftId: z.string().optional(),
@@ -146,6 +146,7 @@ export async function articleRoutes(app: FastifyInstance) {
         title: string
         slug: string
         summary: string | null
+        content_free: string | null
         word_count: number | null
         access_mode: string
         price_pence: number | null
@@ -158,7 +159,7 @@ export async function articleRoutes(app: FastifyInstance) {
         writer_pubkey: string
       }>(
         `SELECT a.id, a.writer_id, a.nostr_event_id, a.nostr_d_tag,
-                a.title, a.slug, a.summary, a.word_count,
+                a.title, a.slug, a.summary, a.content_free, a.word_count,
                 a.access_mode, a.price_pence, a.gate_position_pct,
                 a.vault_event_id, a.published_at,
                 w.username AS writer_username,
@@ -184,6 +185,7 @@ export async function articleRoutes(app: FastifyInstance) {
         title: r.title,
         slug: r.slug,
         summary: r.summary,
+        contentFree: r.content_free,
         wordCount: r.word_count,
         accessMode: r.access_mode,
         isPaywalled: r.access_mode === 'paywalled',
@@ -198,6 +200,52 @@ export async function articleRoutes(app: FastifyInstance) {
           avatar: r.writer_avatar,
           pubkey: r.writer_pubkey,
         },
+      })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // GET /articles/by-event/:nostrEventId — fetch article by Nostr event ID
+  //
+  // Used by the editor to load an article for editing when only the event ID
+  // is known. Returns the same shape as GET /articles/:dTag.
+  // ---------------------------------------------------------------------------
+
+  app.get<{ Params: { nostrEventId: string } }>(
+    '/articles/by-event/:nostrEventId',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const { nostrEventId } = req.params
+
+      const { rows } = await pool.query(
+        `SELECT a.id, a.writer_id, a.nostr_event_id, a.nostr_d_tag,
+                a.title, a.slug, a.summary, a.content_free, a.word_count,
+                a.access_mode, a.price_pence, a.gate_position_pct,
+                a.vault_event_id, a.published_at
+         FROM articles a
+         WHERE a.nostr_event_id = $1 AND a.deleted_at IS NULL`,
+        [nostrEventId]
+      )
+
+      if (rows.length === 0) {
+        return reply.status(404).send({ error: 'Article not found' })
+      }
+
+      const r = rows[0]
+      return reply.status(200).send({
+        id: r.id,
+        nostrEventId: r.nostr_event_id,
+        dTag: r.nostr_d_tag,
+        title: r.title,
+        slug: r.slug,
+        summary: r.summary,
+        contentFree: r.content_free,
+        wordCount: r.word_count,
+        accessMode: r.access_mode,
+        isPaywalled: r.access_mode === 'paywalled',
+        pricePence: r.price_pence,
+        gatePositionPct: r.gate_position_pct,
+        publishedAt: r.published_at?.toISOString() ?? null,
       })
     }
   )

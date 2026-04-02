@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v4.2.0
+# platform.pub — Deployment Reference v4.3.0
 
 **Date:** 2 April 2026
-**Replaces:** v4.1.0 (see bottom for change log)
+**Replaces:** v4.2.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -206,6 +206,94 @@ Configures UFW (ports 22, 80, 443 only), SSH key-only auth, and certbot auto-ren
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v4.2.0
+
+No new migrations. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
+
+This release delivers the resilience and hardening work described in `RESILIENCE.md` and `FIXES-REMAINING.md`. Major changes:
+
+**Architecture:**
+
+1. **NDK removed from client** — The web frontend no longer imports `@nostr-dev-kit/ndk` or opens WebSocket connections to the relay. All Nostr operations go through the gateway HTTP API. Three new gateway endpoints support this:
+   - `POST /api/v1/sign-and-publish` — signs a Nostr event via key-custody and publishes to the relay in one call
+   - `GET /api/v1/feed/following` — returns articles + notes from followed writers via DB query (replaces client-side relay subscription)
+   - `GET /api/v1/articles/by-event/:nostrEventId` — fetches article metadata by Nostr event ID (used by the editor for loading drafts)
+2. **Article reader SSR** — `/article/[dTag]` is now a Server Component. The page fetches article data from the gateway at request time (ISR, revalidate 60s), renders markdown to HTML server-side, and sends it as static HTML. Interactive elements (paywall gate, replies, share/report buttons, quote selection) hydrate as client islands. The gateway's `GET /articles/:dTag` response now includes a `contentFree` field with the free portion of the article content.
+3. **Writer profile SSR** — `/[username]` is now a Server Component. Profile header (name, avatar, bio, article count) renders as static HTML. The interactive activity feed (`WriterActivity`) hydrates as a client island.
+
+**Performance (client bundle reductions):**
+
+| Route | Before | After | Reduction |
+|-------|--------|-------|-----------|
+| Article reader | 278 KB | 161 KB | 42% |
+| Feed | 231 KB | 114 KB | 51% |
+| Writer profile | 231 KB | 114 KB | 51% |
+| Dashboard | 221 KB | 105 KB | 52% |
+| Write/editor | 210 KB | 94 KB | 55% |
+
+**Font optimisation:**
+
+- Removed Google Fonts import (Instrument Sans, Literata, IBM Plex Mono — 3 external font loads)
+- Self-hosted Literata (serif) as woff2 in `web/public/fonts/` (~108 KB total, Latin + Latin-Extended, normal + italic)
+- Sans-serif uses system font stack: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
+- Monospace uses system font stack: `ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`
+- Preload links added in `layout.tsx` for the two primary Literata woff2 files
+
+**Docker & security:**
+
+- `ENV NODE_ENV=production` added to `web/Dockerfile`, `payment-service/Dockerfile`, `key-service/Dockerfile`
+- Root `.dockerignore` added (excludes `node_modules`, `dist`, `.git`, `.next`, `*.log`, `.env`)
+- HSTS header now includes `preload` directive
+- `'unsafe-inline'` removed from CSP `style-src`
+- Article `pricePence` validation capped at 999,999 (£9,999.99)
+
+**Other fixes:**
+
+- Config cache TTL (30s) added to `loadConfig()` — stale config no longer persists until restart
+- Notification inserts now awaited with try/catch instead of fire-and-forget `.catch()`
+- Webhook handler uses static pool import instead of dynamic import
+- TypeScript target bumped from ES2017 to ES2020 in `web/tsconfig.json`
+- `pg` aligned to `^8.20.0` and `dotenv` to `^17.3.1` across all services
+- Vote buttons have `aria-label` attributes
+- Session storage `unlocked:*` keys cleared on logout
+- Shared `Avatar` component with explicit dimensions, lazy loading, and initials fallback
+- Print stylesheet hides chrome, expands article body, sets print-friendly typography
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migrations — just rebuild
+docker compose build gateway web
+docker compose up -d gateway web
+
+# Reload nginx to pick up any CSP/HSTS changes
+docker compose exec nginx nginx -s reload
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# All services should show (healthy) after ~30s
+
+curl -s http://localhost:3000/health
+# Should return {"status":"ok","service":"gateway"}
+
+# Verify NDK is not in the client bundle
+docker exec platform-pub-web-1 sh -c "grep -r 'nostr-dev-kit' /app/.next/static 2>/dev/null | wc -l"
+# Should return 0
+
+# Verify self-hosted fonts are served
+curl -sI http://localhost:3010/fonts/literata-latin-400.woff2 | head -5
+# Should return 200
+
+# Verify new gateway endpoints
+curl -s http://localhost:3000/api/v1/articles/by-event/test 2>&1 | head -1
+# Should return JSON (404 for nonexistent event, but endpoint exists)
+```
+
+---
 
 ### From v4.1.0
 
@@ -3331,8 +3419,8 @@ Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), conver
 | /followers | Accounts who follow you |
 | /notifications | Recent notifications (new followers, replies, subscribers, quotes, mentions) — full-page view used on mobile |
 | /write | Article editor with paywall gate marker |
-| /article/:dTag | Article reader with paywall unlock |
-| /:username | Writer profile (public) |
+| /article/:dTag | Article reader with paywall unlock (SSR, ISR 60s) |
+| /:username | Writer profile (SSR, ISR 60s) |
 | /auth | Signup / login |
 | /auth/google/callback | Google OAuth callback (handles Google redirect, exchanges code, sets session) |
 | /auth/verify | Magic link verification |
@@ -3399,6 +3487,80 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v4.3.0 — 2 April 2026
+
+**Resilience, NDK removal, SSR conversion, font optimisation, hardening**
+
+No new migrations. Services changed: **gateway**, **web**.
+
+- Removed `@nostr-dev-kit/ndk` and `@nostr-dev-kit/ndk-cache-dexie` from web client — all Nostr operations go through gateway HTTP API
+- Added gateway endpoints: `POST /sign-and-publish`, `GET /feed/following`, `GET /articles/by-event/:nostrEventId`
+- Converted article reader (`/article/[dTag]`) to Server Component with ISR (60s)
+- Converted writer profile (`/[username]`) to Server Component with ISR (60s)
+- Gateway `GET /articles/:dTag` now returns `contentFree` field for server-side markdown rendering
+- Self-hosted Literata woff2 fonts in `web/public/fonts/` (replaced Google Fonts import)
+- Sans-serif and monospace switched to system font stacks (removed Instrument Sans, IBM Plex Mono)
+- Font preload links added to `layout.tsx`
+- `ENV NODE_ENV=production` added to web, payment-service, key-service Dockerfiles
+- Root `.dockerignore` created
+- HSTS `preload` directive added
+- `'unsafe-inline'` removed from CSP `style-src`
+- Article `pricePence` validation capped at 999,999
+- Config cache TTL (30s) in `loadConfig()`
+- Notification inserts awaited with try/catch
+- Webhook handler static pool import
+- TypeScript target ES2017→ES2020
+- `pg` ^8.20.0 and `dotenv` ^17.3.1 aligned across all services
+- Vote button `aria-label` attributes
+- Session storage `unlocked:*` keys cleared on logout
+- Shared `Avatar` component (explicit dimensions, lazy loading, initials fallback)
+- Print stylesheet added
+- Client bundle reductions: 42–55% across all routes
+
+**New files:**
+- `web/src/components/profile/WriterActivity.tsx`
+- `web/src/components/ui/Avatar.tsx`
+- `web/public/fonts/literata-latin-400.woff2`
+- `web/public/fonts/literata-latin-400-italic.woff2`
+- `web/public/fonts/literata-latin-ext-400.woff2`
+- `web/public/fonts/literata-latin-ext-400-italic.woff2`
+- `gateway/src/routes/signing.ts`
+- `.dockerignore`
+
+**Modified files (30+):**
+- `gateway/src/routes/articles.ts` — `contentFree` field, `/by-event/:id` endpoint, pricePence cap
+- `gateway/src/routes/notes.ts` — `/feed/following` endpoint, awaited notification inserts
+- `gateway/src/routes/signing.ts` — new `POST /sign-and-publish`
+- `web/src/app/article/[dTag]/page.tsx` — SSR conversion
+- `web/src/app/[username]/page.tsx` — SSR conversion
+- `web/src/components/article/ArticleReader.tsx` — accepts pre-rendered HTML, uses Avatar, NDK removed
+- `web/src/components/feed/FeedView.tsx` — gateway API replaces relay queries
+- `web/src/components/feed/QuoteCard.tsx` — NDK fallback removed
+- `web/src/app/dashboard/page.tsx` — NDK event replaced with signAndPublish
+- `web/src/app/write/page.tsx` — relay fetch replaced with gateway API
+- `web/src/lib/ndk.ts` — types-only (no runtime NDK)
+- `web/src/lib/sign.ts` — gateway signing proxy
+- `web/src/lib/publish.ts` — uses signAndPublish
+- `web/src/lib/publishNote.ts` — uses signAndPublish
+- `web/src/lib/comments.ts` — uses signAndPublish
+- `web/src/lib/replies.ts` — uses signAndPublish
+- `web/src/lib/api.ts` — feed.following(), contentFree type
+- `web/src/app/globals.css` — self-hosted @font-face, system font stacks, print stylesheet
+- `web/src/app/layout.tsx` — font preload links
+- `web/tailwind.config.js` — system font stacks
+- `web/package.json` — removed NDK packages
+- `web/tsconfig.json` — target ES2020
+- `web/Dockerfile`, `payment-service/Dockerfile`, `key-service/Dockerfile` — NODE_ENV=production
+- `shared/src/db/client.ts` — config cache TTL
+- `payment-service/src/routes/webhook.ts` — static pool import
+- `web/src/components/ui/VoteControls.tsx` — aria-labels
+- `web/src/stores/auth.ts` — session storage cleanup
+- `web/src/components/payment/CardSetup.tsx` — system font stack
+- `nginx.conf` — HSTS preload, CSP update
+- All service `package.json` files — pg/dotenv alignment
+
+---
 
 ### v3.31.0 — 2 April 2026
 

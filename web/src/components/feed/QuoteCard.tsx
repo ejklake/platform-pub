@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { getNdk } from '../../lib/ndk'
 
 interface ResolvedContent {
   type: 'note' | 'article'
@@ -76,28 +75,8 @@ export function QuoteCard({ eventId }: QuoteCardProps) {
         const r = await fetch(`/api/v1/content/resolve?eventId=${encodeURIComponent(eventId)}`, { credentials: 'include' })
         if (!cancelled && r.ok) {
           setData(await r.json())
-          setLoading(false)
-          return
         }
-      } catch { /* fall through */ }
-
-      try {
-        const ndk = getNdk()
-        await ndk.connect()
-        const event = await ndk.fetchEvent(eventId)
-        if (!cancelled && event) {
-          setData({
-            type: 'note',
-            eventId: event.id,
-            content: (event.content ?? '').slice(0, 200),
-            publishedAt: event.created_at ?? 0,
-            author: {
-              username: event.pubkey,
-              displayName: event.pubkey.slice(0, 8) + '…',
-            },
-          })
-        }
-      } catch { /* give up */ }
+      } catch { /* ignore */ }
 
       if (!cancelled) setLoading(false)
     }

@@ -1,19 +1,27 @@
-import { NDKEvent } from '@nostr-dev-kit/ndk'
-
 // =============================================================================
 // Signing Utility
 //
 // Signs a Nostr event template via the gateway's custodial signing service.
-// Shared by the article publishing pipeline (publish.ts) and the note
-// publishing pipeline (publishNote.ts).
-//
-// The gateway decrypts the user's custodial private key, signs the event,
-// and returns the fully populated event (id, pubkey, sig, created_at).
+// Works with plain event objects — no NDK dependency required.
 // =============================================================================
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? ''
 
-export async function signViaGateway(event: NDKEvent): Promise<NDKEvent> {
+export interface NostrEventTemplate {
+  kind: number
+  content: string
+  tags: string[][]
+  created_at?: number
+}
+
+export interface SignedNostrEvent extends NostrEventTemplate {
+  id: string
+  pubkey: string
+  sig: string
+  created_at: number
+}
+
+export async function signViaGateway(event: NostrEventTemplate): Promise<SignedNostrEvent> {
   const res = await fetch(`${GATEWAY_URL}/api/v1/sign`, {
     method: 'POST',
     credentials: 'include',
@@ -30,10 +38,41 @@ export async function signViaGateway(event: NDKEvent): Promise<NDKEvent> {
   }
 
   const signedData = await res.json()
-  event.id = signedData.id
-  event.sig = signedData.sig
-  event.pubkey = signedData.pubkey
-  event.created_at = signedData.created_at
+  return {
+    ...event,
+    id: signedData.id,
+    sig: signedData.sig,
+    pubkey: signedData.pubkey,
+    created_at: signedData.created_at,
+  }
+}
 
-  return event
+/**
+ * Sign a Nostr event and publish it to the relay in a single gateway call.
+ * Eliminates the need for the client to have direct relay access.
+ */
+export async function signAndPublish(event: NostrEventTemplate): Promise<SignedNostrEvent> {
+  const res = await fetch(`${GATEWAY_URL}/api/v1/sign-and-publish`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      kind: event.kind,
+      content: event.content,
+      tags: event.tags,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Sign-and-publish failed: ${res.status}`)
+  }
+
+  const signedData = await res.json()
+  return {
+    ...event,
+    id: signedData.id,
+    sig: signedData.sig,
+    pubkey: signedData.pubkey,
+    created_at: signedData.created_at,
+  }
 }

@@ -165,6 +165,7 @@ export interface ArticleMetadata {
   title: string
   slug: string
   summary: string | null
+  contentFree: string | null
   wordCount: number | null
   isPaywalled: boolean
   pricePence: number | null
@@ -263,6 +264,9 @@ export const content = {
 export const feed = {
   global: () =>
     request<{ items: any[] }>('/feed/global'),
+
+  following: () =>
+    request<{ items: any[] }>('/feed/following'),
 
   featured: () =>
     request<{ articles: any[] }>('/feed/featured'),

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import Stripe from 'stripe'
+import { pool } from '../db/client.js'
 import { settlementService } from '../services/settlement.js'
 import { payoutService } from '../services/payout.js'
 import { accrualService } from '../services/accrual.js'
@@ -131,8 +132,6 @@ async function handleStripeEvent(event: Stripe.Event): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function handleConnectKycComplete(stripeConnectId: string): Promise<void> {
-  const { pool } = await import('../db/client.js')
-
   const { rows } = await pool.query<{ id: string }>(
     `UPDATE accounts
      SET stripe_connect_kyc_complete = TRUE, updated_at = now()

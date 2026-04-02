@@ -6,9 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { myArticles, account as accountApi, type MyArticle } from '../../lib/api'
 import { loadDrafts, deleteDraft } from '../../lib/drafts'
-import { NDKEvent } from '@nostr-dev-kit/ndk'
-import { getNdk, KIND_DELETION } from '../../lib/ndk'
-import { signViaGateway } from '../../lib/sign'
+import { KIND_DELETION } from '../../lib/ndk'
+import { signAndPublish } from '../../lib/sign'
 import { DrivesTab } from '../../components/dashboard/DrivesTab'
 import { FreePassManager } from '../../components/dashboard/FreePassManager'
 
@@ -79,12 +78,11 @@ function ArticlesTab({ userId, pubkey }: { userId: string; pubkey: string }) {
       const result = await myArticles.remove(id)
       setArticles(p => p.filter(a => a.id !== id))
       try {
-        const ndk = getNdk(); await ndk.connect()
-        const delEvent = new NDKEvent(ndk)
-        delEvent.kind = KIND_DELETION; delEvent.content = ''
-        delEvent.tags = [['e', result.nostrEventId], ['a', `30023:${pubkey}:${result.dTag}`]]
-        const signed = await signViaGateway(delEvent)
-        await signed.publish()
+        await signAndPublish({
+          kind: KIND_DELETION,
+          content: '',
+          tags: [['e', result.nostrEventId], ['a', `30023:${pubkey}:${result.dTag}`]],
+        })
       } catch { /* non-fatal */ }
     }
     catch { setError('Failed to delete.') }

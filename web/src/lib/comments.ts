@@ -1,19 +1,10 @@
-import { getNdk, KIND_NOTE } from './ndk'
-import { signViaGateway } from './sign'
-import { NDKEvent } from '@nostr-dev-kit/ndk'
+import { KIND_NOTE } from './ndk'
+import { signAndPublish } from './sign'
 
 // =============================================================================
 // Comment Publishing Service
 //
-// Publishes a comment as a Nostr kind 1 event with e and p tags referencing
-// the parent content. Then indexes via the gateway.
-//
-// Pipeline:
-//   1. Build kind 1 event with e tag (target) and p tag (target author)
-//   2. If replying, add second e tag for parent comment
-//   3. Sign via gateway (custodial key)
-//   4. Publish to relay
-//   5. Index via POST /api/v1/comments
+// Publishes a comment as a Nostr kind 1 event via the gateway, then indexes.
 // =============================================================================
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? ''
@@ -33,30 +24,21 @@ interface PublishCommentResult {
 }
 
 export async function publishComment(params: PublishCommentParams): Promise<PublishCommentResult> {
-  const ndk = getNdk()
-  await ndk.connect()
-
-  // Build the kind 1 comment event
-  const commentEvent = new NDKEvent(ndk)
-  commentEvent.kind = KIND_NOTE
-  commentEvent.content = params.content
-  commentEvent.tags = [
+  const tags: string[][] = [
     ['e', params.targetEventId, '', 'root'],
     ['p', params.targetAuthorPubkey],
   ]
 
-  // If replying to another comment, add a reply e tag
   if (params.parentCommentEventId) {
-    commentEvent.tags.push(['e', params.parentCommentEventId, '', 'reply'])
+    tags.push(['e', params.parentCommentEventId, '', 'reply'])
   }
 
-  // Sign via gateway (custodial key)
-  const signed = await signViaGateway(commentEvent)
+  const signed = await signAndPublish({
+    kind: KIND_NOTE,
+    content: params.content,
+    tags,
+  })
 
-  // Publish to relay
-  await signed.publish()
-
-  // Index in platform DB
   const indexResult = await indexComment({
     nostrEventId: signed.id,
     targetEventId: params.targetEventId,

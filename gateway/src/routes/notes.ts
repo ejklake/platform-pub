@@ -89,12 +89,16 @@ export async function noteRoutes(app: FastifyInstance) {
           : quotedNote
         const quotedAuthorId = quotedArticle.rows[0]?.author_id
         if (quotedAuthorId && quotedAuthorId !== authorId) {
-          pool.query(
-            `INSERT INTO notifications (recipient_id, actor_id, type)
-             VALUES ($1, $2, 'new_quote')
-             ON CONFLICT DO NOTHING`,
-            [quotedAuthorId, authorId]
-          ).catch((err) => logger.warn({ err }, 'Failed to insert new_quote notification'))
+          try {
+            await pool.query(
+              `INSERT INTO notifications (recipient_id, actor_id, type)
+               VALUES ($1, $2, 'new_quote')
+               ON CONFLICT DO NOTHING`,
+              [quotedAuthorId, authorId]
+            )
+          } catch (err) {
+            logger.warn({ err }, 'Failed to insert new_quote notification')
+          }
         }
       }
 
@@ -113,12 +117,16 @@ export async function noteRoutes(app: FastifyInstance) {
             values.push(`($${i * 2 + 1}, $${i * 2 + 2}, 'new_mention')`)
             params.push(mentioned.id, authorId)
           })
-          pool.query(
-            `INSERT INTO notifications (recipient_id, actor_id, type)
-             VALUES ${values.join(', ')}
-             ON CONFLICT DO NOTHING`,
-            params
-          ).catch((err) => logger.warn({ err }, 'Failed to insert mention notifications'))
+          try {
+            await pool.query(
+              `INSERT INTO notifications (recipient_id, actor_id, type)
+               VALUES ${values.join(', ')}
+               ON CONFLICT DO NOTHING`,
+              params
+            )
+          } catch (err) {
+            logger.warn({ err }, 'Failed to insert mention notifications')
+          }
         }
       }
 
@@ -361,6 +369,93 @@ export async function noteRoutes(app: FastifyInstance) {
       return reply.send({ items })
     } catch (err) {
       logger.error({ err }, 'Global feed fetch failed')
+      return reply.status(500).send({ error: 'Feed fetch failed' })
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // GET /feed/following — feed from followed writers
+  //
+  // Returns articles and notes from writers the authenticated user follows,
+  // sorted by timestamp descending. Replaces client-side relay queries.
+  // ---------------------------------------------------------------------------
+
+  app.get('/feed/following', { preHandler: requireAuth }, async (req, reply) => {
+    const readerId = req.session!.sub!
+    try {
+      const [articlesRes, notesRes] = await Promise.all([
+        pool.query(`
+          SELECT
+            a.nostr_event_id, a.nostr_d_tag, a.title, a.summary, a.content_free,
+            a.access_mode, a.price_pence, a.gate_position_pct,
+            EXTRACT(EPOCH FROM a.published_at)::bigint AS published_at,
+            acc.nostr_pubkey
+          FROM articles a
+          JOIN accounts acc ON acc.id = a.writer_id
+          WHERE a.deleted_at IS NULL
+            AND a.published_at IS NOT NULL
+            AND (a.writer_id IN (SELECT writer_id FROM follows WHERE follower_id = $1)
+                 OR a.writer_id = $1)
+          ORDER BY a.published_at DESC
+          LIMIT 30
+        `, [readerId]),
+        pool.query(`
+          SELECT
+            n.nostr_event_id, n.content, n.is_quote_comment,
+            n.quoted_event_id, n.quoted_event_kind,
+            n.quoted_excerpt, n.quoted_title, n.quoted_author,
+            EXTRACT(EPOCH FROM n.published_at)::bigint AS published_at,
+            acc.nostr_pubkey
+          FROM notes n
+          JOIN accounts acc ON acc.id = n.author_id
+          WHERE n.reply_to_event_id IS NULL
+            AND (n.author_id IN (SELECT writer_id FROM follows WHERE follower_id = $1)
+                 OR n.author_id = $1)
+          ORDER BY n.published_at DESC
+          LIMIT 30
+        `, [readerId]),
+      ])
+
+      const items: any[] = []
+
+      for (const row of articlesRes.rows) {
+        items.push({
+          type: 'article',
+          nostrEventId: row.nostr_event_id,
+          pubkey: row.nostr_pubkey,
+          dTag: row.nostr_d_tag,
+          title: row.title,
+          summary: row.summary ?? '',
+          contentFree: row.content_free ?? '',
+          accessMode: row.access_mode,
+          isPaywalled: row.access_mode === 'paywalled',
+          pricePence: row.price_pence ?? undefined,
+          gatePositionPct: row.gate_position_pct ?? undefined,
+          publishedAt: Number(row.published_at),
+        })
+      }
+
+      for (const row of notesRes.rows) {
+        items.push({
+          type: 'note',
+          nostrEventId: row.nostr_event_id,
+          pubkey: row.nostr_pubkey,
+          content: row.content,
+          isQuoteComment: row.is_quote_comment,
+          quotedEventId: row.quoted_event_id ?? undefined,
+          quotedEventKind: row.quoted_event_kind ?? undefined,
+          quotedExcerpt: row.quoted_excerpt ?? undefined,
+          quotedTitle: row.quoted_title ?? undefined,
+          quotedAuthor: row.quoted_author ?? undefined,
+          publishedAt: Number(row.published_at),
+        })
+      }
+
+      items.sort((a, b) => b.publishedAt - a.publishedAt)
+
+      return reply.send({ items })
+    } catch (err) {
+      logger.error({ err }, 'Following feed fetch failed')
       return reply.status(500).send({ error: 'Feed fetch failed' })
     }
   })

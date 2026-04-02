@@ -1,480 +1,68 @@
-'use client'
+import { notFound } from 'next/navigation'
+import { WriterActivity } from '../../components/profile/WriterActivity'
+import { Avatar } from '../../components/ui/Avatar'
+import type { WriterProfile } from '../../lib/api'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
-import { writers, type WriterProfile, type VoteTally, type MyVoteCount } from '../../lib/api'
-import { useAuth } from '../../stores/auth'
-import Link from 'next/link'
-import { ArticleCard } from '../../components/feed/ArticleCard'
-import { NoteCard } from '../../components/feed/NoteCard'
-import { NoteComposer } from '../../components/feed/NoteComposer'
-import { VoteControls } from '../../components/ui/VoteControls'
-import type { ArticleEvent, NoteEvent } from '../../lib/ndk'
-import type { QuoteTarget } from '../../lib/publishNote'
-import { formatDateFromISO } from '../../lib/format'
+// =============================================================================
+// Writer Profile Page — /[username]  (Server Component)
+//
+// Fetches the writer's profile from the gateway at request time and renders
+// the static header (name, avatar, bio) as HTML. The interactive activity
+// feed (articles, notes, replies, votes, follow/subscribe) is a client
+// component island that hydrates on top.
+// =============================================================================
 
-interface DbArticle {
-  id: string
-  nostrEventId: string
-  dTag: string
-  title: string
-  slug: string
-  summary: string | null
-  wordCount: number | null
-  isPaywalled: boolean
-  publishedAt: string | null
+const GATEWAY = process.env.GATEWAY_INTERNAL_URL ?? process.env.GATEWAY_URL ?? 'http://localhost:3000'
+
+async function getWriter(username: string): Promise<WriterProfile | null> {
+  const res = await fetch(`${GATEWAY}/api/v1/writers/${username}`, {
+    next: { revalidate: 60 },
+  })
+  if (!res.ok) return null
+  return res.json()
 }
 
-interface DbNote {
-  id: string
-  nostrEventId: string
-  content: string
-  publishedAt: string
-  quotedEventId?: string
-  quotedEventKind?: number
-  quotedExcerpt?: string
-  quotedTitle?: string
-  quotedAuthor?: string
-}
-
-interface DbReply {
-  id: string
-  nostrEventId: string
-  content: string
-  publishedAt: string
-  isDeleted: boolean
-  targetKind: number
-  targetEventId: string | null
-  articleSlug: string | null
-  articleTitle: string | null
-  parentEventId: string | null
-  parentAuthorUsername: string | null
-  parentAuthorDisplayName: string | null
-}
-
-type ActivityItem =
-  | { kind: 'article'; publishedAt: string; data: DbArticle }
-  | { kind: 'note'; publishedAt: string; data: DbNote }
-  | { kind: 'reply'; publishedAt: string; data: DbReply }
-
-interface SubStatus {
-  subscribed: boolean
-  ownContent?: boolean
-  status?: string
-  pricePence?: number
-  currentPeriodEnd?: string
-}
-
-export default function WriterProfilePage() {
-  const params = useParams()
-  const username = params.username as string
-  const { user, loading: authLoading } = useAuth()
-  const [writer, setWriter] = useState<WriterProfile | null>(null)
-  const [activity, setActivity] = useState<ActivityItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-  const [profileError, setProfileError] = useState(false)
-  const [following, setFollowing] = useState(false)
-  const [followLoading, setFollowLoading] = useState(false)
-  const [subStatus, setSubStatus] = useState<SubStatus | null>(null)
-  const [subLoading, setSubLoading] = useState(false)
-  const [pendingQuote, setPendingQuote] = useState<QuoteTarget | null>(null)
-  const [voteTallies, setVoteTallies] = useState<Record<string, VoteTally>>({})
-  const [myVoteCounts, setMyVoteCounts] = useState<Record<string, MyVoteCount>>({})
-
-  // Load profile, articles, notes, and replies
-  useEffect(() => {
-    async function loadProfile() {
-      setLoading(true)
-      try {
-        const writerData = await writers.getProfile(username)
-        setWriter(writerData)
-        const [articlesRes, notesRes, repliesRes] = await Promise.all([
-          fetch(`/api/v1/writers/${username}/articles?limit=50`, { credentials: 'include' }),
-          fetch(`/api/v1/writers/${username}/notes?limit=50`, { credentials: 'include' }),
-          fetch(`/api/v1/writers/${username}/replies?limit=50`, { credentials: 'include' }),
-        ])
-        const items: ActivityItem[] = []
-        if (articlesRes.ok) {
-          const data = await articlesRes.json()
-          for (const a of (data.articles ?? []) as DbArticle[]) {
-            if (a.publishedAt) items.push({ kind: 'article', publishedAt: a.publishedAt, data: a })
-          }
-        }
-        if (notesRes.ok) {
-          const data = await notesRes.json()
-          for (const n of (data.notes ?? []) as DbNote[]) {
-            items.push({ kind: 'note', publishedAt: n.publishedAt, data: n })
-          }
-        }
-        if (repliesRes.ok) {
-          const data = await repliesRes.json()
-          for (const r of (data.replies ?? []) as DbReply[]) {
-            items.push({ kind: 'reply', publishedAt: r.publishedAt, data: r })
-          }
-        }
-        items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-        setActivity(items)
-
-        // Batch-fetch vote tallies and user's own vote counts
-        const eventIds = items.map(i => {
-          if (i.kind === 'article') return (i.data as DbArticle).nostrEventId
-          if (i.kind === 'note') return (i.data as DbNote).nostrEventId
-          return (i.data as DbReply).nostrEventId
-        })
-        if (eventIds.length > 0) {
-          const idsParam = eventIds.join(',')
-          const [talliesRes, myVotesRes] = await Promise.all([
-            fetch(`/api/v1/votes/tally?eventIds=${idsParam}`)
-              .then(r => r.ok ? r.json() : { tallies: {} })
-              .catch(() => ({ tallies: {} })),
-            fetch(`/api/v1/votes/mine?eventIds=${idsParam}`, { credentials: 'include' })
-              .then(r => r.ok ? r.json() : { voteCounts: {} })
-              .catch(() => ({ voteCounts: {} })),
-          ])
-          setVoteTallies(talliesRes.tallies ?? {})
-          setMyVoteCounts(myVotesRes.voteCounts ?? {})
-        }
-      } catch (err: any) {
-        if (err.status === 404) setNotFound(true)
-        else setProfileError(true)
-      } finally { setLoading(false) }
-    }
-    if (username) loadProfile()
-  }, [username])
-
-  // Check follow + subscription status
-  useEffect(() => {
-    if (!user || !writer) return
-    async function checkStatus() {
-      try {
-        const [followRes, subRes] = await Promise.all([
-          fetch('/api/v1/follows', { credentials: 'include' }),
-          fetch(`/api/v1/subscriptions/check/${writer!.id}`, { credentials: 'include' }),
-        ])
-        if (followRes.ok) {
-          const data = await followRes.json()
-          setFollowing((data.writers ?? []).some((w: any) => w.id === writer!.id))
-        }
-        if (subRes.ok) {
-          setSubStatus(await subRes.json())
-        }
-      } catch { setSubStatus({ subscribed: false }) }
-    }
-    checkStatus()
-  }, [user, writer])
-
-  async function handleToggleFollow() {
-    if (!user || !writer) return
-    setFollowLoading(true)
-    try {
-      const res = await fetch(`/api/v1/follows/${writer.id}`, {
-        method: following ? 'DELETE' : 'POST',
-        credentials: 'include',
-      })
-      if (res.ok) setFollowing(!following)
-    } catch (err) { console.error('Follow error:', err) }
-    finally { setFollowLoading(false) }
-  }
-
-  async function handleSubscribe() {
-    if (!user || !writer) return
-    setSubLoading(true)
-    try {
-      const res = await fetch(`/api/v1/subscriptions/${writer.id}`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setSubStatus({ subscribed: true, status: 'active', pricePence: data.pricePence, currentPeriodEnd: data.currentPeriodEnd })
-      }
-    } catch (err) { console.error('Subscribe error:', err) }
-    finally { setSubLoading(false) }
-  }
-
-  async function handleUnsubscribe() {
-    if (!user || !writer) return
-    setSubLoading(true)
-    try {
-      const res = await fetch(`/api/v1/subscriptions/${writer.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setSubStatus({ subscribed: true, status: 'cancelled', currentPeriodEnd: data.accessUntil })
-      }
-    } catch (err) { console.error('Unsubscribe error:', err) }
-    finally { setSubLoading(false) }
-  }
-
-  const handleNoteDeleted = useCallback((id: string) => {
-    setActivity(prev => prev.filter(i => !(i.kind === 'note' && (i.data as DbNote).nostrEventId === id)))
-  }, [])
-
-  const handleQuote = useCallback((target: QuoteTarget) => {
-    setPendingQuote(target)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
-
-  const isOwnProfile = user?.username === username
-  const articleCount = activity.filter(i => i.kind === 'article').length
-  const hasPaywalledArticles = activity.some(i => i.kind === 'article' && (i.data as DbArticle).isPaywalled)
-
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-article-frame px-6 py-12">
-        <div className="flex items-center gap-4 mb-12">
-          <div className="h-14 w-14 animate-pulse bg-white" />
-          <div><div className="h-6 w-36 animate-pulse bg-white mb-2" /><div className="h-3 w-20 animate-pulse bg-white" /></div>
-        </div>
-      </div>
-    )
-  }
-
-  if (notFound) {
-    return (
-      <div className="mx-auto max-w-article-frame px-6 py-28 text-center">
-        <h1 className="font-serif text-2xl font-light text-black mb-2">User not found</h1>
-        <p className="text-ui-sm text-grey-400">No user with the username @{username} exists on Platform.</p>
-      </div>
-    )
-  }
-
-  if (profileError) {
-    return (
-      <div className="mx-auto max-w-article-frame px-6 py-28 text-center">
-        <p className="text-ui-sm text-grey-400">Something went wrong loading this profile. Please try again.</p>
-      </div>
-    )
-  }
+export default async function WriterProfilePage({ params }: { params: { username: string } }) {
+  const writer = await getWriter(params.username)
+  if (!writer) return notFound()
 
   return (
     <div className="mx-auto max-w-article-frame px-6 py-12">
+      {/* Static profile header — arrives as HTML */}
       <div className="mb-12">
         <div className="flex items-center gap-4 mb-4">
-          {writer?.avatar ? (
-            <img src={writer.avatar} alt="" className="h-14 w-14 rounded-full object-cover" />
-          ) : (
-            <span className="flex h-14 w-14 items-center justify-center bg-grey-100 text-lg font-medium text-black rounded-full">
-              {(writer?.displayName ?? username)[0].toUpperCase()}
-            </span>
-          )}
+          <Avatar src={writer.avatar} name={writer.displayName ?? params.username} size={56} lazy={false} />
           <div className="flex-1">
-            <h1 className="font-serif text-3xl sm:text-4xl font-light text-black" style={{ letterSpacing: '-0.02em' }}>{writer?.displayName ?? username}</h1>
-            <p className="text-ui-xs text-grey-300 mt-0.5">@{username}</p>
+            <h1
+              className="font-serif text-3xl sm:text-4xl font-light text-black"
+              style={{ letterSpacing: '-0.02em' }}
+            >
+              {writer.displayName ?? params.username}
+            </h1>
+            <p className="text-ui-xs text-grey-300 mt-0.5">@{params.username}</p>
           </div>
-
-          {/* Action buttons — logged-in non-owner */}
-          {user && !isOwnProfile && writer && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleToggleFollow}
-                disabled={followLoading}
-                className={`transition-colors disabled:opacity-50 ${following ? 'btn-soft py-1.5 px-4 text-ui-xs' : 'btn py-1.5 px-4 text-ui-xs'}`}
-              >
-                {followLoading ? '...' : following ? 'Following' : 'Follow'}
-              </button>
-
-              {hasPaywalledArticles && subStatus && !subStatus.ownContent && (
-                subStatus.subscribed ? (
-                  <button
-                    onClick={handleUnsubscribe}
-                    disabled={subLoading}
-                    className="btn-soft py-1.5 px-4 text-ui-xs disabled:opacity-50 transition-colors"
-                  >
-                    {subLoading ? '...' : subStatus.status === 'cancelled'
-                      ? `Access until ${new Date(subStatus.currentPeriodEnd!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
-                      : 'Subscribed'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSubscribe}
-                    disabled={subLoading}
-                    className="btn-accent py-1.5 px-4 text-ui-xs disabled:opacity-50 transition-colors"
-                  >
-                    {subLoading ? '...' : `Subscribe £${((subStatus.pricePence ?? writer.subscriptionPricePence ?? 500) / 100).toFixed(2)}/mo`}
-                  </button>
-                )
-              )}
-            </div>
-          )}
-
-          {/* Log in prompt for anonymous visitors */}
-          {!user && !authLoading && writer && !isOwnProfile && (
-            <Link href="/auth?mode=login" className="text-ui-xs text-grey-400 hover:text-black transition-colors">
-              Log in to follow
-            </Link>
-          )}
         </div>
 
-        {writer?.bio && (
-          <p className="font-serif text-sm text-grey-600 leading-relaxed max-w-lg" style={{ lineHeight: '1.7' }}>{writer.bio}</p>
+        {writer.bio && (
+          <p
+            className="font-serif text-sm text-grey-600 leading-relaxed max-w-lg"
+            style={{ lineHeight: '1.7' }}
+          >
+            {writer.bio}
+          </p>
         )}
         <p className="mt-4 text-ui-xs text-grey-300">
-          {articleCount} article{articleCount !== 1 ? 's' : ''}
+          {writer.articleCount} article{writer.articleCount !== 1 ? 's' : ''}
         </p>
       </div>
 
       <div className="rule-inset mb-10" />
 
-      {/* Quote composer modal */}
-      {pendingQuote && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={() => setPendingQuote(null)}
-        >
-          <div className="w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <NoteComposer
-              quoteTarget={pendingQuote}
-              onPublished={() => setPendingQuote(null)}
-              onClearQuote={() => setPendingQuote(null)}
-            />
-          </div>
-        </div>
-      )}
-
-      {activity.length === 0 ? (
-        <p className="text-ui-sm text-grey-400 py-10">Looks like {writer?.displayName ?? username} hasn't said anything yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {activity.map(item => {
-            if (item.kind === 'article') {
-              const a = item.data as DbArticle
-              const articleEvent: ArticleEvent & { type: 'article' } = {
-                type: 'article',
-                id: a.nostrEventId,
-                pubkey: writer!.pubkey,
-                dTag: a.dTag,
-                title: a.title,
-                summary: a.summary ?? '',
-                content: '',
-                publishedAt: a.publishedAt ? Math.floor(new Date(a.publishedAt).getTime() / 1000) : 0,
-                tags: [],
-                isPaywalled: a.isPaywalled,
-              }
-              return <ArticleCard key={a.id} article={articleEvent} onQuote={handleQuote} voteTally={voteTallies[a.nostrEventId]} myVoteCounts={myVoteCounts[a.nostrEventId]} />
-            }
-            if (item.kind === 'note') {
-              const n = item.data as DbNote
-              const noteEvent: NoteEvent = {
-                type: 'note',
-                id: n.nostrEventId,
-                pubkey: writer!.pubkey,
-                content: n.content,
-                publishedAt: Math.floor(new Date(n.publishedAt).getTime() / 1000),
-                quotedEventId: n.quotedEventId,
-                quotedEventKind: n.quotedEventKind,
-                quotedExcerpt: n.quotedExcerpt,
-                quotedTitle: n.quotedTitle,
-                quotedAuthor: n.quotedAuthor,
-              }
-              return <NoteCard key={n.id} note={noteEvent} onDeleted={handleNoteDeleted} onQuote={handleQuote} voteTally={voteTallies[n.nostrEventId]} myVoteCounts={myVoteCounts[n.nostrEventId]} />
-            }
-            const r = item.data as DbReply
-            return <DbReplyCard key={r.id} reply={r} writerName={writer?.displayName ?? username} isOwnProfile={isOwnProfile} onQuote={handleQuote} voteTally={voteTallies[r.nostrEventId]} myVoteCounts={myVoteCounts[r.nostrEventId]} />
-          })}
-        </div>
-      )}
+      {/* Interactive activity feed — client component island */}
+      <WriterActivity
+        username={params.username}
+        writer={writer}
+      />
     </div>
   )
 }
-
-function DbReplyCard({ reply, writerName, isOwnProfile, onQuote, voteTally, myVoteCounts }: { reply: DbReply; writerName: string; isOwnProfile: boolean; onQuote?: (target: QuoteTarget) => void; voteTally?: VoteTally; myVoteCounts?: MyVoteCount }) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [isDeleted, setIsDeleted] = useState(reply.isDeleted)
-  const [content, setContent] = useState(reply.content)
-
-  const articleHref = reply.articleSlug
-    ? `${reply.articleSlug}#reply-${reply.id}`
-    : null
-  const fullArticleHref = articleHref ? `/article/${articleHref}` : null
-
-  async function handleDelete() {
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      setTimeout(() => setConfirmDelete(false), 3000)
-      return
-    }
-    try {
-      const res = await fetch(`/api/v1/replies/${reply.id}`, { method: 'DELETE', credentials: 'include' })
-      if (res.ok) {
-        setIsDeleted(true)
-        setContent('[deleted]')
-      }
-    } catch { /* ignore */ }
-    setConfirmDelete(false)
-  }
-
-  if (isDeleted) {
-    return (
-      <div className="bg-white p-5 border-l-[3px] border-grey-200">
-        <p className="label-ui text-grey-400 mb-2">{writerName} · Reply</p>
-        <p className="text-ui-xs text-grey-300 italic">[Deleted]</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-white p-5 border-l-[3px] border-grey-200">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="label-ui text-grey-400">{writerName} · Reply</span>
-        <time className="text-ui-xs text-grey-300" dateTime={reply.publishedAt}>{formatDateFromISO(reply.publishedAt)}</time>
-        {isOwnProfile && (
-          <button
-            onClick={handleDelete}
-            className={`ml-auto text-ui-xs transition-colors ${confirmDelete ? 'text-red-500 font-medium' : 'text-grey-300 hover:text-red-500'}`}
-          >
-            {confirmDelete ? 'Confirm?' : 'Delete'}
-          </button>
-        )}
-      </div>
-
-      {/* "Replying to" badge */}
-      {reply.parentAuthorUsername && (
-        <p className="text-ui-xs text-grey-300 mb-2">
-          Replying to{' '}
-          <Link href={`/${reply.parentAuthorUsername}`} className="text-grey-400 hover:text-black transition-colors underline underline-offset-2">
-            @{reply.parentAuthorDisplayName ?? reply.parentAuthorUsername}
-          </Link>
-        </p>
-      )}
-
-      {/* Content */}
-      {fullArticleHref ? (
-        <Link href={fullArticleHref} className="block hover:opacity-80 transition-opacity">
-          <p className="font-serif text-sm text-black leading-relaxed" style={{ lineHeight: '1.7' }}>{content}</p>
-        </Link>
-      ) : (
-        <p className="font-serif text-sm text-black leading-relaxed" style={{ lineHeight: '1.7' }}>{content}</p>
-      )}
-
-      {/* Footer: article link + actions */}
-      <div className="mt-3 flex items-center gap-3 flex-wrap">
-        {reply.articleSlug && (
-          <Link
-            href={`/article/${reply.articleSlug}`}
-            className="text-ui-xs text-grey-400 hover:text-black transition-colors underline underline-offset-2"
-            onClick={e => e.stopPropagation()}
-          >
-            {reply.articleTitle ?? 'View article'}
-          </Link>
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {onQuote && (
-            <button
-              onClick={() => onQuote({ eventId: reply.nostrEventId, eventKind: 1111, authorPubkey: '', previewContent: content.slice(0, 200), previewAuthorName: writerName })}
-              className="text-ui-xs text-grey-300 hover:text-black transition-colors"
-            >
-              Quote
-            </button>
-          )}
-          <VoteControls targetEventId={reply.nostrEventId} targetKind={1111} isOwnContent={isOwnProfile} initialTally={voteTally} initialMyVotes={myVoteCounts} />
-        </div>
-      </div>
-    </div>
-  )
-}
-

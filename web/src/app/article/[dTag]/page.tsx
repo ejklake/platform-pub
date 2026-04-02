@@ -1,141 +1,59 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import { articles as articlesApi, type ArticleMetadata } from '../../../lib/api'
-import { getNdk, fetchArticleByDTag, type ArticleEvent } from '../../../lib/ndk'
+import { notFound } from 'next/navigation'
+import { renderMarkdown } from '../../../lib/markdown'
 import { ArticleReader } from '../../../components/article/ArticleReader'
+import type { ArticleMetadata } from '../../../lib/api'
 
 // =============================================================================
-// Article Page — /article/:dTag
+// Article Page — /article/:dTag  (Server Component)
 //
-// Fetches article metadata from the gateway (DB index) and the full NIP-23
-// content from the relay. Renders via ArticleReader which handles the
-// paywall gate and vault decryption.
+// Fetches article metadata + free content from the gateway at request time,
+// renders markdown to HTML on the server, and passes the result to the
+// ArticleReader client component for interactive features (paywall, replies,
+// quote selection).
 //
-// Two data sources:
-//   - Gateway /articles/:dTag → metadata, writer info, paywall config
-//   - Relay NIP-23 event → actual article markdown content
-//
-// The gateway metadata includes writer display name, avatar, and paywall
-// info. The relay has the canonical content. Both are needed.
+// The article body arrives as static HTML — no JavaScript needed to read it.
 // =============================================================================
 
-export default function ArticlePage() {
-  const params = useParams()
-  const dTag = params.dTag as string
+const GATEWAY = process.env.GATEWAY_INTERNAL_URL ?? process.env.GATEWAY_URL ?? 'http://localhost:3000'
 
-  const [metadata, setMetadata] = useState<ArticleMetadata | null>(null)
-  const [article, setArticle] = useState<ArticleEvent | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+async function getArticle(dTag: string): Promise<ArticleMetadata | null> {
+  const res = await fetch(`${GATEWAY}/api/v1/articles/${dTag}`, {
+    next: { revalidate: 60 },
+  })
+  if (!res.ok) return null
+  return res.json()
+}
 
-  useEffect(() => {
-    async function loadArticle() {
-      setLoading(true)
-      try {
-        // Step 1: Fetch metadata from gateway
-        const meta = await articlesApi.getByDTag(dTag)
-        setMetadata(meta)
+export default async function ArticlePage({ params }: { params: { dTag: string } }) {
+  const article = await getArticle(params.dTag)
+  if (!article) return notFound()
 
-        // Step 2: Fetch the NIP-23 event from the relay
-        const ndk = getNdk()
-        await ndk.connect()
-        const articleEvent = await fetchArticleByDTag(ndk, meta.writer.pubkey, dTag)
-
-        if (!articleEvent) {
-          // Metadata exists but relay event not found — fallback to metadata
-          // This can happen if the relay hasn't received the event yet
-          setArticle({
-            id: meta.nostrEventId,
-            pubkey: meta.writer.pubkey,
-            dTag: meta.dTag,
-            title: meta.title,
-            summary: meta.summary ?? '',
-            content: '', // No content available from relay
-            publishedAt: meta.publishedAt
-              ? Math.floor(new Date(meta.publishedAt).getTime() / 1000)
-              : 0,
-            tags: [],
-            pricePence: meta.pricePence ?? undefined,
-            gatePositionPct: meta.gatePositionPct ?? undefined,
-            isPaywalled: meta.isPaywalled,
-          })
-        } else {
-          // Merge: relay has content, gateway has paywall config.
-          // Always use meta.nostrEventId as the canonical id — the relay may
-          // have a newer event (different id) that hasn't been re-indexed yet.
-          setArticle({
-            ...articleEvent,
-            id: meta.nostrEventId,
-            pricePence: meta.pricePence ?? articleEvent.pricePence,
-            gatePositionPct: meta.gatePositionPct ?? articleEvent.gatePositionPct,
-            isPaywalled: meta.isPaywalled,
-          })
-        }
-      } catch (err: any) {
-        if (err.status === 404) {
-          setNotFound(true)
-        } else {
-          console.error('Article load error:', err)
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (dTag) loadArticle()
-  }, [dTag])
-
-  if (loading) {
-    return <ArticleSkeleton />
-  }
-
-  if (notFound || !article || !metadata) {
-    return (
-      <div className="mx-auto max-w-article px-6 py-24 text-center">
-        <h1 className="font-serif text-2xl font-bold text-black mb-2">
-          Article not found
-        </h1>
-        <p className="text-grey-400">
-          This article doesn't exist or has been removed.
-        </p>
-      </div>
-    )
-  }
+  // Render free-section markdown to HTML on the server
+  const freeHtml = article.contentFree
+    ? await renderMarkdown(article.contentFree)
+    : ''
 
   return (
     <ArticleReader
-      article={article}
-      writerName={metadata.writer.displayName ?? metadata.writer.username}
-      writerUsername={metadata.writer.username}
-      writerAvatar={metadata.writer.avatar ?? undefined}
+      article={{
+        id: article.nostrEventId,
+        pubkey: article.writer.pubkey,
+        dTag: article.dTag,
+        title: article.title,
+        summary: article.summary ?? '',
+        content: article.contentFree ?? '',
+        publishedAt: article.publishedAt
+          ? Math.floor(new Date(article.publishedAt).getTime() / 1000)
+          : 0,
+        tags: [],
+        pricePence: article.pricePence ?? undefined,
+        gatePositionPct: article.gatePositionPct ?? undefined,
+        isPaywalled: article.isPaywalled,
+      }}
+      writerName={article.writer.displayName ?? article.writer.username}
+      writerUsername={article.writer.username}
+      writerAvatar={article.writer.avatar ?? undefined}
+      preRenderedFreeHtml={freeHtml}
     />
-  )
-}
-
-function ArticleSkeleton() {
-  return (
-    <div className="mx-auto max-w-article px-6 py-12">
-      {/* Byline */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="h-10 w-10 animate-pulse rounded-full bg-grey-100" />
-        <div>
-          <div className="h-4 w-28 animate-pulse rounded bg-grey-100 mb-1" />
-          <div className="h-3 w-20 animate-pulse rounded bg-grey-100" />
-        </div>
-      </div>
-      {/* Title */}
-      <div className="h-10 w-3/4 animate-pulse rounded bg-grey-100 mb-4" />
-      <div className="h-10 w-1/2 animate-pulse rounded bg-grey-100 mb-10" />
-      {/* Body */}
-      <div className="space-y-3">
-        <div className="h-4 w-full animate-pulse rounded bg-grey-100" />
-        <div className="h-4 w-full animate-pulse rounded bg-grey-100" />
-        <div className="h-4 w-5/6 animate-pulse rounded bg-grey-100" />
-        <div className="h-4 w-full animate-pulse rounded bg-grey-100" />
-        <div className="h-4 w-3/4 animate-pulse rounded bg-grey-100" />
-      </div>
-    </div>
   )
 }

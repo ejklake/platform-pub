@@ -15,10 +15,10 @@
     "fastify": "^4.26.0",
     "@fastify/sensible": "^5.5.0",
     "nostr-tools": "^2.3.0",
-    "pg": "^8.11.0",
+    "pg": "^8.20.0",
     "zod": "^3.22.0",
     "pino": "^8.19.0",
-    "dotenv": "^16.4.0"
+    "dotenv": "^17.3.1"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

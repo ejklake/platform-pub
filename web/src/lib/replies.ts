@@ -1,19 +1,10 @@
-import { getNdk, KIND_NOTE } from './ndk'
-import { signViaGateway } from './sign'
-import { NDKEvent } from '@nostr-dev-kit/ndk'
+import { KIND_NOTE } from './ndk'
+import { signAndPublish } from './sign'
 
 // =============================================================================
 // Reply Publishing Service
 //
-// Publishes a reply as a Nostr kind 1 event with e and p tags referencing
-// the parent content. Then indexes via the gateway.
-//
-// Pipeline:
-//   1. Build kind 1 event with e tag (target) and p tag (target author)
-//   2. If replying to another reply, add second e tag for parent
-//   3. Sign via gateway (custodial key)
-//   4. Publish to relay
-//   5. Index via POST /api/v1/replies
+// Publishes a reply as a Nostr kind 1 event via the gateway, then indexes.
 // =============================================================================
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? ''
@@ -33,30 +24,21 @@ interface PublishReplyResult {
 }
 
 export async function publishReply(params: PublishReplyParams): Promise<PublishReplyResult> {
-  const ndk = getNdk()
-  await ndk.connect()
-
-  // Build the kind 1 reply event
-  const replyEvent = new NDKEvent(ndk)
-  replyEvent.kind = KIND_NOTE
-  replyEvent.content = params.content
-  replyEvent.tags = [
+  const tags: string[][] = [
     ['e', params.targetEventId, '', 'root'],
     ['p', params.targetAuthorPubkey],
   ]
 
-  // If replying to another reply, add a reply e tag
   if (params.parentCommentEventId) {
-    replyEvent.tags.push(['e', params.parentCommentEventId, '', 'reply'])
+    tags.push(['e', params.parentCommentEventId, '', 'reply'])
   }
 
-  // Sign via gateway (custodial key)
-  const signed = await signViaGateway(replyEvent)
+  const signed = await signAndPublish({
+    kind: KIND_NOTE,
+    content: params.content,
+    tags,
+  })
 
-  // Publish to relay
-  await signed.publish()
-
-  // Index in platform DB
   const indexResult = await indexReply({
     nostrEventId: signed.id,
     targetEventId: params.targetEventId,

@@ -124,6 +124,7 @@ export function VoteControls({
           onClick={() => handleVoteClick('up')}
           disabled={disabled}
           title={!user ? 'Log in to vote' : isOwnContent ? 'Cannot vote on own content' : 'Upvote'}
+          aria-label={!user ? 'Log in to vote' : isOwnContent ? 'Cannot vote on own content' : 'Upvote'}
           className={`px-1.5 py-0.5 text-ui-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed
             ${myVotes.upCount > 0
               ? 'text-crimson font-medium'
@@ -154,6 +155,7 @@ export function VoteControls({
           onClick={() => handleVoteClick('down')}
           disabled={disabled}
           title={!user ? 'Log in to vote' : isOwnContent ? 'Cannot vote on own content' : 'Downvote'}
+          aria-label={!user ? 'Log in to vote' : isOwnContent ? 'Cannot vote on own content' : 'Downvote'}
           className={`px-1.5 py-0.5 text-ui-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed
             ${myVotes.downCount > 0
               ? 'text-crimson font-medium'

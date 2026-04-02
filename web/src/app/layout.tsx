@@ -17,6 +17,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="preload" href="/fonts/literata-latin-400.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/literata-latin-400-italic.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link
           rel="alternate"
           type="application/rss+xml"

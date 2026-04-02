@@ -1,18 +1,11 @@
-import { getNdk, KIND_NOTE } from './ndk'
-import { signViaGateway } from './sign'
-import { NDKEvent } from '@nostr-dev-kit/ndk'
+import { KIND_NOTE } from './ndk'
+import { signAndPublish } from './sign'
 
 // =============================================================================
 // Note Publishing Service
 //
-// Publishes a short-form note (Nostr kind 1). Much simpler than the article
-// pipeline — no paywall, no vault, no TipTap, no Markdown conversion.
-//
-// Pipeline:
-//   1. Build kind 1 event with plain text content
-//   2. Sign via gateway (custodial key)
-//   3. Publish to relay
-//   4. Index in platform DB via gateway
+// Publishes a short-form note (Nostr kind 1) via the gateway.
+// No direct relay access needed — signing and publishing happen server-side.
 // =============================================================================
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? ''
@@ -25,8 +18,6 @@ export interface QuoteTarget {
   eventId: string
   eventKind: number
   authorPubkey: string
-  // Preview fields — populated by the quoting card so the composer can show an
-  // instant preview without a round-trip to /api/v1/content/resolve
   previewTitle?: string
   previewContent?: string
   previewAuthorName?: string
@@ -38,45 +29,25 @@ export async function publishNote(
   authorPubkey: string,
   quoteTarget?: QuoteTarget
 ): Promise<PublishNoteResult> {
-  const ndk = getNdk()
-  await ndk.connect()
-
-  // Build the kind 1 event
-  const noteEvent = new NDKEvent(ndk)
-  noteEvent.kind = KIND_NOTE
-  noteEvent.content = content
-  noteEvent.tags = []
+  const tags: string[][] = []
 
   // Add q tag for quote-notes (NIP-18)
   if (quoteTarget) {
-    noteEvent.tags.push(['q', quoteTarget.eventId, '', quoteTarget.authorPubkey])
-    // For text-excerpt quotes, store the excerpt and attribution as tags
-    // so Platform can render them with special styling
+    tags.push(['q', quoteTarget.eventId, '', quoteTarget.authorPubkey])
     if (quoteTarget.highlightedText) {
       const words = quoteTarget.highlightedText.trim().split(/\s+/).slice(0, 80).join(' ')
-      noteEvent.tags.push(['excerpt', words])
-      if (quoteTarget.previewTitle) noteEvent.tags.push(['excerpt-title', quoteTarget.previewTitle])
-      if (quoteTarget.previewAuthorName) noteEvent.tags.push(['excerpt-author', quoteTarget.previewAuthorName])
+      tags.push(['excerpt', words])
+      if (quoteTarget.previewTitle) tags.push(['excerpt-title', quoteTarget.previewTitle])
+      if (quoteTarget.previewAuthorName) tags.push(['excerpt-author', quoteTarget.previewAuthorName])
     }
   }
 
-  // Sign via gateway (custodial key)
-  const signed = await signViaGateway(noteEvent)
-
-  // Wait for at least one relay to be connected before publishing
-  if (ndk.pool.connectedRelays().length === 0) {
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('No relays available — try again in a moment')), 5000)
-      const check = () => {
-        if (ndk.pool.connectedRelays().length > 0) { clearTimeout(timeout); resolve() }
-        else setTimeout(check, 100)
-      }
-      check()
-    })
-  }
-
-  // Publish to relay
-  await signed.publish()
+  // Sign and publish via gateway
+  const signed = await signAndPublish({
+    kind: KIND_NOTE,
+    content,
+    tags,
+  })
 
   // Index in platform DB
   await indexNote({
@@ -94,10 +65,6 @@ export async function publishNote(
 
   return { noteEventId: signed.id }
 }
-
-// =============================================================================
-// Internal helpers
-// =============================================================================
 
 async function indexNote(params: {
   nostrEventId: string
@@ -117,7 +84,6 @@ async function indexNote(params: {
   })
 
   if (!res.ok) {
-    // Non-fatal — the note is on the relay, just not indexed yet
     console.error('Note indexing failed:', res.status)
   }
 }

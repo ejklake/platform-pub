@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useAuth } from '../../stores/auth'
 import { PaywallGate } from './PaywallGate'
 import { unwrapContentKey, decryptVaultContent } from '../../lib/vault'
-import { getNdk, fetchVaultEvent } from '../../lib/ndk'
 import { renderMarkdown } from '../../lib/markdown'
+import { Avatar } from '../ui/Avatar'
 import { ReportButton } from '../ui/ReportButton'
 import { ShareButton } from '../ui/ShareButton'
 import { ReplySection } from '../replies/ReplySection'
@@ -20,6 +20,7 @@ interface ArticleReaderProps {
   writerName: string
   writerUsername: string
   writerAvatar?: string
+  preRenderedFreeHtml?: string
 }
 
 // Extract first image from markdown content
@@ -41,13 +42,13 @@ function stripHeroImage(content: string, heroUrl: string): string {
     .trim()
 }
 
-export function ArticleReader({ article, writerName, writerUsername, writerAvatar }: ArticleReaderProps) {
+export function ArticleReader({ article, writerName, writerUsername, writerAvatar, preRenderedFreeHtml }: ArticleReaderProps) {
   const { user } = useAuth()
   const [paywallBody, setPaywallBody] = useState<string | null>(null)
   const [unlocking, setUnlocking] = useState(false)
   const [unlockError, setUnlockError] = useState<string | null>(null)
   const [showAllowanceModal, setShowAllowanceModal] = useState(false)
-  const [freeHtml, setFreeHtml] = useState<string>('')
+  const [freeHtml, setFreeHtml] = useState<string>(preRenderedFreeHtml ?? '')
   const [paywallHtml, setPaywallHtml] = useState<string>('')
 
   // Text-selection quote flow
@@ -75,7 +76,7 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
   const heroImage = extractHeroImage(article.content)
   const contentWithoutHero = heroImage ? stripHeroImage(article.content, heroImage) : article.content
 
-  useEffect(() => { renderMarkdown(contentWithoutHero).then(setFreeHtml) }, [contentWithoutHero])
+  useEffect(() => { if (!preRenderedFreeHtml) renderMarkdown(contentWithoutHero).then(setFreeHtml) }, [contentWithoutHero, preRenderedFreeHtml])
   useEffect(() => { if (paywallBody) renderMarkdown(paywallBody).then(setPaywallHtml) }, [paywallBody])
   useEffect(() => {
     document.addEventListener('mouseup', handleMouseUp)
@@ -101,14 +102,8 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
         throw err
       }
 
-      let ciphertext: string | undefined = gatePassResult.ciphertext
+      const ciphertext: string | undefined = gatePassResult.ciphertext
         ?? article.encryptedPayload
-
-      if (!ciphertext) {
-        const ndk = getNdk(); await ndk.connect()
-        const vaultEvent = await fetchVaultEvent(ndk, article.dTag)
-        if (vaultEvent) ciphertext = vaultEvent.ciphertext
-      }
 
       if (!ciphertext) {
         setUnlockError('Could not find the encrypted content.')
@@ -194,13 +189,7 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
             {/* Byline — Instrument Sans name + date */}
             <div className="mb-8 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {writerAvatar ? (
-                  <img src={writerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center text-[10px] font-mono uppercase bg-grey-100 text-grey-400 rounded-full">
-                    {writerName[0].toUpperCase()}
-                  </span>
-                )}
+                <Avatar src={writerAvatar} name={writerName} size={36} lazy={false} />
                 <div>
                   <a href={`/${writerUsername}`} className="font-sans text-[14px] font-semibold text-black hover:opacity-70 transition-opacity">{writerName}</a>
                   <p className="font-sans text-[13px] text-grey-400">{publishDate}</p>
