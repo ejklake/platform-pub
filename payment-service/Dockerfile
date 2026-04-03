@@ -7,6 +7,7 @@ RUN cd shared && npm install && cd ../payment-service && npm install
 RUN ln -sf /app/shared /app/payment-service/shared
 ENV NODE_ENV=production
 RUN addgroup -S app && adduser -S app -G app
+RUN chown -R app:app /app
 USER app
 EXPOSE 3001
 CMD ["./payment-service/node_modules/.bin/tsx", "payment-service/src/index.ts"]

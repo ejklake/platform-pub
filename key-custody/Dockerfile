@@ -7,6 +7,7 @@ RUN cd shared && npm install && cd ../key-custody && npm install
 RUN ln -sf /app/shared /app/key-custody/shared
 ENV NODE_ENV=production
 RUN addgroup -S app && adduser -S app -G app
+RUN chown -R app:app /app
 USER app
 EXPOSE 3004
 CMD ["./key-custody/node_modules/.bin/tsx", "key-custody/src/index.ts"]

@@ -51,6 +51,47 @@ function fakePubkey(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
+// ---------------------------------------------------------------------------
+// Generate a real secp256k1 Nostr keypair with the private key encrypted
+// using the same AES-256-GCM scheme as key-custody (ACCOUNT_KEY_HEX).
+// Format: base64(iv[12] + authTag[16] + ciphertext[32])
+// ---------------------------------------------------------------------------
+
+function getAccountKey(): Buffer {
+  const keyHex = process.env.ACCOUNT_KEY_HEX;
+  if (!keyHex) throw new Error("ACCOUNT_KEY_HEX must be set for seed keypair generation");
+  const key = Buffer.from(keyHex, "hex");
+  if (key.length !== 32) throw new Error("ACCOUNT_KEY_HEX must be 32 bytes (64 hex chars)");
+  return key;
+}
+
+function fakeKeypair(): { pubkey: string; privkeyEnc: string } {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("ec", {
+    namedCurve: "secp256k1",
+  });
+
+  // Extract raw 32-byte private key via JWK
+  const jwk = privateKey.export({ format: "jwk" });
+  const privBytes = Buffer.from(jwk.d!, "base64url");
+
+  // Extract x-only pubkey from JWK (Nostr uses x-coordinate only)
+  const pubJwk = publicKey.export({ format: "jwk" });
+  const xOnlyPubkey = Buffer.from(pubJwk.x!, "base64url");
+
+  // Encrypt private key with ACCOUNT_KEY_HEX (same scheme as key-custody)
+  const accountKey = getAccountKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", accountKey, iv);
+  const encrypted = Buffer.concat([cipher.update(privBytes), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  const privkeyEnc = Buffer.concat([iv, authTag, encrypted]).toString("base64");
+
+  return {
+    pubkey: xOnlyPubkey.toString("hex"),
+    privkeyEnc,
+  };
+}
+
 function fakeEventId(): string {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -192,11 +233,13 @@ async function seedWriters(client: pg.PoolClient): Promise<Account[]> {
     }
     usedUsernames.add(username);
 
+    const kp = fakeKeypair();
     rows.push([
       username,
       `${firstName} ${lastName}`,
       faker.person.bio(),
-      fakePubkey(),
+      kp.pubkey,
+      kp.privkeyEnc,
       true,
       true,
       "active",
@@ -210,7 +253,7 @@ async function seedWriters(client: pg.PoolClient): Promise<Account[]> {
     client,
     "accounts",
     [
-      "username", "display_name", "bio", "nostr_pubkey",
+      "username", "display_name", "bio", "nostr_pubkey", "nostr_privkey_enc",
       "is_writer", "is_reader", "status",
       "subscription_price_pence", "annual_discount_pct",
       "created_at",
@@ -241,11 +284,13 @@ async function seedReaders(client: pg.PoolClient): Promise<Account[]> {
     }
     usedUsernames.add(username);
 
+    const kp = fakeKeypair();
     rows.push([
       username,
       `${firstName} ${lastName}`,
       faker.person.bio(),
-      fakePubkey(),
+      kp.pubkey,
+      kp.privkeyEnc,
       false,
       true,
       "active",
@@ -259,7 +304,7 @@ async function seedReaders(client: pg.PoolClient): Promise<Account[]> {
     client,
     "accounts",
     [
-      "username", "display_name", "bio", "nostr_pubkey",
+      "username", "display_name", "bio", "nostr_pubkey", "nostr_privkey_enc",
       "is_writer", "is_reader", "status",
       "stripe_customer_id", "free_allowance_remaining_pence",
       "created_at",

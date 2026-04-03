@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v4.9.0
+# platform.pub — Deployment Reference v4.9.1
 
 **Date:** 3 April 2026
-**Replaces:** v4.8.1 (see bottom for change log)
+**Replaces:** v4.9.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -222,15 +222,18 @@ The seed script (`scripts/seed.ts`) populates the database with realistic fake u
 
 ```bash
 # Default: 200 writers, 800 readers (~1000 users), dense relationships
+ACCOUNT_KEY_HEX=<your key-custody ACCOUNT_KEY_HEX> \
 DATABASE_URL=postgres://platformpub:$POSTGRES_PASSWORD@localhost:5432/platformpub \
   npx tsx scripts/seed.ts --clean
 
 # Small dataset: 15 writers, 25 readers (fast, for quick testing)
-npx tsx scripts/seed.ts --clean --small
+ACCOUNT_KEY_HEX=<...> npx tsx scripts/seed.ts --clean --small
 
 # Custom sizes:
-npx tsx scripts/seed.ts --clean --writers 50 --readers 200 --articles 10
+ACCOUNT_KEY_HEX=<...> npx tsx scripts/seed.ts --clean --writers 50 --readers 200 --articles 10
 ```
+
+> **Required env vars:** `ACCOUNT_KEY_HEX` (from key-custody `.env`) is required to generate encrypted Nostr keypairs for seeded accounts. `KMS_MASTER_KEY_HEX` (from key-service `.env`) is required for vault key generation on paywalled articles. Without these, the seed script will create accounts without custodial keypairs and skip vault key generation respectively.
 
 Options:
 - `--clean` — wipe all seeded data before re-seeding (preserves the `billyisland` account)
@@ -246,6 +249,50 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v4.9.0
+
+No new migrations. Services changed: **all four backend Dockerfiles** (gateway, payment-service, key-service, key-custody). Deploy order: **rebuild all backend services**.
+
+This is a hotfix for a container permissions bug that caused the key-service to crash-loop on startup, breaking all paywall unlocks and subscription reads.
+
+**Root cause:** All four service Dockerfiles copy source files as root, then switch to a non-root `app` user via `USER app`. The `app` user could not read source files when host file permissions were restrictive (e.g., files created or modified with a non-world-readable umask). The key-service was the first to fail because it was rebuilt most recently, but all four services were vulnerable.
+
+**Symptom:** Clicking "Continue reading" on a paywalled article returned "Internal error". The gateway's `fetch()` to the unreachable key-service threw a connection error, caught by the gate-pass catch-all handler.
+
+**Fix:** Added `RUN chown -R app:app /app` before `USER app` in all four service Dockerfiles, ensuring the `app` user owns all files regardless of host permissions.
+
+**Also in this release:** The seed script (`scripts/seed.ts`) now generates real secp256k1 Nostr keypairs with encrypted private keys (matching the key-custody encryption scheme), so paywalled article unlocking works correctly on seeded data. A backfill script (`scripts/backfill-keypairs.ts`) is provided for existing seed databases.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# Rebuild all backend services (Dockerfile fix)
+docker compose build gateway keyservice payment key-custody
+docker compose up -d gateway keyservice payment key-custody
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# All services should show running (not Restarting) after ~30s
+
+# Key-service must be alive — this was the crash-looping service
+docker compose logs keyservice --tail 5
+# Should show "Key service started" with port 3002
+
+# Test the unlock flow by visiting a paywalled article and clicking unlock
+```
+
+> **Seed data:** If you previously seeded data and paywall unlocking fails on seeded accounts, run the keypair backfill:
+> ```bash
+> ACCOUNT_KEY_HEX=<your key-custody ACCOUNT_KEY_HEX> \
+> DATABASE_URL=postgres://platformpub:$POSTGRES_PASSWORD@localhost:5432/platformpub \
+>   npx tsx scripts/backfill-keypairs.ts
+> ```
+
+---
 
 ### From v4.8.1
 
