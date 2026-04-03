@@ -1,39 +1,41 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { freePasses, type FreePass } from '../../lib/api'
+import { freePasses, giftLinks, type FreePass, type GiftLink } from '../../lib/api'
+import { UserSearch, type UserSearchResult } from '../ui/UserSearch'
 
 export function FreePassManager({ articleId }: { articleId: string }) {
   const [passes, setPasses] = useState<FreePass[]>([])
+  const [links, setLinks] = useState<GiftLink[]>([])
   const [loading, setLoading] = useState(true)
-  const [username, setUsername] = useState('')
   const [granting, setGranting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function fetchPasses() {
+  async function fetchData() {
     setLoading(true)
     try {
-      const data = await freePasses.list(articleId)
-      setPasses(data.passes)
+      const [passData, linkData] = await Promise.all([
+        freePasses.list(articleId),
+        giftLinks.list(articleId),
+      ])
+      setPasses(passData.passes)
+      setLinks(linkData.giftLinks)
     } catch {
-      setError('Failed to load free passes.')
+      setError('Failed to load data.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { fetchPasses() }, [articleId])
+  useEffect(() => { fetchData() }, [articleId])
 
-  async function handleGrant(e: React.FormEvent) {
-    e.preventDefault()
-    if (!username.trim()) return
+  async function handleGrant(user: UserSearchResult) {
     setGranting(true); setError(null)
     try {
-      await freePasses.grant(articleId, username.trim())
-      setUsername('')
-      fetchPasses()
+      await freePasses.grant(articleId, user.id)
+      fetchData()
     } catch {
-      setError('Failed to grant access. Check the username.')
+      setError('Failed to grant access.')
     } finally {
       setGranting(false)
     }
@@ -48,6 +50,15 @@ export function FreePassManager({ articleId }: { articleId: string }) {
     }
   }
 
+  async function handleRevokeLink(linkId: string) {
+    try {
+      await giftLinks.revoke(articleId, linkId)
+      setLinks(prev => prev.map(l => l.id === linkId ? { ...l, revoked: true } : l))
+    } catch {
+      setError('Failed to revoke gift link.')
+    }
+  }
+
   return (
     <div className="border-t border-grey-200 px-4 py-4 bg-grey-100/50">
       <p className="label-ui text-grey-400 mb-3">Free passes</p>
@@ -55,18 +66,14 @@ export function FreePassManager({ articleId }: { articleId: string }) {
       {error && <p className="text-[13px] font-sans text-crimson mb-3">{error}</p>}
 
       {/* Grant form */}
-      <form onSubmit={handleGrant} className="flex items-center gap-2 mb-4">
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="Username"
-          className="flex-1 border border-grey-200 px-3 py-1.5 text-[13px] font-sans text-black placeholder-grey-300 bg-white"
+      <div className="flex items-center gap-2 mb-4">
+        <UserSearch
+          onSelect={handleGrant}
+          placeholder="Search users to grant access…"
+          className="flex-1"
         />
-        <button type="submit" disabled={granting} className="btn text-sm disabled:opacity-50">
-          {granting ? '…' : 'Grant'}
-        </button>
-      </form>
+        {granting && <span className="text-[12px] font-mono text-grey-400">Granting…</span>}
+      </div>
 
       {/* Existing passes */}
       {loading ? (
@@ -86,6 +93,30 @@ export function FreePassManager({ articleId }: { articleId: string }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Gift links */}
+      {!loading && links.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-grey-200">
+          <p className="label-ui text-grey-400 mb-2">Gift links</p>
+          <div className="space-y-1">
+            {links.map(l => (
+              <div key={l.id} className="flex items-center justify-between py-1.5">
+                <div>
+                  <span className="text-[12px] font-mono text-grey-400">
+                    {l.redemptionCount} of {l.maxRedemptions} used
+                  </span>
+                  {l.revoked && <span className="text-[11px] font-mono text-crimson ml-2">revoked</span>}
+                </div>
+                {!l.revoked && (
+                  <button onClick={() => handleRevokeLink(l.id)} className="text-[12px] font-sans text-grey-300 hover:text-black">
+                    Revoke
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

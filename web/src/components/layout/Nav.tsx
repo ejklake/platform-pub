@@ -142,7 +142,7 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
   }
 
   return (
-    <div className="fixed inset-x-0 top-[56px] bg-white border-b border-grey-200 z-40 px-6 py-4 shadow-sm">
+    <div className="fixed inset-x-0 top-[60px] bg-white border-b border-grey-200 z-40 px-6 py-4 shadow-sm">
       {loading ? (
         <div className="h-4 w-24 animate-pulse bg-grey-100" />
       ) : user ? (
@@ -242,25 +242,17 @@ export function Nav() {
     return (
       <>
         <header className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur-sm border-b border-grey-100">
-          <div className="flex items-center justify-between px-6 h-[56px] max-w-content mx-auto">
+          <div className="flex items-center justify-between px-6 h-[60px] max-w-content mx-auto">
             {/* Logo — mark only, grey */}
             <Link
               href={logoHref}
               className="flex-shrink-0"
             >
               <ThereforeMark
-                size={16}
+                size={29}
                 weight="heavy"
                 className="text-grey-400 hover:text-grey-600 transition-colors"
               />
-            </Link>
-
-            {/* Back to feed */}
-            <Link
-              href="/feed"
-              className="font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
-            >
-              &#8592; Feed
             </Link>
 
             {/* Avatar (if logged in) */}
@@ -294,7 +286,7 @@ export function Nav() {
   return (
     <>
       <header className="fixed top-0 inset-x-0 z-50 bg-white border-b border-grey-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="flex items-center justify-between px-6 h-[56px] max-w-content mx-auto">
+        <div className="flex items-center justify-between px-6 h-[60px] max-w-content mx-auto">
 
           {/* Left: logo + nav links */}
           <div className="flex items-center gap-6">
@@ -304,12 +296,12 @@ export function Nav() {
               className="flex items-center gap-[7px] flex-shrink-0 group"
             >
               <ThereforeMark
-                size={22}
+                size={29}
                 weight="heavy"
                 className="text-crimson group-hover:text-crimson-dark transition-colors"
               />
-              <span className="font-serif text-[20px] font-medium italic text-crimson group-hover:text-crimson-dark transition-colors leading-none"
-                style={{ letterSpacing: '-0.01em' }}
+              <span className="font-serif text-[26px] font-medium italic text-crimson group-hover:text-crimson-dark transition-colors leading-none"
+                style={{ letterSpacing: '-0.01em', transform: 'translateY(-1px)' }}
               >
                 Platform
               </span>

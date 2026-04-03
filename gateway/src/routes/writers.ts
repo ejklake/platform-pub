@@ -37,10 +37,11 @@ export async function writerRoutes(app: FastifyInstance) {
         hosting_type: string
         subscription_price_pence: number
         annual_discount_pct: number
+        show_commission_button: boolean
       }>(
         `SELECT id, nostr_pubkey, username, display_name, bio,
                 avatar_blossom_url, hosting_type, subscription_price_pence,
-                annual_discount_pct
+                annual_discount_pct, show_commission_button
          FROM accounts
          WHERE username = $1 AND status = 'active'`,
         [username]
@@ -79,6 +80,7 @@ export async function writerRoutes(app: FastifyInstance) {
         hostingType: writer.hosting_type,
         subscriptionPricePence: writer.subscription_price_pence,
         annualDiscountPct: writer.annual_discount_pct,
+        showCommissionButton: writer.show_commission_button,
         articleCount: parseInt(countResult.rows[0].count, 10),
         followerCount: parseInt(followerResult.rows[0].count, 10),
         followingCount: parseInt(followingResult.rows[0].count, 10),

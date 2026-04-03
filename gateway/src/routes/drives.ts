@@ -35,6 +35,7 @@ const CreateDriveSchema = z.object({
   suggestedPricePence: z.number().int().min(1).optional(),
   deadline: z.string().datetime().optional(),
   draftId: z.string().regex(UUID_RE).optional(),
+  parentNoteEventId: z.string().max(200).optional(),
 })
 
 const UpdateDriveSchema = z.object({
@@ -85,8 +86,9 @@ export async function driveRoutes(app: FastifyInstance) {
     const result = await pool.query<{ id: string }>(
       `INSERT INTO pledge_drives (
          creator_id, origin, target_writer_id, title, description,
-         funding_target_pence, suggested_price_pence, deadline, draft_id
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         funding_target_pence, suggested_price_pence, deadline, draft_id,
+         parent_note_event_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id`,
       [
         creatorId,
@@ -98,6 +100,7 @@ export async function driveRoutes(app: FastifyInstance) {
         data.suggestedPricePence ?? null,
         data.deadline ?? null,
         data.draftId ?? null,
+        data.parentNoteEventId ?? null,
       ]
     )
 
@@ -419,18 +422,36 @@ export async function driveRoutes(app: FastifyInstance) {
   // POST /drives/:id/accept — target writer accepts a commission
   // ---------------------------------------------------------------------------
 
+  const AcceptCommissionSchema = z.object({
+    acceptanceTerms: z.string().max(5000).optional(),
+    backerAccessMode: z.enum(['free', 'paywalled']).optional(),
+    deadline: z.string().datetime().optional(),
+  })
+
   app.post<{ Params: { id: string } }>(
     '/drives/:id/accept',
     { preHandler: requireAuth },
     async (req, reply) => {
       const writerId = req.session!.sub!
+      const parsed = AcceptCommissionSchema.safeParse(req.body ?? {})
+      const terms = parsed.success ? parsed.data : {}
 
       const result = await pool.query(
-        `UPDATE pledge_drives SET accepted_at = now()
+        `UPDATE pledge_drives
+         SET accepted_at = now(),
+             acceptance_terms = COALESCE($3, acceptance_terms),
+             backer_access_mode = COALESCE($4, backer_access_mode),
+             deadline = COALESCE($5::timestamptz, deadline)
          WHERE id = $1 AND target_writer_id = $2 AND origin = 'commission'
            AND accepted_at IS NULL AND status IN ('open', 'funded')
          RETURNING id`,
-        [req.params.id, writerId]
+        [
+          req.params.id,
+          writerId,
+          terms.acceptanceTerms ?? null,
+          terms.backerAccessMode ?? null,
+          terms.deadline ?? null,
+        ]
       )
 
       if (result.rowCount === 0) {

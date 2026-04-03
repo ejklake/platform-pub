@@ -18,6 +18,7 @@ interface NoteCardProps {
   note: NoteEvent
   onDeleted?: (id: string) => void
   onQuote?: (target: QuoteTarget) => void
+  onCommission?: (targetWriterId: string, targetWriterName: string, parentNoteEventId: string) => void
   voteTally?: VoteTally
   myVoteCounts?: MyVoteCount
 }
@@ -63,7 +64,7 @@ function ExcerptPennant({ note }: { note: NoteEvent }) {
   )
 }
 
-export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: NoteCardProps) {
+export function NoteCard({ note, onDeleted, onQuote, onCommission, voteTally, myVoteCounts }: NoteCardProps) {
   const { user } = useAuth()
   const writerInfo = useWriterName(note.pubkey)
   const [showComposer, setShowComposer] = useState(false)
@@ -209,6 +210,14 @@ export function NoteCard({ note, onDeleted, onQuote, voteTally, myVoteCounts }: 
                 className="hover:text-black transition-colors"
               >
                 Quote
+              </button>
+            )}
+            {user && onCommission && !isAuthor && writerInfo && (
+              <button
+                onClick={() => onCommission(writerInfo.id!, writerInfo.displayName ?? writerInfo.username ?? '', note.id)}
+                className="hover:text-black transition-colors"
+              >
+                Commission
               </button>
             )}
             <VoteControls

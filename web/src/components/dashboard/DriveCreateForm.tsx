@@ -20,7 +20,7 @@ export function DriveCreateForm({ onCreated, onCancel }: { onCreated: () => void
     }
     setSaving(true); setError(null)
     try {
-      await drives.create({ type, title: title.trim(), description: description.trim(), targetAmountPence: pence })
+      await drives.create({ origin: type, title: title.trim(), description: description.trim(), fundingTargetPence: pence })
       onCreated()
     } catch {
       setError('Failed to create drive.')

@@ -13,16 +13,20 @@ import { ReplySection } from '../replies/ReplySection'
 import { AllowanceExhaustedModal } from '../ui/AllowanceExhaustedModal'
 import { NoteComposer } from '../feed/NoteComposer'
 import { ThereforeMark } from '../icons/ThereforeMark'
-import { articles as articlesApi } from '../../lib/api'
+import { UserSearch, type UserSearchResult } from '../ui/UserSearch'
+import { articles as articlesApi, freePasses, giftLinks } from '../../lib/api'
 import type { ArticleEvent } from '../../lib/ndk'
 
 interface ArticleReaderProps {
   article: ArticleEvent
+  articleDbId?: string
   writerName: string
   writerUsername: string
   writerAvatar?: string
   writerId?: string
   subscriptionPricePence?: number
+  writerSpendThisMonthPence?: number
+  nudgeShownThisMonth?: boolean
   preRenderedFreeHtml?: string
 }
 
@@ -45,7 +49,7 @@ function stripHeroImage(content: string, heroUrl: string): string {
     .trim()
 }
 
-export function ArticleReader({ article, writerName, writerUsername, writerAvatar, writerId, subscriptionPricePence, preRenderedFreeHtml }: ArticleReaderProps) {
+export function ArticleReader({ article, articleDbId, writerName, writerUsername, writerAvatar, writerId, subscriptionPricePence, writerSpendThisMonthPence, nudgeShownThisMonth, preRenderedFreeHtml }: ArticleReaderProps) {
   const { user } = useAuth()
   const [paywallBody, setPaywallBody] = useState<string | null>(null)
   const [unlocking, setUnlocking] = useState(false)
@@ -55,6 +59,53 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
   const [paywallHtml, setPaywallHtml] = useState<string>('')
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
+
+  // Gift access flow
+  const [showGiftModal, setShowGiftModal] = useState(false)
+  const [giftGranting, setGiftGranting] = useState(false)
+  const [giftSuccess, setGiftSuccess] = useState<string | null>(null)
+  const [giftError, setGiftError] = useState<string | null>(null)
+  const isOwnContent = user?.id === writerId
+
+  async function handleGiftAccess(recipient: UserSearchResult) {
+    if (!articleDbId) return
+    setGiftGranting(true); setGiftError(null); setGiftSuccess(null)
+    try {
+      await freePasses.grant(articleDbId, recipient.id)
+      setGiftSuccess(`Access granted to ${recipient.displayName ?? recipient.username}`)
+    } catch {
+      setGiftError('Failed to grant access.')
+    } finally {
+      setGiftGranting(false)
+    }
+  }
+
+  // Gift link creation
+  const [showGiftLinkModal, setShowGiftLinkModal] = useState(false)
+  const [giftLinkLimit, setGiftLinkLimit] = useState(5)
+  const [giftLinkCreating, setGiftLinkCreating] = useState(false)
+  const [giftLinkUrl, setGiftLinkUrl] = useState<string | null>(null)
+
+  async function handleCreateGiftLink() {
+    if (!articleDbId) return
+    setGiftLinkCreating(true)
+    try {
+      const result = await giftLinks.create(articleDbId, giftLinkLimit)
+      setGiftLinkUrl(window.location.origin + result.url)
+    } catch { /* ignore */ }
+    finally { setGiftLinkCreating(false) }
+  }
+
+  // Redeem gift token from URL query param
+  useEffect(() => {
+    if (!articleDbId || !user) return
+    const params = new URLSearchParams(window.location.search)
+    const giftToken = params.get('gift')
+    if (!giftToken) return
+    giftLinks.redeem(articleDbId, giftToken)
+      .then(() => { window.location.replace(window.location.pathname) })
+      .catch(() => {})
+  }, [articleDbId, user])
 
   // Text-selection quote flow
   const articleBodyRef = useRef<HTMLDivElement>(null)
@@ -162,6 +213,23 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
     <div className="min-h-screen bg-white">
       {showAllowanceModal && <AllowanceExhaustedModal onClose={() => setShowAllowanceModal(false)} />}
 
+      {/* Gift access modal */}
+      {showGiftModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowGiftModal(false)}>
+          <div className="bg-white border border-grey-200 shadow-lg w-full max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-[20px] font-medium text-black mb-1">Gift access</h3>
+            <p className="text-[13px] font-sans text-grey-400 mb-4">Search for a reader to grant free access to this article.</p>
+            <UserSearch onSelect={handleGiftAccess} placeholder="Search readers…" />
+            {giftGranting && <p className="mt-3 text-[12px] font-mono text-grey-400">Granting…</p>}
+            {giftSuccess && <p className="mt-3 text-[12px] font-mono text-green-600">{giftSuccess}</p>}
+            {giftError && <p className="mt-3 text-[12px] font-mono text-crimson">{giftError}</p>}
+            <button onClick={() => setShowGiftModal(false)} className="mt-4 text-[12px] font-mono text-grey-400 hover:text-black transition-colors">
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Text-selection quote popup */}
       {selectionPopup && (
         <div
@@ -177,6 +245,53 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
           >
             Quote
           </button>
+        </div>
+      )}
+
+      {/* Gift link modal */}
+      {showGiftLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowGiftLinkModal(false)}>
+          <div className="bg-white border border-grey-200 shadow-lg w-full max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-serif text-[20px] font-medium text-black mb-1">Create gift link</h3>
+            <p className="text-[13px] font-sans text-grey-400 mb-4">Generate a shareable link that grants free access.</p>
+            {!giftLinkUrl ? (
+              <>
+                <label className="block text-[12px] font-mono text-grey-400 mb-1">Redemption limit</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={giftLinkLimit}
+                  onChange={(e) => setGiftLinkLimit(parseInt(e.target.value, 10) || 5)}
+                  className="w-20 border border-grey-200 px-2 py-1 text-[13px] font-sans text-black mb-4"
+                />
+                <div>
+                  <button onClick={handleCreateGiftLink} disabled={giftLinkCreating} className="btn text-sm disabled:opacity-50">
+                    {giftLinkCreating ? 'Creating…' : 'Generate link'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  readOnly
+                  value={giftLinkUrl}
+                  className="w-full border border-grey-200 px-3 py-1.5 text-[13px] font-mono text-black bg-grey-50 mb-3"
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  onClick={() => { navigator.clipboard.writeText(giftLinkUrl) }}
+                  className="btn text-sm"
+                >
+                  Copy link
+                </button>
+              </>
+            )}
+            <button onClick={() => setShowGiftLinkModal(false)} className="mt-4 block text-[12px] font-mono text-grey-400 hover:text-black transition-colors">
+              Close
+            </button>
+          </div>
         </div>
       )}
 
@@ -228,6 +343,22 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
               <div className="flex items-center gap-3">
                 <ShareButton url={articleUrl} title={article.title} />
                 <ReportButton targetNostrEventId={article.id} />
+                {isOwnContent && article.isPaywalled && (
+                  <>
+                    <button
+                      onClick={() => setShowGiftModal(true)}
+                      className="text-[12px] font-mono uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
+                    >
+                      Gift
+                    </button>
+                    <button
+                      onClick={() => { setShowGiftLinkModal(true); setGiftLinkUrl(null) }}
+                      className="text-[12px] font-mono uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
+                    >
+                      Gift link
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -271,13 +402,16 @@ export function ArticleReader({ article, writerName, writerUsername, writerAvata
                   isSubscribed={isSubscribed}
                   onSubscribe={handleSubscribe}
                   subscribing={subscribing}
+                  writerSpendThisMonthPence={writerSpendThisMonthPence}
+                  nudgeShownThisMonth={nudgeShownThisMonth}
+                  writerId={writerId}
                 />
               )}
 
               {paywallBody && <div className="prose prose-lg mt-10" dangerouslySetInnerHTML={{ __html: paywallHtml }} />}
 
               <div className="ornament mt-16 mb-12">
-                <ThereforeMark size={24} weight="light" className="text-grey-400" />
+                <ThereforeMark size={24} weight="heavy" className="text-grey-400" />
               </div>
               <ReplySection targetEventId={article.id} targetKind={30023} targetAuthorPubkey={article.pubkey} contentAuthorId={undefined} />
             </article>

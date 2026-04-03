@@ -5,6 +5,11 @@ import { drives, type PledgeDrive } from '../../lib/api'
 
 export function DriveCard({ drive, onUpdate }: { drive: PledgeDrive; onUpdate: () => void }) {
   const [acting, setActing] = useState(false)
+  const [showAcceptForm, setShowAcceptForm] = useState(false)
+  const [acceptanceTerms, setAcceptanceTerms] = useState('')
+  const [backerAccessMode, setBackerAccessMode] = useState<'free' | 'paywalled'>('free')
+  const [deadline, setDeadline] = useState('')
+
   const progressPct = drive.targetAmountPence > 0
     ? Math.min(100, Math.round((drive.currentAmountPence / drive.targetAmountPence) * 100))
     : 0
@@ -26,7 +31,14 @@ export function DriveCard({ drive, onUpdate }: { drive: PledgeDrive; onUpdate: (
 
   async function handleAccept() {
     setActing(true)
-    try { await drives.accept(drive.id); onUpdate() }
+    try {
+      await drives.accept(drive.id, {
+        acceptanceTerms: acceptanceTerms.trim() || undefined,
+        backerAccessMode,
+        deadline: deadline || undefined,
+      })
+      onUpdate()
+    }
     catch { alert('Failed to accept commission.') }
     finally { setActing(false) }
   }
@@ -97,15 +109,66 @@ export function DriveCard({ drive, onUpdate }: { drive: PledgeDrive; onUpdate: (
         </div>
       )}
 
-      {/* Commission accept/decline — only when it's a pending commission */}
-      {isCommission && isActive && drive.currentAmountPence === 0 && (
+      {/* Commission accept/decline — with acceptance terms form */}
+      {isCommission && isActive && !showAcceptForm && (
         <div className="mt-4 flex items-center gap-3 border-t border-grey-200 pt-4">
-          <button onClick={handleAccept} disabled={acting} className="btn text-sm disabled:opacity-50">
+          <button onClick={() => setShowAcceptForm(true)} disabled={acting} className="btn text-sm disabled:opacity-50">
             Accept commission
           </button>
           <button onClick={handleDecline} disabled={acting} className="btn-ghost text-sm disabled:opacity-50">
             Decline
           </button>
+        </div>
+      )}
+
+      {/* Acceptance terms form */}
+      {showAcceptForm && (
+        <div className="mt-4 border-t border-grey-200 pt-4 space-y-3">
+          <p className="font-mono text-[12px] uppercase tracking-[0.06em] text-grey-400">Acceptance terms</p>
+
+          <div>
+            <label className="block text-[13px] font-sans text-grey-600 mb-1">What are you committing to deliver?</label>
+            <textarea
+              value={acceptanceTerms}
+              onChange={(e) => setAcceptanceTerms(e.target.value)}
+              placeholder="Confirm or refine what you'll write…"
+              className="w-full border border-grey-200 px-3 py-2 text-[14px] font-sans text-black placeholder-grey-300 bg-white resize-none"
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[13px] font-sans text-grey-600 mb-1">Deadline (optional)</label>
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="border border-grey-200 px-3 py-1.5 text-[14px] font-sans text-black bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[13px] font-sans text-grey-600 mb-1">Will the result be free to backers?</label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="backerAccess" checked={backerAccessMode === 'free'} onChange={() => setBackerAccessMode('free')} />
+                <span className="text-[13px] font-sans text-black">Free to backers</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="backerAccess" checked={backerAccessMode === 'paywalled'} onChange={() => setBackerAccessMode('paywalled')} />
+                <span className="text-[13px] font-sans text-black">Paywalled</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button onClick={handleAccept} disabled={acting} className="btn text-sm disabled:opacity-50">
+              {acting ? 'Accepting…' : 'Accept'}
+            </button>
+            <button onClick={() => setShowAcceptForm(false)} className="text-[13px] font-sans text-grey-400 hover:text-black transition-colors">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>

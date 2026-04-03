@@ -172,6 +172,8 @@ export interface ArticleMetadata {
   gatePositionPct: number | null
   vaultEventId: string | null
   publishedAt: string | null
+  writerSpendThisMonthPence: number | null
+  nudgeShownThisMonth: boolean
   writer: {
     id: string
     username: string
@@ -311,6 +313,7 @@ export interface WriterProfile {
   hostingType: string
   subscriptionPricePence: number
   annualDiscountPct: number
+  showCommissionButton: boolean
   articleCount: number
   followerCount: number
   followingCount: number
@@ -638,7 +641,15 @@ export interface FreePass {
 }
 
 export const drives = {
-  create: (data: { type: 'crowdfund' | 'commission'; title: string; description: string; targetAmountPence: number; targetWriterId?: string }) =>
+  create: (data: {
+    origin: 'crowdfund' | 'commission'
+    title: string
+    description?: string
+    fundingTargetPence?: number
+    suggestedPricePence?: number
+    targetWriterId?: string
+    parentNoteEventId?: string
+  }) =>
     request<{ driveId: string }>('/drives', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -665,8 +676,11 @@ export const drives = {
   withdrawPledge: (id: string) =>
     request<{ ok: boolean }>(`/drives/${id}/pledge`, { method: 'DELETE' }),
 
-  accept: (id: string) =>
-    request<{ ok: boolean }>(`/drives/${id}/accept`, { method: 'POST' }),
+  accept: (id: string, terms?: { acceptanceTerms?: string; backerAccessMode?: 'free' | 'paywalled'; deadline?: string }) =>
+    request<{ ok: boolean }>(`/drives/${id}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(terms ?? {}),
+    }),
 
   decline: (id: string) =>
     request<{ ok: boolean }>(`/drives/${id}/decline`, { method: 'POST' }),
@@ -689,15 +703,50 @@ export const freePasses = {
   list: (articleId: string) =>
     request<{ passes: FreePass[] }>(`/articles/${articleId}/free-passes`),
 
-  grant: (articleId: string, username: string) =>
+  grant: (articleId: string, recipientId: string) =>
     request<{ ok: boolean }>(`/articles/${articleId}/free-pass`, {
       method: 'POST',
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ recipientId }),
     }),
 
   revoke: (articleId: string, userId: string) =>
     request<{ ok: boolean }>(`/articles/${articleId}/free-pass/${userId}`, {
       method: 'DELETE',
+    }),
+}
+
+// =============================================================================
+// Gift Links
+// =============================================================================
+
+export interface GiftLink {
+  id: string
+  token: string
+  maxRedemptions: number
+  redemptionCount: number
+  revoked: boolean
+  createdAt: string
+}
+
+export const giftLinks = {
+  create: (articleId: string, maxRedemptions = 5) =>
+    request<{ id: string; token: string; url: string; maxRedemptions: number }>(`/articles/${articleId}/gift-link`, {
+      method: 'POST',
+      body: JSON.stringify({ maxRedemptions }),
+    }),
+
+  list: (articleId: string) =>
+    request<{ giftLinks: GiftLink[] }>(`/articles/${articleId}/gift-links`),
+
+  revoke: (articleId: string, linkId: string) =>
+    request<{ ok: boolean }>(`/articles/${articleId}/gift-link/${linkId}`, {
+      method: 'DELETE',
+    }),
+
+  redeem: (articleId: string, token: string) =>
+    request<{ ok: boolean; unlocked: boolean }>(`/articles/${articleId}/redeem-gift`, {
+      method: 'POST',
+      body: JSON.stringify({ token }),
     }),
 }
 

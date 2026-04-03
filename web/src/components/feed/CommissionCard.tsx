@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { PledgeDrive } from '../../lib/api'
-import { drives } from '../../lib/api'
 import { useAuth } from '../../stores/auth'
-import { formatDateFromISO } from '../../lib/format'
+import { drives } from '../../lib/api'
 
-export function ProfileDriveCard({ drive }: { drive: PledgeDrive }) {
+export function CommissionCard({ drive }: { drive: PledgeDrive }) {
   const { user } = useAuth()
-  const [showPledge, setShowPledge] = useState(false)
   const [pledgeAmount, setPledgeAmount] = useState('')
+  const [showPledge, setShowPledge] = useState(false)
   const [pledging, setPledging] = useState(false)
   const [pledgeError, setPledgeError] = useState<string | null>(null)
   const [pledged, setPledged] = useState(false)
@@ -35,59 +35,54 @@ export function ProfileDriveCard({ drive }: { drive: PledgeDrive }) {
     }
   }
 
-  const isActive = drive.status === 'active' || drive.status === 'funded'
-
   return (
-    <div className="bg-white px-6 py-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono text-[12px] uppercase tracking-[0.06em] text-grey-300">
-              Pledge drive
-            </span>
-            {drive.pinnedOnProfile && (
-              <span className="font-mono text-[12px] uppercase tracking-[0.06em] text-crimson">Pinned</span>
-            )}
-            <span className={`font-mono text-[12px] uppercase tracking-[0.06em] ${
-              drive.status === 'funded' ? 'text-black' : drive.status === 'cancelled' ? 'text-grey-300' : 'text-grey-400'
-            }`}>
-              {drive.status}
-            </span>
-          </div>
-          <p className="font-serif text-lg font-medium text-black">{drive.title}</p>
-          {drive.description && (
-            <p className="text-[14px] text-grey-600 font-sans mt-1 line-clamp-2">{drive.description}</p>
-          )}
-        </div>
+    <div className="bg-white border border-grey-200 px-6 py-5">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="font-mono text-[12px] uppercase tracking-[0.06em] text-crimson">
+          Commission
+        </span>
+        <span className={`font-mono text-[12px] uppercase tracking-[0.06em] ${
+          drive.status === 'funded' ? 'text-black' : 'text-grey-400'
+        }`}>
+          {drive.status}
+        </span>
+      </div>
 
-        <div className="text-right flex-shrink-0">
-          <p className="font-serif text-lg text-black">
-            £{(drive.currentAmountPence / 100).toFixed(2)}
-          </p>
+      {/* Title and target writer */}
+      <p className="font-serif text-lg font-medium text-black">{drive.title}</p>
+      {drive.description && (
+        <p className="text-[14px] text-grey-600 font-sans mt-1 line-clamp-3">{drive.description}</p>
+      )}
+      <p className="mt-2 font-mono text-[12px] text-grey-400 uppercase tracking-[0.04em]">
+        For <Link href={`/${drive.writerUsername}`} className="hover:text-black transition-colors">{drive.writerUsername}</Link>
+      </p>
+
+      {/* Amount and progress */}
+      <div className="mt-3 flex items-center justify-between">
+        <p className="font-serif text-[22px] text-black">
+          £{(drive.currentAmountPence / 100).toFixed(2)}
+        </p>
+        {drive.targetAmountPence > 0 && (
           <p className="font-mono text-[12px] text-grey-300 uppercase tracking-[0.06em]">
             of £{(drive.targetAmountPence / 100).toFixed(2)}
           </p>
-        </div>
+        )}
       </div>
 
       {/* Progress bar */}
-      <div className="mt-3 h-1.5 bg-grey-100 w-full">
-        <div
-          className="h-full bg-crimson transition-all"
-          style={{ width: `${progressPct}%` }}
-        />
-      </div>
-      <div className="mt-1 flex items-center justify-between">
-        <p className="font-mono text-[12px] text-grey-300 uppercase tracking-[0.06em]">
-          {progressPct}% · {drive.pledgeCount} {drive.pledgeCount === 1 ? 'pledge' : 'pledges'}
-        </p>
-        <time className="font-mono text-[12px] text-grey-300 uppercase tracking-[0.06em]">
-          {formatDateFromISO(drive.createdAt)}
-        </time>
-      </div>
+      {drive.targetAmountPence > 0 && (
+        <div className="mt-2 h-1.5 bg-grey-100 w-full">
+          <div className="h-full bg-crimson transition-all" style={{ width: `${progressPct}%` }} />
+        </div>
+      )}
+
+      <p className="mt-1 font-mono text-[12px] text-grey-300 uppercase tracking-[0.06em]">
+        {drive.pledgeCount} {drive.pledgeCount === 1 ? 'pledge' : 'pledges'}
+      </p>
 
       {/* Pledge action */}
-      {user && isActive && !pledged && (
+      {user && !pledged && drive.status !== 'cancelled' && (
         <div className="mt-3">
           {!showPledge ? (
             <button

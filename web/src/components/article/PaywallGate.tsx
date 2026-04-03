@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ThereforeMark } from '../icons/ThereforeMark'
 
@@ -18,6 +18,9 @@ interface PaywallGateProps {
   isSubscribed?: boolean
   onSubscribe?: () => void
   subscribing?: boolean
+  writerSpendThisMonthPence?: number
+  nudgeShownThisMonth?: boolean
+  writerId?: string
 }
 
 export function PaywallGate({
@@ -25,6 +28,7 @@ export function PaywallGate({
   onUnlock, unlocking, error,
   writerUsername, writerName, subscriptionPricePence, isSubscribed,
   onSubscribe, subscribing,
+  writerSpendThisMonthPence, nudgeShownThisMonth, writerId,
 }: PaywallGateProps) {
   let heading: string
   let subtext: string
@@ -49,8 +53,47 @@ export function PaywallGate({
   const showSubscribeOption = isLoggedIn && !isSubscribed && subscriptionPricePence && subscriptionPricePence > 0
   const subPricePounds = subscriptionPricePence ? (subscriptionPricePence / 100).toFixed(2) : null
 
+  // Subscription nudge logic
+  const spendPounds = writerSpendThisMonthPence != null
+    ? (writerSpendThisMonthPence / 100).toFixed(2)
+    : null
+  const meetsThreshold = writerSpendThisMonthPence != null && subscriptionPricePence != null
+    && writerSpendThisMonthPence >= subscriptionPricePence * 0.7
+  const overThreshold = writerSpendThisMonthPence != null && subscriptionPricePence != null
+    && writerSpendThisMonthPence > subscriptionPricePence
+  const showConversionOffer = meetsThreshold && !overThreshold && !nudgeShownThisMonth
+  const showOverThresholdNote = overThreshold
+
+  // Mark nudge as shown (one-shot per reader/writer/month)
+  const nudgeMarked = useRef(false)
+  useEffect(() => {
+    if (showConversionOffer && writerId && !nudgeMarked.current) {
+      nudgeMarked.current = true
+      fetch('/api/v1/nudge/shown', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ writerId }),
+      }).catch(() => {})
+    }
+  }, [showConversionOffer, writerId])
+
+  const gateRef = useRef<HTMLDivElement>(null)
+  const [animateEllipsis, setAnimateEllipsis] = useState(false)
+
+  useEffect(() => {
+    const el = gateRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setAnimateEllipsis(true); observer.disconnect() } },
+      { threshold: 0.3 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className="my-16 -mx-[48px]">
+    <div className="my-16 -mx-[48px]" ref={gateRef}>
       {/* Gradient fade */}
       <div className="relative h-[100px] -mt-[100px] pointer-events-none" style={{ background: 'linear-gradient(to bottom, transparent, #FFFFFF)' }} />
 
@@ -60,7 +103,7 @@ export function PaywallGate({
       >
         {/* Ornament */}
         <div className="text-center mb-6">
-          <ThereforeMark size={24} weight="light" className="text-crimson inline-block" />
+          <ThereforeMark size={24} weight="heavy" className="text-crimson inline-block" animate={animateEllipsis ? 'ellipsis' : undefined} />
         </div>
 
         <h2 className="font-serif text-[26px] font-normal text-black mb-3">{heading}</h2>
@@ -92,23 +135,28 @@ export function PaywallGate({
                 disabled={subscribing}
                 className="btn disabled:opacity-50"
               >
-                {subscribing ? 'Subscribing...' : `Subscribe £${subPricePounds}/mo`}
+                {subscribing ? 'Subscribing...' : 'Subscribe'}
               </button>
             ) : writerUsername ? (
               <Link href={`/${writerUsername}`} className="btn inline-block">
-                Subscribe £{subPricePounds}/mo
+                Subscribe
               </Link>
             ) : null}
+
+            {/* Spend-threshold subscription nudge */}
+            {showConversionOffer && spendPounds && (
+              <p className="mt-4 font-mono text-[12px] text-grey-400">
+                You&apos;ve spent £{spendPounds} on {writerName ?? writerUsername} this month. Subscribe now and that spending converts to your first month.
+              </p>
+            )}
+            {showOverThresholdNote && spendPounds && subPricePounds && (
+              <p className="mt-4 font-mono text-[12px] text-grey-400">
+                You&apos;ve spent £{spendPounds} on {writerName ?? writerUsername} this month. A subscription is £{subPricePounds}/mo.
+              </p>
+            )}
           </div>
         )}
 
-        <div className="mt-8 flex items-center justify-center gap-4 font-mono text-[12px] uppercase tracking-[0.02em] text-grey-600">
-          <span>Pay per read</span>
-          <span className="opacity-40">/</span>
-          <span>Subscribe for more</span>
-          <span className="opacity-40">/</span>
-          <span>Cancel anytime</span>
-        </div>
       </div>
     </div>
   )

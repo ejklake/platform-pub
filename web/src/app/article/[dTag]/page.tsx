@@ -50,11 +50,14 @@ export default async function ArticlePage({ params }: { params: { dTag: string }
         gatePositionPct: article.gatePositionPct ?? undefined,
         isPaywalled: article.isPaywalled,
       }}
+      articleDbId={article.id}
       writerName={article.writer.displayName ?? article.writer.username}
       writerUsername={article.writer.username}
       writerAvatar={article.writer.avatar ?? undefined}
       writerId={article.writer.id}
       subscriptionPricePence={article.writer.subscriptionPricePence}
+      writerSpendThisMonthPence={article.writerSpendThisMonthPence ?? undefined}
+      nudgeShownThisMonth={article.nudgeShownThisMonth ?? false}
       preRenderedFreeHtml={freeHtml}
     />
   )

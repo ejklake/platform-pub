@@ -1,7 +1,7 @@
-# platform.pub — Deployment Reference v4.8.0
+# platform.pub — Deployment Reference v4.9.0
 
-**Date:** 2 April 2026
-**Replaces:** v4.7.1 (see bottom for change log)
+**Date:** 3 April 2026
+**Replaces:** v4.8.1 (see bottom for change log)
 
 This is the single source of truth for deploying and operating platform.pub.
 
@@ -158,7 +158,7 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.8.0, `schema.sql` includes all structural changes through migration 025; the `_migrations` table is pre-seeded accordingly. Migrations 026–027 must be run separately on existing databases.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v4.9.0, `schema.sql` includes all structural changes through migration 025; the `_migrations` table is pre-seeded accordingly. Migrations 026–030 must be run separately on existing databases.
 
 For **fresh** databases: no action needed — the schema and `_migrations` seed handle everything.
 
@@ -246,6 +246,78 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v4.8.1
+
+New migrations (028, 029, 030). Services changed: **gateway**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+This release implements:
+- ThereforeMark weight consistency (`heavy` everywhere) and CSS animations (spin on page load/hover, ellipsis on paywall gate scroll)
+- Nav bar: brand lockup scaled ~30%, canvas-mode mark matched, "← Feed" removed, nav height 56→60px
+- Paywall gate: bottom legend removed, subscription price deduplicated, ellipsis animation on scroll-into-view
+- Smart subscription nudge: spend-threshold prompt when reader hits ≥70% of writer's sub price in a month, with conversion flow
+- Author gifting: UserSearch typeahead replaces plain text input in FreePassManager, Gift button on own articles, capped gift links with shareable URLs
+- Commissions architecture: Commission button on writer profiles, commission from reply threads, CommissionCard + CommissionForm, pledge action on ProfileDriveCard, acceptance terms flow in dashboard
+
+**Database migrations:**
+
+- Migration 028: Creates `subscription_nudge_log` table (tracks spend-threshold nudge display per reader/writer/month).
+- Migration 029: Creates `gift_links` table (capped shareable URLs for gifting article access).
+- Migration 030: Adds `parent_note_event_id`, `acceptance_terms`, `backer_access_mode` to `pledge_drives`; adds `show_commission_button` to `accounts`.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply new migrations
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/028_subscription_nudge.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/029_gift_links.sql
+
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/030_commissions_expansion.sql
+
+# 2. Rebuild and restart services
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Verify migrations applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT name FROM _migrations ORDER BY name" | grep -E '028|029|030'
+
+# Verify new tables exist
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "\d subscription_nudge_log"
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "\d gift_links"
+
+# Verify new columns
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name='pledge_drives' AND column_name IN ('parent_note_event_id','acceptance_terms','backer_access_mode')"
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT column_name FROM information_schema.columns WHERE table_name='accounts' AND column_name='show_commission_button'"
+
+# Visual checks:
+# - Nav: logo lockup should be ~30% larger, no "← Feed" in canvas mode
+# - ThereforeMark ornaments should appear bolder (heavy weight)
+# - Hover the nav logo — dots should orbit
+# - Paywall gate: no "Pay per read / Subscribe for more / Cancel anytime" legend
+# - Subscribe button should say "Subscribe" (no price), price is in the legend text
+# - On own paywalled articles: Gift and Gift link buttons in the byline action area
+# - Writer profile pages: Commission button next to Follow/Subscribe
+# - Pledge drives on profiles: Pledge button visible to logged-in readers
+# - Dashboard commissions: Accept shows terms form (description, deadline, access mode)
+```
+
+---
 
 ### From v4.7.1
 

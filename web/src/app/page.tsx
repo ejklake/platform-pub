@@ -99,7 +99,7 @@ export default function HomePage() {
 
       {/* ── Section 5: Closing ornament ── */}
       <div className="mt-32 ornament">
-        <ThereforeMark size={24} weight="light" />
+        <ThereforeMark size={24} weight="heavy" />
       </div>
     </div>
   )

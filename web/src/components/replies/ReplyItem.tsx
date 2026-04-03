@@ -31,6 +31,7 @@ interface ReplyItemProps {
   dark?: boolean  // kept for API compat
   onReply?: (replyId: string, replyEventId: string, authorName: string) => void
   onDelete?: (replyId: string) => void
+  onCommission?: (targetWriterId: string, targetWriterName: string, parentNoteEventId: string) => void
   renderComposer?: (replyId: string) => ReactNode
   voteTally?: VoteTally
   myVoteCounts?: MyVoteCount
@@ -44,6 +45,7 @@ export function ReplyItem({
   compact = false,
   onReply,
   onDelete,
+  onCommission,
   renderComposer,
   voteTally,
   myVoteCounts,
@@ -130,6 +132,14 @@ export function ReplyItem({
                     {confirmDelete ? 'Confirm?' : 'Delete'}
                   </button>
                 )}
+                {currentUserId && onCommission && reply.author.id !== currentUserId && (
+                  <button
+                    onClick={() => onCommission(reply.author.id, reply.author.displayName ?? reply.author.username ?? '', reply.nostrEventId)}
+                    className="hover:text-grey-400 transition-colors"
+                  >
+                    Commission
+                  </button>
+                )}
                 <ReportButton targetNostrEventId={reply.nostrEventId} />
                 <VoteControls
                   targetEventId={reply.nostrEventId}
@@ -155,6 +165,7 @@ export function ReplyItem({
                 depth={depth + 1}
                 onReply={onReply}
                 onDelete={onDelete}
+                onCommission={onCommission}
                 renderComposer={renderComposer}
               />
               {renderComposer?.(nested.id)}

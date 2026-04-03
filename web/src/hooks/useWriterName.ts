@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react'
 // =============================================================================
 
 interface WriterInfo {
+  id: string | null
   displayName: string
   username: string
   avatar: string | null
@@ -52,6 +53,7 @@ async function fetchWriterByPubkey(pubkey: string): Promise<WriterInfo | null> {
     if (!res.ok) return null
     const data = await res.json()
     return {
+      id: data.id ?? null,
       displayName: data.displayName ?? data.username ?? pubkey.slice(0, 12),
       username: data.username,
       avatar: data.avatar,

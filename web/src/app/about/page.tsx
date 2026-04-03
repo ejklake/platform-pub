@@ -43,7 +43,7 @@ export default function AboutPage() {
       </div>
 
       <div className="ornament mb-12">
-        <ThereforeMark size={24} weight="light" />
+        <ThereforeMark size={24} weight="heavy" />
       </div>
 
       {!loading && !user && (

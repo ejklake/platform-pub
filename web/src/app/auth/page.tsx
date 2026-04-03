@@ -80,7 +80,7 @@ export default function AuthPage() {
     return (
       <div className="mx-auto max-w-sm px-6 py-28 text-center">
         <div className="ornament mb-8">
-          <ThereforeMark size={24} weight="light" />
+          <ThereforeMark size={24} weight="heavy" />
         </div>
         <h1 className="font-serif text-2xl font-medium text-black mb-4 tracking-tight">
           Check your email
