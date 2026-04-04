@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# platform.pub — Server Hardening Script
+# all.haus — Server Hardening Script
 #
 # Run once on the production server (91.99.106.104) before launch.
 # Requires root. Idempotent — safe to re-run.
@@ -21,7 +21,7 @@
 
 set -euo pipefail
 
-echo "=== platform.pub server hardening ==="
+echo "=== all.haus server hardening ==="
 
 # -------------------------------------------------------------------------
 # 1. UFW Firewall

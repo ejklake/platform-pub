@@ -154,7 +154,7 @@ export default function AuthPage() {
             <div>
               <label htmlFor="username" className="label-muted block mb-2" style={{ fontSize: '13px' }}>Username</label>
               <input id="username" type="text" required pattern="^[a-z0-9_-]+$" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} className="w-full bg-white px-4 py-[14px] text-black focus:outline-none" style={{ fontSize: '16px', border: '1.5px solid #E5E5E5' }} placeholder="yourname" />
-              <p className="mt-2 text-mono-xs text-grey-400">yourname.platform.pub</p>
+              <p className="mt-2 text-mono-xs text-grey-400">yourname.all.haus</p>
             </div>
           </>
         )}

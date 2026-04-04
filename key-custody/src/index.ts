@@ -6,7 +6,7 @@ import { pool } from './db/client.js'
 import logger from './lib/logger.js'
 
 // =============================================================================
-// platform.pub — Key Custody Service
+// all.haus — Key Custody Service
 //
 // Sole responsibility: custody and use of user Nostr private keys.
 //

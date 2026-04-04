@@ -1,7 +1,7 @@
 {
   "name": "@platform-pub/payment-service",
   "version": "0.1.0",
-  "description": "Reading tab accrual, settlement, and writer payout service for platform.pub",
+  "description": "Reading tab accrual, settlement, and writer payout service for all.haus",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

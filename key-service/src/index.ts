@@ -7,7 +7,7 @@ import { pool } from './db/client.js'
 import logger from './lib/logger.js'
 
 // =============================================================================
-// platform.pub — Key Service
+// all.haus — Key Service
 //
 // Runs alongside the relay. Single responsibility: on proof of payment,
 // issue the content key for a given article to a given reader, encrypted

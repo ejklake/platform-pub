@@ -8,7 +8,7 @@ import { pool } from './db/client.js'
 import logger from './lib/logger.js'
 
 // =============================================================================
-// platform.pub — Payment Service
+// all.haus — Payment Service
 // =============================================================================
 
 // Validate required env vars at startup — fail fast

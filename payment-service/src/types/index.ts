@@ -1,5 +1,5 @@
 // =============================================================================
-// platform.pub — Payment Service Types
+// all.haus — Payment Service Types
 // Derived from ADR v0.7 and schema.sql
 // =============================================================================
 

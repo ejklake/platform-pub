@@ -34,7 +34,7 @@ import { pool } from '../shared/src/db/client.js'
 import logger from '../shared/src/lib/logger.js'
 
 // =============================================================================
-// platform.pub — API Gateway
+// all.haus — API Gateway
 //
 // Single ingress point for all client requests. Responsibilities:
 //

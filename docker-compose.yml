@@ -1,5 +1,5 @@
 # =============================================================================
-# platform.pub — Local Development Stack
+# all.haus — Local Development Stack
 #
 # Services:
 #   postgres    — shared database
@@ -80,9 +80,9 @@ services:
       DATABASE_URL: postgresql://platformpub:${POSTGRES_PASSWORD}@postgres:5432/platformpub
       PAYMENT_SERVICE_URL: http://payment:3001
       KEY_SERVICE_URL: http://keyservice:3002
-      APP_URL: https://platform.pub
+      APP_URL: https://all.haus
       MEDIA_DIR: /app/media
-      PUBLIC_MEDIA_URL: https://platform.pub/media
+      PUBLIC_MEDIA_URL: https://all.haus/media
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
       interval: 10s
@@ -161,7 +161,7 @@ services:
       context: .
       dockerfile: web/Dockerfile
       args:
-        NEXT_PUBLIC_RELAY_URL: wss://platform.pub/relay
+        NEXT_PUBLIC_RELAY_URL: wss://all.haus/relay
         NEXT_PUBLIC_GATEWAY_URL: ""
     restart: unless-stopped
     ports:

@@ -1,7 +1,7 @@
 {
   "name": "@platform-pub/key-service",
   "version": "0.1.0",
-  "description": "Vault encryption, key issuance, and NIP-44 wrapping for platform.pub",
+  "description": "Vault encryption, key issuance, and NIP-44 wrapping for all.haus",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

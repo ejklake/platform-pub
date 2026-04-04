@@ -12,7 +12,7 @@ import logger from '../../shared/src/lib/logger.js'
 // These are public routes — no auth required. The writer profile page is
 // the primary landing surface for cold traffic per ADR §II.5:
 //   "The primary cold traffic pattern at launch is writer-directed: a writer
-//    posts 'find me at writer.platform.pub' and their audience follows that link."
+//    posts 'find me at writer.all.haus' and their audience follows that link."
 // =============================================================================
 
 export async function writerRoutes(app: FastifyInstance) {

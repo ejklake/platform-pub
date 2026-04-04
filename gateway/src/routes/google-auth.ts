@@ -32,7 +32,7 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 function getGoogleConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const appUrl = process.env.APP_URL ?? 'https://platform.pub'
+  const appUrl = process.env.APP_URL ?? 'https://all.haus'
 
   // The redirect_uri must point to the Next.js callback page (not a proxied
   // gateway route) so Google lands the browser directly on the frontend.

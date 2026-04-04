@@ -20,7 +20,7 @@ function emailHtml(heading: string, body: string): string {
       </h2>
       ${body}
       <p style="font-size: 12px; color: #d6d3d1; margin-top: 32px;">
-        platform.pub — writing worth reading
+        all.haus — writing worth reading
       </p>
     </div>
   `.trim()

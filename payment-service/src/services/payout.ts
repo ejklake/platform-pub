@@ -251,7 +251,7 @@ export class PayoutService {
         currency: 'gbp',
         destination: stripeConnectId,
         metadata: {
-          platform: 'platform.pub',
+          platform: 'all.haus',
           writer_id: writerId,
         },
       })

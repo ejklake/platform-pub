@@ -22,7 +22,7 @@ import logger from '../../shared/src/lib/logger.js'
 // =============================================================================
 
 const MEDIA_DIR = process.env.MEDIA_DIR ?? '/app/media'
-const PUBLIC_MEDIA_URL = process.env.PUBLIC_MEDIA_URL ?? 'https://platform.pub/media'
+const PUBLIC_MEDIA_URL = process.env.PUBLIC_MEDIA_URL ?? 'https://all.haus/media'
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 
 // oEmbed provider endpoints
@@ -158,7 +158,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       const oembedUrl = `${oembedEndpoint}?url=${encodeURIComponent(url)}&format=json&maxwidth=680`
 
       const res = await fetch(oembedUrl, {
-        headers: { 'User-Agent': 'Platform/1.6 (+https://platform.pub)' },
+        headers: { 'User-Agent': 'Platform/1.6 (+https://all.haus)' },
       })
 
       if (!res.ok) {

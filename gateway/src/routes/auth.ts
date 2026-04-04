@@ -270,7 +270,7 @@ export async function authRoutes(app: FastifyInstance) {
           transfers: { requested: true },
         },
         metadata: {
-          platform: 'platform.pub',
+          platform: 'all.haus',
           account_id: accountId,
         },
       })
@@ -327,7 +327,7 @@ export async function authRoutes(app: FastifyInstance) {
         // Create Stripe Customer
         const customer = await stripe.customers.create({
           metadata: {
-            platform: 'platform.pub',
+            platform: 'all.haus',
             account_id: accountId,
           },
         })

@@ -1,7 +1,7 @@
 {
   "name": "@platform-pub/gateway",
   "version": "0.1.0",
-  "description": "API gateway — auth, session management, and service proxy for platform.pub",
+  "description": "API gateway — auth, session management, and service proxy for all.haus",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

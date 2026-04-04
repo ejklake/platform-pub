@@ -1,9 +1,9 @@
-# platform.pub — Deployment Reference v4.9.1
+# all.haus — Deployment Reference v4.9.1
 
 **Date:** 3 April 2026
 **Replaces:** v4.9.0 (see bottom for change log)
 
-This is the single source of truth for deploying and operating platform.pub.
+This is the single source of truth for deploying and operating all.haus.
 
 ---
 
@@ -1724,7 +1724,7 @@ ss -tlnp | grep -E '3001|3002|3003|3004'
 # Should return nothing (no host port bindings)
 
 # Verify nginx security headers
-curl -sI https://platform.pub | grep -i strict-transport
+curl -sI https://all.haus | grep -i strict-transport
 # Should return Strict-Transport-Security header
 ```
 
@@ -2209,7 +2209,7 @@ docker logs platform-pub-gateway-1 --tail 5
 #
 # ── Magic link email (gateway .env) ──
 # EMAIL_PROVIDER set to postmark, POSTMARK_API_KEY configured,
-# EMAIL_FROM set to login@platform.pub. Gateway restart required
+# EMAIL_FROM set to login@all.haus. Gateway restart required
 # to pick up .env changes (not in git).
 ```
 
@@ -3666,9 +3666,9 @@ No schema changes. Rebuild gateway and web, then update the Google OAuth redirec
 cd /root/platform-pub
 git pull origin master
 
-# Ensure APP_URL in gateway/.env is the FRONTEND URL (e.g. https://platform.pub),
+# Ensure APP_URL in gateway/.env is the FRONTEND URL (e.g. https://all.haus),
 # NOT the gateway URL. This has always been required but was previously undocumented.
-grep APP_URL gateway/.env   # should be https://platform.pub or http://localhost:3010
+grep APP_URL gateway/.env   # should be https://all.haus or http://localhost:3010
 
 docker compose build gateway web
 docker compose up -d gateway web
@@ -3679,7 +3679,7 @@ In APIs & Services → Credentials → your OAuth 2.0 client, remove the old red
 
 | Remove | Add |
 |--------|-----|
-| `https://platform.pub/api/v1/auth/google/callback` | `https://platform.pub/auth/google/callback` |
+| `https://all.haus/api/v1/auth/google/callback` | `https://all.haus/auth/google/callback` |
 
 Verify:
 ```bash

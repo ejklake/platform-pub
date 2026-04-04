@@ -181,7 +181,7 @@ export class SettlementService {
       confirm: true,
       off_session: true,
       metadata: {
-        platform: 'platform.pub',
+        platform: 'all.haus',
         reader_id: readerId,
         tab_id: tabId,
         trigger_type: triggerType,

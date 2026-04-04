@@ -4,7 +4,7 @@ import { pool } from '../../shared/src/db/client.js'
 // =============================================================================
 // RSS Feed Routes
 //
-// Per ADR §II.6: "RSS/Atom output: platform.pub writers' public posts
+// Per ADR §II.6: "RSS/Atom output: all.haus writers' public posts
 // available as RSS at launch, for distribution."
 //
 // Two feeds:
@@ -18,7 +18,7 @@ import { pool } from '../../shared/src/db/client.js'
 // Feed format: RSS 2.0 (broader client support than Atom)
 // =============================================================================
 
-const SITE_URL = process.env.APP_URL ?? 'https://platform.pub'
+const SITE_URL = process.env.APP_URL ?? 'https://all.haus'
 
 export async function rssRoutes(app: FastifyInstance) {
 

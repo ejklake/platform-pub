@@ -50,9 +50,9 @@ export async function sendMagicLinkEmail(
 
   await sendEmail({
     to,
-    subject: 'Your platform.pub login link',
+    subject: 'Your all.haus login link',
     textBody: [
-      'Click this link to log in to platform.pub:',
+      'Click this link to log in to all.haus:',
       '',
       verifyUrl,
       '',
@@ -63,7 +63,7 @@ export async function sendMagicLinkEmail(
     htmlBody: `
       <div style="font-family: -apple-system, system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 0;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1c1917; margin-bottom: 16px;">
-          Log in to platform.pub
+          Log in to all.haus
         </h2>
         <p style="font-size: 15px; color: #57534e; line-height: 1.6; margin-bottom: 24px;">
           Click the button below to log in. This link expires in ${expiresInMinutes} minutes.
@@ -76,7 +76,7 @@ export async function sendMagicLinkEmail(
           If you didn't request this email, you can safely ignore it.
         </p>
         <p style="font-size: 12px; color: #d6d3d1; margin-top: 24px;">
-          platform.pub — writing worth reading
+          all.haus — writing worth reading
         </p>
       </div>
     `.trim(),
@@ -91,7 +91,7 @@ async function sendViaPostmark(params: EmailParams): Promise<void> {
   const apiKey = process.env.POSTMARK_API_KEY
   if (!apiKey) throw new Error('POSTMARK_API_KEY not set')
 
-  const fromAddress = process.env.EMAIL_FROM ?? 'login@platform.pub'
+  const fromAddress = process.env.EMAIL_FROM ?? 'login@all.haus'
 
   const res = await fetch('https://api.postmarkapp.com/email', {
     method: 'POST',
@@ -123,7 +123,7 @@ async function sendViaResend(params: EmailParams): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) throw new Error('RESEND_API_KEY not set')
 
-  const fromAddress = process.env.EMAIL_FROM ?? 'login@platform.pub'
+  const fromAddress = process.env.EMAIL_FROM ?? 'login@all.haus'
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',

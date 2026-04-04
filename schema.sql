@@ -1,5 +1,5 @@
 -- =============================================================================
--- platform.pub — PostgreSQL Schema
+-- all.haus — PostgreSQL Schema
 -- Full schema incorporating migrations 001–025.
 -- Loaded by Docker initdb.d on first boot.
 -- =============================================================================

@@ -1,7 +1,7 @@
 {
   "name": "@platform-pub/shared",
   "version": "0.1.0",
-  "description": "Shared database client, auth, session, and keypair management for platform.pub",
+  "description": "Shared database client, auth, session, and keypair management for all.haus",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
