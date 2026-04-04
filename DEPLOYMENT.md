@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.0.0
+# all.haus — Deployment Reference v5.0.1
 
 **Date:** 4 April 2026
-**Replaces:** v4.9.1 (see bottom for change log)
+**Replaces:** v5.0.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,52 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.0.0
+
+No new migrations. Services changed: **web**. Deploy order: **rebuild web**.
+
+Fixes a deploy-blocking bug where the landing page (and all pages) showed an infinite loading spinner instead of content. The `AuthProvider` component was blocking the entire render tree until the `/api/v1/auth/me` request completed. If the gateway was slow to start after a deploy, or the request hung, the site was unusable. The fix removes the loading gate from `AuthProvider` — auth now hydrates in the background while pages render immediately. All authenticated pages already have their own loading/redirect guards.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build web
+docker compose up -d web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+
+# web should show (healthy) after ~30s
+
+# Landing page should render immediately without a spinner
+curl -s http://localhost:3010 | grep -q "Free authors" && echo "OK" || echo "FAIL"
+
+# Visual check: open the site in a browser
+# - Landing page should load instantly (no spinning box)
+# - Nav should show login/signup links while auth hydrates
+# - Protected pages (/dashboard, /write, etc.) still show their own loading states
+```
+
+```bash
+# v5.0.1 — Fix blank landing page (AuthProvider loading gate)
+#
+# AuthProvider was rendering a full-screen spinner and blocking all
+# children until fetchMe() resolved. If the gateway was slow or
+# unreachable after a deploy, the entire site was stuck on a spinner.
+#
+# Fix: removed the loading gate. AuthProvider now fires fetchMe() on
+# mount and renders children immediately. Every page that requires
+# auth already checks loading + user from the auth store individually.
+#
+# Files changed:
+#   web/src/components/layout/AuthProvider.tsx — removed loading gate
+```
+
+---
 
 ### From v4.9.1
 
@@ -1722,9 +1768,11 @@ Changes:
 # File: docker-compose.yml
 #
 # ── Fix 21: Auth hydration guard ──
-# AuthProvider now renders a loading spinner until fetchMe() resolves,
-# preventing children from rendering in an indeterminate auth state.
-# Protected routes no longer flash or redirect incorrectly on page load.
+# AuthProvider fires fetchMe() on mount. Individual protected pages
+# check the loading/user state from the auth store and show their own
+# loading states or redirects as needed. (The original full-screen
+# loading gate was removed in v5.0.1 — it blocked all page rendering
+# when the gateway was slow, causing a blank site after deploys.)
 # File: web/src/components/layout/AuthProvider.tsx
 #
 # ── Fix 22: ON DELETE clauses for migrations 016-017 ──
