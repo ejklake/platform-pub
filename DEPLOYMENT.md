@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.0.1
+# all.haus — Deployment Reference v5.0.3
 
 **Date:** 4 April 2026
-**Replaces:** v5.0.0 (see bottom for change log)
+**Replaces:** v5.0.2 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,54 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.0.2
+
+No new migrations. No service rebuild required. Services changed: **nginx** only. Deploy order: **reload nginx**.
+
+Fixes two bugs introduced by the v3.28.0 CSP header: navigation items not rendering (stuck on skeleton pulse) and the `/auth` page failing to load. The CSP `script-src 'self'` directive blocked Next.js App Router inline bootstrap scripts (`self.__next_f.push(...)`), preventing client-side hydration. Without hydration, the Zustand auth store never ran `fetchMe()`, so `loading` stayed `true` and the nav showed only the pulse placeholder. The auth page — a `'use client'` component — rendered an empty shell.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No rebuild needed — only nginx.conf changed
+docker compose exec nginx nginx -s reload
+```
+
+Verify:
+```bash
+# Nav items should render (Feed, About for anon; Feed, Write, Dashboard, Following for authed)
+curl -s https://all.haus | grep -q 'Feed' && echo "OK" || echo "FAIL"
+
+# Auth page should load
+curl -s -o /dev/null -w "%{http_code}" https://all.haus/auth
+# Should return 200
+
+# CSP header should now include 'unsafe-inline' in script-src
+curl -sI https://all.haus | grep -i content-security-policy
+# Should show: script-src 'self' 'unsafe-inline'
+```
+
+```bash
+# v5.0.3 — Fix nav items not loading and auth page not rendering
+#
+# The CSP header in nginx.conf had script-src 'self' without
+# 'unsafe-inline'. Next.js App Router emits inline <script> tags
+# for React Server Components flight data (self.__next_f.push(...)).
+# Blocking these prevented client-side hydration entirely:
+#   - Nav component stuck on loading=true skeleton (fetchMe() never ran)
+#   - Auth page (/auth) rendered empty (it's a 'use client' component)
+#   - Login/signup buttons invisible (rendered in the loading===false branch)
+#
+# Fix: added 'unsafe-inline' to script-src in the CSP header.
+# This matches the style-src fix from v5.0.2.
+#
+# Files changed:
+#   nginx.conf — CSP script-src now includes 'unsafe-inline'
+```
+
+---
 
 ### From v5.0.0
 
@@ -1869,7 +1917,7 @@ Changes:
 # X-Content-Type-Options nosniff, Referrer-Policy
 # strict-origin-when-cross-origin, Permissions-Policy (camera,
 # microphone, geolocation disabled), Content-Security-Policy
-# (default-src 'self', script-src 'self', style-src 'self' 'unsafe-inline',
+# (default-src 'self', script-src 'self' 'unsafe-inline', style-src 'self' 'unsafe-inline',
 # img-src 'self' data: blob:, connect-src 'self' wss:).
 # File: nginx.conf
 #
@@ -4260,6 +4308,27 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.0.3 — 4 April 2026
+
+**Fix: nav items not loading, auth page not rendering (CSP blocks Next.js hydration)**
+
+**Root cause:** The CSP header in `nginx.conf` had `script-src 'self'` without `'unsafe-inline'`, which blocked Next.js App Router inline bootstrap scripts (`self.__next_f.push(...)`). Without client-side hydration: the Zustand auth store never called `fetchMe()`, so the Nav component stayed in `loading === true` state (showing only a skeleton pulse); the `/auth` page — a `'use client'` component — rendered an empty shell; and the login/signup buttons in the nav (rendered in the `loading === false` branch) were never visible.
+
+**Changes:**
+
+- `nginx.conf`: added `'unsafe-inline'` to CSP `script-src` — Next.js App Router requires this for its inline flight-data scripts
+
+**Files changed:** `nginx.conf`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose exec nginx nginx -s reload`
+
+No service rebuild required.
+
+---
 
 ### v5.0.2 — 4 April 2026
 
