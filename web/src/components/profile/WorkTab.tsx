@@ -125,7 +125,7 @@ export function WorkTab({ username, writer, isOwnProfile, onQuote }: WorkTabProp
   }
 
   if (items.length === 0) {
-    return <p className="text-ui-sm text-grey-400 py-10">No articles or pledge drives yet.</p>
+    return <p className="text-ui-sm text-grey-400 py-10">No articles yet.</p>
   }
 
   const pinned = items

@@ -53,11 +53,16 @@ export async function writerRoutes(app: FastifyInstance) {
 
       const writer = rows[0]
 
-      // Count published articles, followers, and following
-      const [countResult, followerResult, followingResult] = await Promise.all([
+      // Count published articles, paywalled articles, followers, and following
+      const [countResult, paywalledResult, followerResult, followingResult] = await Promise.all([
         pool.query<{ count: string }>(
           `SELECT COUNT(*) AS count FROM articles
            WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL`,
+          [writer.id]
+        ),
+        pool.query<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM articles
+           WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL AND access_mode = 'paywalled'`,
           [writer.id]
         ),
         pool.query<{ count: string }>(
@@ -82,6 +87,7 @@ export async function writerRoutes(app: FastifyInstance) {
         annualDiscountPct: writer.annual_discount_pct,
         showCommissionButton: writer.show_commission_button,
         articleCount: parseInt(countResult.rows[0].count, 10),
+        hasPaywalledArticle: parseInt(paywalledResult.rows[0].count, 10) > 0,
         followerCount: parseInt(followerResult.rows[0].count, 10),
         followingCount: parseInt(followingResult.rows[0].count, 10),
       })

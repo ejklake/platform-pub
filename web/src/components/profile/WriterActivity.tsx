@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '../../stores/auth'
+import { messages as messagesApi } from '../../lib/api'
 import { NoteComposer } from '../feed/NoteComposer'
 import { WorkTab } from './WorkTab'
 import { SocialTab } from './SocialTab'
@@ -15,7 +16,7 @@ import { CommissionForm } from '../ui/CommissionForm'
 
 type ProfileTab = 'work' | 'social' | 'followers' | 'following'
 
-const TABS: ProfileTab[] = ['work', 'social', 'followers', 'following']
+const ALL_TABS: ProfileTab[] = ['work', 'social', 'followers', 'following']
 
 interface SubStatus {
   subscribed: boolean
@@ -33,8 +34,15 @@ interface WriterActivityProps {
 export function WriterActivity({ username, writer }: WriterActivityProps) {
   const { user, loading: authLoading } = useAuth()
   const searchParams = useSearchParams()
+
+  // Only show Work tab if the writer has published at least one article
+  const tabs = writer.articleCount > 0
+    ? ALL_TABS
+    : ALL_TABS.filter(t => t !== 'work')
+
   const rawTab = searchParams.get('tab')
-  const initialTab: ProfileTab = (rawTab && TABS.includes(rawTab as ProfileTab)) ? rawTab as ProfileTab : 'work'
+  const defaultTab = tabs[0]
+  const initialTab: ProfileTab = (rawTab && tabs.includes(rawTab as ProfileTab)) ? rawTab as ProfileTab : defaultTab
 
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab)
   const [following, setFollowing] = useState(false)
@@ -45,10 +53,10 @@ export function WriterActivity({ username, writer }: WriterActivityProps) {
 
   // Sync tab from URL changes
   useEffect(() => {
-    if (rawTab && TABS.includes(rawTab as ProfileTab)) {
+    if (rawTab && tabs.includes(rawTab as ProfileTab)) {
       setActiveTab(rawTab as ProfileTab)
     }
-  }, [rawTab])
+  }, [rawTab, tabs])
 
   function switchTab(tab: ProfileTab) {
     setActiveTab(tab)
@@ -134,12 +142,23 @@ export function WriterActivity({ username, writer }: WriterActivityProps) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
+  const router = useRouter()
   const isOwnProfile = user?.username === username
   const [showCommissionForm, setShowCommissionForm] = useState(false)
+  const [msgLoading, setMsgLoading] = useState(false)
 
-  // Check if writer has paywalled articles (for showing subscription UI)
-  // We show the sub button if the writer has a subscription price set
-  const hasPaywall = writer.subscriptionPricePence > 0
+  async function handleMessage() {
+    if (!user || !writer) return
+    setMsgLoading(true)
+    try {
+      const result = await messagesApi.createConversation([writer.id])
+      router.push(`/messages#${result.conversationId}`)
+    } catch { router.push('/messages') }
+    finally { setMsgLoading(false) }
+  }
+
+  // Show subscription/commission UI only if writer has published a paywalled article
+  const hasPaywall = writer.hasPaywalledArticle && writer.subscriptionPricePence > 0
 
   return (
     <>
@@ -154,7 +173,15 @@ export function WriterActivity({ username, writer }: WriterActivityProps) {
             {followLoading ? '...' : following ? 'Following' : 'Follow'}
           </button>
 
-          {writer.showCommissionButton && (
+          <button
+            onClick={handleMessage}
+            disabled={msgLoading}
+            className="btn-ghost py-1.5 px-4 text-ui-xs transition-colors disabled:opacity-50"
+          >
+            {msgLoading ? '...' : 'Message'}
+          </button>
+
+          {writer.showCommissionButton && writer.hasPaywalledArticle && (
             <button
               onClick={() => setShowCommissionForm(true)}
               className="btn-ghost py-1.5 px-4 text-ui-xs transition-colors"
@@ -246,7 +273,7 @@ export function WriterActivity({ username, writer }: WriterActivityProps) {
 
       {/* Tab navigation */}
       <div className="flex gap-2 mb-8">
-        {TABS.map(tab => (
+        {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => switchTab(tab)}

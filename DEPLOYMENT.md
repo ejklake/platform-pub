@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.0.3
+# all.haus — Deployment Reference v5.1.0
 
 **Date:** 4 April 2026
-**Replaces:** v5.0.2 (see bottom for change log)
+**Replaces:** v5.0.3 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,51 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.0.3
+
+No new migrations. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
+
+This release improves empty profile page UX and adds a Message button to writer profiles.
+
+**Backend (gateway):**
+
+- Writer profile endpoint (`GET /writers/:username`) now returns `hasPaywalledArticle` boolean, indicating whether the writer has published at least one paywalled article.
+
+**Frontend (web):**
+
+- **Work tab hidden on empty profiles**: the Work tab is no longer shown on writer profiles until the writer has published at least one article. Default tab becomes Social.
+- **Subscribe / Commission buttons gated**: Subscribe and Commission buttons only appear once the writer has published a paywalled article (previously they appeared as soon as the writer set a subscription price or enabled commissions, even with no content).
+- **Message button on profiles**: logged-in users now see a "Message" button on writer profile pages. Clicking it creates a DM conversation and navigates to `/messages`.
+- **Empty state text**: "No articles or pledge drives yet." changed to "No articles yet."
+- **Avatar error fallback**: the Avatar component now gracefully falls back to the initial-letter placeholder when an avatar image fails to load (previously showed a broken image).
+- **Favicon**: replaced three-dots favicon with the crimson ∀ (ForAllMark) used in the nav bar.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Verify favicon is the ∀ mark
+curl -s http://localhost:3010/favicon.svg | grep -q 'path' && echo "OK" || echo "FAIL"
+
+# Visual checks:
+# - Visit a writer profile with no articles — Work tab should be hidden, Social tab active
+# - Visit a writer profile with articles — Work tab should be visible and active
+# - Subscribe/Commission buttons should only appear on profiles with paywalled articles
+# - Message button should appear next to Follow on other users' profiles
+# - Browser tab should show the crimson ∀ mark, not three dots
+```
+
+---
 
 ### From v5.0.2
 
@@ -4308,6 +4353,32 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.1.0 — 4 April 2026
+
+**Improve empty profile UX, add Message button to writer profiles**
+
+**Changes:**
+
+- `gateway/src/routes/writers.ts`: writer profile endpoint now returns `hasPaywalledArticle` boolean (queries articles with `access_mode = 'paywalled'`)
+- `web/src/lib/api.ts`: added `hasPaywalledArticle` to `WriterProfile` type
+- `web/src/components/profile/WriterActivity.tsx`: Work tab hidden when `articleCount === 0`; Subscribe button gated on `hasPaywalledArticle`; Commission button gated on `hasPaywalledArticle`; added Message button that creates a DM conversation and navigates to `/messages`
+- `web/src/components/profile/WorkTab.tsx`: empty state text changed from "No articles or pledge drives yet." to "No articles yet."
+- `web/src/components/ui/Avatar.tsx`: added `onError` fallback — broken avatar images now show the initial-letter placeholder instead of a broken image icon
+- `web/public/favicon.svg`: replaced three-dots design with crimson ∀ (ForAllMark)
+- `feature-debt.md` (new): lightweight scratchpad for future feature ideas mentioned in passing
+
+**Files changed:** `gateway/src/routes/writers.ts`, `web/src/lib/api.ts`, `web/src/components/profile/WriterActivity.tsx`, `web/src/components/profile/WorkTab.tsx`, `web/src/components/ui/Avatar.tsx`, `web/public/favicon.svg`, `feature-debt.md`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose build gateway web`
+3. `docker compose up -d gateway web`
+
+No new migrations. No env vars changed.
+
+---
 
 ### v5.0.3 — 4 April 2026
 

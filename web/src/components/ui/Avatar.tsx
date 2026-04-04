@@ -1,3 +1,7 @@
+'use client'
+
+import { useState } from 'react'
+
 interface AvatarProps {
   src?: string | null
   name: string
@@ -7,8 +11,9 @@ interface AvatarProps {
 
 export function Avatar({ src, name, size = 28, lazy = true }: AvatarProps) {
   const initial = (name || '?')[0].toUpperCase()
+  const [failed, setFailed] = useState(false)
 
-  if (!src) {
+  if (!src || failed) {
     return (
       <span
         style={{ width: size, height: size, fontSize: size * 0.4 }}
@@ -27,6 +32,7 @@ export function Avatar({ src, name, size = 28, lazy = true }: AvatarProps) {
       height={size}
       loading={lazy ? 'lazy' : undefined}
       className="object-cover flex-shrink-0"
+      onError={() => setFailed(true)}
     />
   )
 }

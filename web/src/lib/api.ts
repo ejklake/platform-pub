@@ -315,6 +315,7 @@ export interface WriterProfile {
   annualDiscountPct: number
   showCommissionButton: boolean
   articleCount: number
+  hasPaywalledArticle: boolean
   followerCount: number
   followingCount: number
 }
