@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { FeaturedWriters } from '../components/home/FeaturedWriters'
-import { ThereforeMark } from '../components/icons/ThereforeMark'
+import { ForAllMark } from '../components/icons/ForAllMark'
 
 export default function HomePage() {
   return (
@@ -8,72 +8,91 @@ export default function HomePage() {
 
       {/* ── Section 1: Hero ── */}
       <section>
-        <h1 className="font-serif text-[48px] font-medium leading-[1.05] text-black sm:text-[48px]" style={{ letterSpacing: '-0.03em' }}>
+        <h1
+          className="font-sans font-semibold text-black leading-none"
+          style={{ fontSize: 'clamp(52px, 9vw, 92px)', letterSpacing: '-0.035em', lineHeight: '0.92' }}
+        >
           Free authors.
         </h1>
-        <p className="font-serif text-[48px] font-normal leading-[1.05] text-grey-300 sm:text-[48px] mt-1" style={{ letterSpacing: '-0.03em' }}>
-          Writing that's worth something.
+        <p
+          className="font-sans font-semibold text-grey-600 mt-1 leading-none"
+          style={{ fontSize: 'clamp(52px, 9vw, 92px)', letterSpacing: '-0.035em', lineHeight: '0.92' }}
+        >
+          Writing that&apos;s worth something.
         </p>
 
-        <div className="rule-accent mt-12" />
+        {/* 6px slab rule */}
+        <div className="slab-rule mt-12" />
 
-        <p className="mt-8 font-sans text-lg text-black leading-relaxed max-w-lg">
-          At Platform, you own your identity. Build a profile that
+        <p className="mt-8 font-sans text-[18px] text-black leading-relaxed" style={{ maxWidth: '440px' }}>
+          At all.haus, you own your identity. Build a profile that
           exists on your terms. Find an audience that pays, from
           day one.
         </p>
 
         <div className="mt-10">
-          <Link href="/auth?mode=signup" className="btn-accent">
+          <Link href="/auth?mode=signup" className="btn-accent inline-block">
             Get started — free £5 credit
           </Link>
         </div>
       </section>
 
-      {/* ── Section 2: Manifesto ── */}
+      {/* ── Section 2: Manifesto ("The deal") ── */}
       <section className="mt-32">
-        <div className="rule-accent pt-8">
-          <p className="mb-8 font-mono text-[12px] uppercase tracking-[0.06em] text-grey-400">
-            THE DEAL
-          </p>
+        <div className="flex flex-col md:flex-row">
+          {/* Label column — black, 180px */}
+          <div className="bg-black md:w-[180px] flex-shrink-0 px-6 py-4 md:py-8">
+            <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-grey-400">THE DEAL</span>
+          </div>
 
-          {[
-            'Own your name.',
-            'Own your audience.',
-            'Own your archive.',
-            'Leave whenever you want, and take everything with you.',
-          ].map((line, i, arr) => (
-            <div key={i}>
-              <p className="font-serif italic text-black" style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 400, padding: '0.6em 0' }}>
-                {line}
-              </p>
-              {i < arr.length - 1 && <div className="rule" />}
-            </div>
-          ))}
+          {/* Manifesto lines */}
+          <div className="flex-1 md:pl-8 pt-4 md:pt-0">
+            {[
+              'Own your name.',
+              'Own your audience.',
+              'Own your archive.',
+              'Leave whenever you want, and take everything with you.',
+            ].map((line, i, arr) => (
+              <div key={i}>
+                <p
+                  className="font-serif italic text-black py-5"
+                  style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 400 }}
+                >
+                  {line}
+                </p>
+                {i < arr.length - 1 && <div className="slab-rule-4" />}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ── Section 3: How it works ── */}
       <section className="mt-24">
-        <div className="p-[2.5rem_2rem] bg-grey-100 border border-grey-200">
-          <p className="mb-8 font-mono text-[12px] uppercase tracking-[0.06em] text-grey-400">
-            HOW IT WORKS
-          </p>
+        {/* Label bar */}
+        <div className="section-label-bar">
+          <span>HOW IT WORKS</span>
+        </div>
 
-          <div className="grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        {/* Three-column grid */}
+        <div className="bg-grey-100">
+          <div className="grid md:grid-cols-3">
             {[
               { num: '01', title: 'Write and publish', body: 'Articles and notes. Set a paywall anywhere in the text, or publish free.' },
               { num: '02', title: 'Readers pay per read', body: 'No subscriptions. Charges accumulate on a tab and settle via Stripe.' },
               { num: '03', title: 'You keep 92%', body: '8% covers running costs. No ads, no algorithmic suppression, no tricks.' },
-            ].map(step => (
-              <div key={step.num}>
-                <p className="mb-2 font-mono text-[12px] text-crimson tracking-[0.04em]">
+            ].map((step, i) => (
+              <div
+                key={step.num}
+                className={`p-6 md:p-8 ${i > 0 ? 'border-t-4 border-black md:border-t-0 md:border-l-4' : ''}`}
+              >
+                <p className="mb-2 font-mono text-[11px] text-crimson tracking-[0.04em]">
                   {step.num}
                 </p>
-                <p className="mb-1 font-sans text-[17px] font-semibold text-black">
+                <p className="mb-1 font-sans text-[16px] font-semibold text-black">
                   {step.title}
                 </p>
-                <p className="font-sans text-[15px] text-grey-600 leading-[1.6]">
+                <p className="font-sans text-[14px] text-grey-600 leading-[1.6]">
                   {step.body}
                 </p>
               </div>
@@ -84,22 +103,22 @@ export default function HomePage() {
 
       {/* ── Section 4: Featured writers ── */}
       <section className="mt-24">
-        <p className="mb-8 font-mono text-[12px] uppercase tracking-[0.06em] text-grey-400">
-          NOW WRITING ON PLATFORM
-        </p>
+        <div className="section-label-bar mb-0">
+          <span>NOW WRITING ON ALL.HAUS</span>
+        </div>
 
         <FeaturedWriters />
 
         <div className="mt-8">
-          <Link href="/feed" className="btn-ghost">
-            Read the feed →
+          <Link href="/feed" className="btn-ghost inline-block">
+            Read the feed
           </Link>
         </div>
       </section>
 
-      {/* ── Section 5: Closing ornament ── */}
-      <div className="mt-32 ornament">
-        <ThereforeMark size={24} weight="heavy" />
+      {/* ── Section 5: Closing mark ── */}
+      <div className="flex justify-center mt-20 mb-16">
+        <ForAllMark size={24} className="text-grey-300" />
       </div>
     </div>
   )

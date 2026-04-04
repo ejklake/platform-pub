@@ -12,7 +12,7 @@ import { ShareButton } from '../ui/ShareButton'
 import { ReplySection } from '../replies/ReplySection'
 import { AllowanceExhaustedModal } from '../ui/AllowanceExhaustedModal'
 import { NoteComposer } from '../feed/NoteComposer'
-import { ThereforeMark } from '../icons/ThereforeMark'
+import { ForAllMark } from '../icons/ForAllMark'
 import { UserSearch, type UserSearchResult } from '../ui/UserSearch'
 import { articles as articlesApi, freePasses, giftLinks } from '../../lib/api'
 import type { ArticleEvent } from '../../lib/ndk'
@@ -277,7 +277,7 @@ export function ArticleReader({ article, articleDbId, writerName, writerUsername
                   type="text"
                   readOnly
                   value={giftLinkUrl}
-                  className="w-full border border-grey-200 px-3 py-1.5 text-[13px] font-mono text-black bg-grey-50 mb-3"
+                  className="w-full border border-grey-200 px-3 py-1.5 text-[13px] font-mono text-black bg-grey-100 mb-3"
                   onClick={(e) => (e.target as HTMLInputElement).select()}
                 />
                 <button
@@ -337,7 +337,7 @@ export function ArticleReader({ article, articleDbId, writerName, writerUsername
                 <Avatar src={writerAvatar} name={writerName} size={36} lazy={false} />
                 <div>
                   <a href={`/${writerUsername}`} className="font-sans text-[14px] font-semibold text-black hover:opacity-70 transition-opacity">{writerName}</a>
-                  <p className="font-sans text-[13px] text-grey-400">{publishDate}</p>
+                  <p className="font-sans text-[13px] text-grey-600">{publishDate}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -380,8 +380,8 @@ export function ArticleReader({ article, articleDbId, writerName, writerUsername
               </p>
             )}
 
-            {/* Rule — grey-200 */}
-            <div className="border-t border-grey-200 mb-10 mt-6" />
+            {/* Slab rule */}
+            <div className="slab-rule-4 mb-10 mt-6" />
 
             {/* Article body */}
             <article>
@@ -410,8 +410,8 @@ export function ArticleReader({ article, articleDbId, writerName, writerUsername
 
               {paywallBody && <div className="prose prose-lg mt-10" dangerouslySetInnerHTML={{ __html: paywallHtml }} />}
 
-              <div className="ornament mt-16 mb-12">
-                <ThereforeMark size={24} weight="heavy" className="text-grey-400" />
+              <div className="flex justify-center mt-16 mb-12">
+                <ForAllMark size={24} className="text-grey-300" />
               </div>
               <ReplySection targetEventId={article.id} targetKind={30023} targetAuthorPubkey={article.pubkey} contentAuthorId={undefined} />
             </article>

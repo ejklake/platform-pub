@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { auth } from '../../lib/api'
 import { useAuth } from '../../stores/auth'
-import { ThereforeMark } from '../../components/icons/ThereforeMark'
+import { ForAllMark } from '../../components/icons/ForAllMark'
 
 export default function AuthPage() {
   const searchParams = useSearchParams()
@@ -79,8 +79,8 @@ export default function AuthPage() {
   if (magicLinkSent) {
     return (
       <div className="mx-auto max-w-sm px-6 py-28 text-center">
-        <div className="ornament mb-8">
-          <ThereforeMark size={24} weight="heavy" />
+        <div className="flex justify-center mb-8">
+          <ForAllMark size={24} className="text-grey-300" />
         </div>
         <h1 className="font-serif text-2xl font-medium text-black mb-4 tracking-tight">
           Check your email

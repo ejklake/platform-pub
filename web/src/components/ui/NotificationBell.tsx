@@ -49,9 +49,9 @@ function NotificationItem({ n, onDismiss }: { n: Notification; onDismiss: (id: s
   const destUrl = getDestUrl(n)
 
   const avatar = n.actor?.avatar ? (
-    <img src={n.actor.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0 mt-0.5" />
+    <img src={n.actor.avatar} alt="" className="h-7 w-7  object-cover flex-shrink-0 mt-0.5" />
   ) : (
-    <span className="flex h-7 w-7 items-center justify-center bg-grey-100 text-[10px] font-medium text-grey-400 rounded-full flex-shrink-0 mt-0.5">
+    <span className="flex h-7 w-7 items-center justify-center bg-grey-100 text-[10px] font-medium text-grey-400  flex-shrink-0 mt-0.5">
       {(n.actor?.displayName ?? n.actor?.username ?? '?')[0].toUpperCase()}
     </span>
   )

@@ -63,7 +63,7 @@ export function FollowersTab({ username }: { username: string }) {
           <Link
             key={f.id}
             href={`/${f.username}`}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-grey-50 transition-colors"
+            className="flex items-center gap-3 px-4 py-3 hover:bg-grey-100 transition-colors"
           >
             <Avatar src={f.avatar} name={f.displayName ?? f.username} size={36} />
             <div className="min-w-0 flex-1">

@@ -11,8 +11,6 @@ import type { FeedItem, NoteEvent } from '../../lib/ndk'
 import type { QuoteTarget } from '../../lib/publishNote'
 import { feed as feedApi, votes as votesApi, type VoteTally, type MyVoteCount } from '../../lib/api'
 
-type FeedTab = 'for-you' | 'following'
-
 interface NewUserItem {
   type: 'new_user'
   username: string
@@ -36,9 +34,6 @@ function timeAgo(unixSeconds: number): string {
 export function FeedView() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<FeedTab>('for-you')
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([])
-  const [feedLoading, setFeedLoading] = useState(true)
   const [globalItems, setGlobalItems] = useState<GlobalFeedItem[]>([])
   const [globalLoading, setGlobalLoading] = useState(true)
   const [pendingQuote, setPendingQuote] = useState<QuoteTarget | null>(null)
@@ -50,7 +45,7 @@ export function FeedView() {
 
   // Load the global "For you" feed from the DB
   useEffect(() => {
-    if (!user || activeTab !== 'for-you') return
+    if (!user) return
     async function loadGlobalFeed() {
       setGlobalLoading(true)
       try {
@@ -105,70 +100,14 @@ export function FeedView() {
       finally { setGlobalLoading(false) }
     }
     loadGlobalFeed()
-  }, [user, activeTab])
-
-  useEffect(() => {
-    if (!user || activeTab !== 'following') return
-    async function loadFeed() {
-      setFeedLoading(true)
-      try {
-        const data = await feedApi.following()
-        const items: FeedItem[] = (data.items ?? []).map((item: any) => {
-          if (item.type === 'article') {
-            return {
-              type: 'article' as const,
-              id: item.nostrEventId,
-              pubkey: item.pubkey,
-              dTag: item.dTag,
-              title: item.title,
-              summary: item.summary,
-              content: item.contentFree,
-              isPaywalled: item.isPaywalled,
-              pricePence: item.pricePence,
-              gatePositionPct: item.gatePositionPct,
-              publishedAt: item.publishedAt,
-              tags: [],
-            }
-          } else {
-            return {
-              type: 'note' as const,
-              id: item.nostrEventId,
-              pubkey: item.pubkey,
-              content: item.content,
-              publishedAt: item.publishedAt,
-              quotedEventId: item.quotedEventId,
-              quotedEventKind: item.quotedEventKind,
-              quotedExcerpt: item.quotedExcerpt,
-              quotedTitle: item.quotedTitle,
-              quotedAuthor: item.quotedAuthor,
-            }
-          }
-        })
-        setFeedItems(items)
-
-        const eventIds = items.map(i => i.id)
-        if (eventIds.length > 0) {
-          const [talliesRes, myVotesRes] = await Promise.all([
-            votesApi.getTallies(eventIds).catch(() => ({ tallies: {} })),
-            votesApi.getMyVotes(eventIds).catch(() => ({ voteCounts: {} })),
-          ])
-          setVoteTallies(talliesRes.tallies ?? {})
-          setMyVoteCounts(myVotesRes.voteCounts ?? {})
-        }
-      } catch (err) { console.error('Feed load error:', err) }
-      finally { setFeedLoading(false) }
-    }
-    loadFeed()
-  }, [user, activeTab])
+  }, [user])
 
   const handleNotePublished = useCallback((note: NoteEvent) => {
     setPendingQuote(null)
-    setFeedItems(prev => [note, ...prev])
     setGlobalItems(prev => [note, ...prev])
   }, [])
 
   const handleNoteDeleted = useCallback((id: string) => {
-    setFeedItems(prev => prev.filter(i => i.id !== id))
     setGlobalItems(prev => prev.filter(i => i.type === 'new_user' || i.id !== id))
   }, [])
 
@@ -185,73 +124,34 @@ export function FeedView() {
   return (
     <div className="mx-auto max-w-feed pt-0">
 
-      {/* Sticky zone: composer + tabs */}
-      <div className="sticky top-[56px] z-10 bg-white">
-        <div ref={composerRef} className="px-6 pt-4">
+      {/* Composer */}
+      <div className="sticky top-[60px] z-10 bg-white">
+        <div ref={composerRef} className="px-6 pt-4 pb-4">
           <NoteComposer
             quoteTarget={pendingQuote ?? undefined}
             onPublished={handleNotePublished}
             onClearQuote={() => setPendingQuote(null)}
           />
         </div>
-        <div className="flex px-6 pt-1 border-b-2 border-grey-200">
-          <button
-            onClick={() => setActiveTab('for-you')}
-            className={`tab-feed ${activeTab === 'for-you' ? 'tab-feed-active' : ''}`}
-          >
-            For you
-          </button>
-          <button
-            onClick={() => setActiveTab('following')}
-            className={`tab-feed ${activeTab === 'following' ? 'tab-feed-active' : ''}`}
-          >
-            Following
-          </button>
-        </div>
       </div>
 
-      {/* Content zone */}
-      <div className="pb-10 pt-6">
-        {activeTab === 'for-you' ? (
-          globalLoading ? <InlineSkeleton /> : globalItems.length === 0 ? (
-            <div className="py-20 text-center px-6">
-              <p className="text-ui-sm text-grey-400">Nothing here yet.</p>
-            </div>
-          ) : (
-            <div className="px-6">
-              {globalItems.map((item, idx) => {
-                if (item.type === 'new_user') {
-                  return <NewUserCard key={`new-user-${item.username}-${item.joinedAt}`} item={item} />
-                } else if (item.type === 'article') {
-                  return (
-                    <div key={item.id} className="">
-                      <ArticleCard article={item} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
-                    </div>
-                  )
-                } else {
-                  return <NoteCard key={item.id} note={item} onDeleted={handleNoteDeleted} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
-                }
-              })}
-            </div>
-          )
-        ) : feedLoading ? (
-          <InlineSkeleton />
-        ) : feedItems.length === 0 ? (
+      {/* Feed */}
+      <div className="pb-10">
+        {globalLoading ? <InlineSkeleton /> : globalItems.length === 0 ? (
           <div className="py-20 text-center px-6">
-            <p className="text-ui-sm text-grey-400">
-              Nothing here yet. Search for writers to follow.
-            </p>
+            <p className="text-ui-sm text-grey-600">Nothing here yet.</p>
           </div>
         ) : (
           <div className="px-6">
-            {feedItems.map((item, idx) => item.type === 'article'
-              ? (
-                <div key={item.id} className="">
-                  <ArticleCard article={item} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
-                </div>
-              )
-              : <NoteCard key={item.id} note={item} onDeleted={handleNoteDeleted} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
-            )}
+            {globalItems.map((item) => {
+              if (item.type === 'new_user') {
+                return <NewUserCard key={`new-user-${item.username}-${item.joinedAt}`} item={item} />
+              } else if (item.type === 'article') {
+                return <ArticleCard key={item.id} article={item} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
+              } else {
+                return <NoteCard key={item.id} note={item} onDeleted={handleNoteDeleted} onQuote={handleQuote} voteTally={voteTallies[item.id]} myVoteCounts={myVoteCounts[item.id]} />
+              }
+            })}
           </div>
         )}
       </div>
@@ -269,9 +169,9 @@ function NewUserCard({ item }: { item: NewUserItem }) {
   return (
     <div className="flex items-center gap-3 py-3">
       {item.avatar ? (
-        <img src={item.avatar} alt="" className="h-7 w-7 rounded-full object-cover flex-shrink-0" />
+        <img src={item.avatar} alt="" className="h-7 w-7  object-cover flex-shrink-0" />
       ) : (
-        <span className="flex h-7 w-7 items-center justify-center bg-grey-100 text-[12px] font-medium text-grey-400 rounded-full flex-shrink-0">
+        <span className="flex h-7 w-7 items-center justify-center bg-grey-100 text-[12px] font-medium text-grey-400  flex-shrink-0">
           {initial}
         </span>
       )}
@@ -285,7 +185,7 @@ function NewUserCard({ item }: { item: NewUserItem }) {
         )}
         {' '}joined the platform
       </p>
-      <span className="text-ui-xs text-grey-300 flex-shrink-0">{timeAgo(item.joinedAt)}</span>
+      <span className="text-ui-xs text-grey-600 flex-shrink-0">{timeAgo(item.joinedAt)}</span>
     </div>
   )
 }
@@ -299,7 +199,7 @@ function FeedSkeleton() {
   return (
     <div className="mx-auto max-w-feed pt-16 lg:pt-0 px-6 py-10 space-y-[10px]">
       {[1, 2, 3].map(i => (
-        <div key={i} className="bg-white border border-grey-100 p-5">
+        <div key={i} className="bg-white bg-grey-100 p-5">
           <div className="h-3 w-24 animate-pulse bg-grey-100 mb-4" />
           <div className="h-5 w-3/4 animate-pulse bg-grey-100 mb-3" />
           <div className="h-3 w-full animate-pulse bg-grey-100" />
@@ -313,7 +213,7 @@ function InlineSkeleton() {
   return (
     <div className="px-6 pt-1 space-y-[10px]">
       {[1, 2, 3].map(i => (
-        <div key={i} className="bg-white border border-grey-100 p-5">
+        <div key={i} className="bg-white bg-grey-100 p-5">
           <div className="h-3 w-24 animate-pulse bg-grey-100 mb-4" />
           <div className="h-5 w-3/4 animate-pulse bg-grey-100 mb-3" />
           <div className="h-3 w-full animate-pulse bg-grey-100" />

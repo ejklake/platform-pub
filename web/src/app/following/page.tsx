@@ -113,9 +113,9 @@ export default function FollowingPage() {
               <div key={w.id} className="flex items-center gap-4 py-4">
                 <Link href={`/${w.username}`} className="flex-shrink-0">
                   {w.avatar ? (
-                    <img src={w.avatar} alt="" className="h-11 w-11 rounded-full object-cover" />
+                    <img src={w.avatar} alt="" className="h-11 w-11  object-cover" />
                   ) : (
-                    <span className="flex h-11 w-11 items-center justify-center bg-grey-100 text-sm font-medium text-grey-400 rounded-full">
+                    <span className="flex h-11 w-11 items-center justify-center bg-grey-100 text-sm font-medium text-grey-400 ">
                       {(w.displayName ?? w.username)[0].toUpperCase()}
                     </span>
                   )}
@@ -156,9 +156,9 @@ export default function FollowingPage() {
               <div key={f.id} className="flex items-center gap-4 py-4">
                 <Link href={`/${f.username}`} className="flex-shrink-0">
                   {f.avatar ? (
-                    <img src={f.avatar} alt="" className="h-11 w-11 rounded-full object-cover" />
+                    <img src={f.avatar} alt="" className="h-11 w-11  object-cover" />
                   ) : (
-                    <span className="flex h-11 w-11 items-center justify-center bg-grey-100 text-sm font-medium text-grey-400 rounded-full">
+                    <span className="flex h-11 w-11 items-center justify-center bg-grey-100 text-sm font-medium text-grey-400 ">
                       {(f.displayName ?? f.username)[0].toUpperCase()}
                     </span>
                   )}
@@ -188,7 +188,7 @@ function ListSkeleton() {
     <div className="space-y-3">
       {[1, 2, 3].map(i => (
         <div key={i} className="flex items-center gap-4 py-4 mb-1 animate-pulse">
-          <div className="h-11 w-11 rounded-full bg-grey-100 flex-shrink-0" />
+          <div className="h-11 w-11  bg-grey-100 flex-shrink-0" />
           <div className="flex-1">
             <div className="h-3.5 w-32 bg-grey-100 mb-2 rounded" />
             <div className="h-3 w-20 bg-grey-100 rounded" />

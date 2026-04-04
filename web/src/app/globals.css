@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Self-hosted Literata — the brand font. Latin + Latin-Extended subsets only. */
+/* ── Self-hosted fonts ───────────────────────────────────────────────────────── */
+
+/* Literata — serif, literary voice */
 @font-face {
   font-family: 'Literata';
   font-style: normal;
@@ -36,10 +38,39 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* Jost — geometric sans, platform voice */
+@font-face {
+  font-family: 'Jost';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/jost-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Jost';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/jost-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* IBM Plex Mono — infrastructure voice */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────────── */
+
 @layer base {
   body {
-    @apply bg-white text-black antialiased;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    @apply bg-white text-black antialiased font-sans;
     font-size: 1rem;
     line-height: 1.6;
     padding-top: 0;
@@ -50,10 +81,11 @@
     color: #FFFFFF;
   }
 
+  /* No hairline hrs — use slab-rule classes instead */
   hr {
     border: none;
-    height: 1px;
-    background: #E5E5E5;
+    height: 4px;
+    background: #111111;
   }
 
   input[type="text"],
@@ -62,10 +94,10 @@
   input[type="password"],
   textarea,
   select {
-    @apply bg-white text-black rounded-none;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    @apply bg-white text-black font-sans;
     font-size: 0.9375rem;
     border: 1px solid #E5E5E5;
+    border-radius: 0;
     transition: border-color 0.15s ease;
   }
 
@@ -78,18 +110,17 @@
   }
 
   ::placeholder {
-    color: #BBBBBB;
+    color: #999999;
     font-style: normal;
   }
 
-  /* Checkbox and radio styling */
   input[type="checkbox"],
   input[type="radio"] {
     accent-color: #B5242A;
   }
   input[type="checkbox"] {
-    @apply rounded;
     border-color: #E5E5E5;
+    border-radius: 0;
     width: 1rem;
     height: 1rem;
   }
@@ -101,7 +132,6 @@
     box-shadow: 0 0 0 2px #B5242A;
   }
 
-  /* Range slider */
   input[type="range"] {
     accent-color: #B5242A;
   }
@@ -113,44 +143,51 @@
   }
 }
 
+/* ��─ Components ──────────────────────────────────────────────────────────────── */
+
 @layer components {
-  /* ----- Ornament divider ----- */
-  .ornament {
-    @apply text-center select-none;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: #B5242A;
+
+  /* ----- Slab rules ----- */
+  .slab-rule {
+    border: none;
+    height: 6px;
+    background: #111111;
+    width: 100%;
+  }
+  .slab-rule-4 {
+    border: none;
+    height: 4px;
+    background: #111111;
+    width: 100%;
+  }
+  .slab-rule-crimson {
+    border: none;
+    height: 6px;
+    background: #B5242A;
+    width: 100%;
   }
 
-  /* ----- Rules ----- */
+  /* ----- Legacy rule aliases (map to slab rules) ----- */
   .rule {
     border: none;
-    height: 1px;
-    background: #E5E5E5;
+    height: 4px;
+    background: #111111;
   }
   .rule-inset {
     border: none;
-    height: 1px;
-    background: #E5E5E5;
+    height: 4px;
+    background: #111111;
     margin-left: 1.5rem;
     margin-right: 1.5rem;
   }
-  .rule-accent {
-    border-top: 2.5px solid #B5242A;
-  }
 
-  /* ----- Label styles ----- */
-  .label-ui {
-    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
-    font-size: 0.6875rem;
-    font-weight: 400;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+  /* ----- Section label bar (black bg, mono-caps text) ----- */
+  .section-label-bar {
+    background: #111111;
+    padding: 0.75rem 1.5rem;
   }
-
-  .label-muted {
-    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  .section-label-bar span {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.6875rem;
     font-weight: 400;
     letter-spacing: 0.06em;
@@ -158,34 +195,43 @@
     color: #999999;
   }
 
-  /* ----- Feed tabs ----- */
+  /* ----- Label styles ----- */
+  .label-ui {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.6875rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ----- Feed tabs (on black bar) ----- */
   .tab-feed {
-    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
-    font-size: 0.75rem;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.6875rem;
     font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 0.625rem 1.25rem;
-    margin-right: 1.25rem;
+    letter-spacing: 0.06em;
+    padding: 0.75rem 1.25rem;
+    margin-right: 0.5rem;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 4px solid transparent;
     background: transparent;
     cursor: pointer;
     transition: color 0.15s ease;
-    color: #BBBBBB;
-    margin-bottom: -2px;
+    color: #666666;
+    margin-bottom: -4px;
   }
   .tab-feed-active {
-    color: #1A1A1A;
+    color: #FFFFFF;
     border-bottom-color: #B5242A;
   }
   .tab-feed:hover:not(.tab-feed-active) {
-    color: #666666;
+    color: #FFFFFF;
   }
 
   /* ----- Dashboard tab pills ----- */
   .tab-pill {
-    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.6875rem;
     font-weight: 400;
     letter-spacing: 0.04em;
@@ -198,23 +244,23 @@
     transition: background-color 0.15s ease, color 0.15s ease;
   }
   .tab-pill-active {
-    background: #1A1A1A;
+    background: #111111;
     color: #FFFFFF;
   }
   .tab-pill-inactive {
     background: #F0F0F0;
-    color: #999999;
+    color: #666666;
   }
   .tab-pill-inactive:hover {
-    color: #1A1A1A;
+    color: #111111;
     background: #E5E5E5;
   }
 
   /* ----- Buttons ----- */
   .btn {
-    background: #1A1A1A;
+    background: #111111;
     color: #FFFFFF;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Jost', system-ui, sans-serif;
     font-size: 0.9375rem;
     font-weight: 600;
     letter-spacing: 0;
@@ -235,7 +281,7 @@
   .btn-accent {
     background: #B5242A;
     color: #FFFFFF;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Jost', system-ui, sans-serif;
     font-size: 0.9375rem;
     font-weight: 600;
     letter-spacing: 0;
@@ -248,51 +294,31 @@
   }
   .btn-accent:hover { opacity: 0.85; }
   .btn-accent:focus-visible {
-    outline: 2px solid #1A1A1A;
+    outline: 2px solid #111111;
     outline-offset: 2px;
   }
   .btn-accent:disabled { opacity: 0.5; }
 
   .btn-ghost {
-    background: transparent;
+    background: #F0F0F0;
     color: #666666;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Jost', system-ui, sans-serif;
     font-size: 0.9375rem;
     font-weight: 500;
     letter-spacing: 0;
     text-transform: none;
-    border: 1px solid #E5E5E5;
+    border: none;
     border-radius: 0;
     padding: 0.75rem 2rem;
-    transition: opacity 0.15s ease;
+    transition: background-color 0.15s ease;
     cursor: pointer;
   }
-  .btn-ghost:hover { opacity: 0.85; }
+  .btn-ghost:hover { background: #E5E5E5; }
   .btn-ghost:focus-visible {
     outline: 2px solid #B5242A;
     outline-offset: 2px;
   }
 
-  /* Legacy alias — old code still references .btn-soft */
-  .btn-soft {
-    background: transparent;
-    color: #666666;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-size: 0.9375rem;
-    font-weight: 500;
-    border: 1px solid #E5E5E5;
-    border-radius: 0;
-    padding: 0.75rem 2rem;
-    transition: opacity 0.15s ease;
-    cursor: pointer;
-  }
-  .btn-soft:hover { opacity: 0.85; }
-  .btn-soft:focus-visible {
-    outline: 2px solid #B5242A;
-    outline-offset: 2px;
-  }
-
-  /* Small button variant */
   .btn-sm {
     font-size: 0.875rem;
     padding: 0.625rem 1.5rem;
@@ -311,7 +337,7 @@
     float: left;
     line-height: 0.8;
     margin: 0.05em 0.08em 0 0;
-    color: #1A1A1A;
+    color: #111111;
     font-weight: 500;
   }
 
@@ -323,7 +349,7 @@
     color: #FFFFFF !important;
   }
   .ProseMirror .is-editor-empty:first-child::before {
-    color: #BBBBBB;
+    color: #999999;
   }
 
   /* ----- Paywall gate marker in editor ----- */
@@ -332,25 +358,16 @@
     margin: 2rem 0;
     padding: 0.75rem 1rem;
     background: #F0F0F0;
-    border: 1px dashed #B5242A;
+    border: none;
+    border-left: 4px solid #B5242A;
     cursor: default;
     user-select: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
-  .paywall-gate-marker::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    width: 3px;
-    height: 60%;
-    transform: translateY(-50%);
-    background: #B5242A;
-  }
   .paywall-gate-marker .gate-label {
-    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.6875rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -358,12 +375,12 @@
   }
   .paywall-gate-marker .gate-remove {
     font-size: 0.75rem;
-    color: #999999;
+    color: #666666;
     cursor: pointer;
     transition: color 0.15s ease;
   }
   .paywall-gate-marker .gate-remove:hover {
-    color: #1A1A1A;
+    color: #111111;
   }
 
   /* ----- Article hero image ----- */
@@ -381,7 +398,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(26, 26, 26, 0.75) 0%, rgba(26, 26, 26, 0.15) 60%, transparent 100%);
+    background: linear-gradient(to top, rgba(17, 17, 17, 0.75) 0%, rgba(17, 17, 17, 0.15) 60%, transparent 100%);
   }
   .article-hero-content {
     position: relative;
@@ -392,115 +409,11 @@
   }
 }
 
-/* =============================================================================
-   ThereforeMark animations
-   Centroid of the triangle in viewBox 0 0 26 22 is roughly (13, 13.17).
-   ============================================================================= */
-
-/* --- 6a/6b: Spin — dots orbit the centroid and settle back --- */
-@keyframes therefore-orbit-top {
-  0%   { transform: rotate(0deg);   }
-  60%  { transform: rotate(360deg); }
-  100% { transform: rotate(360deg); }
-}
-@keyframes therefore-orbit-bl {
-  0%   { transform: rotate(0deg);   }
-  60%  { transform: rotate(360deg); }
-  100% { transform: rotate(360deg); }
-}
-@keyframes therefore-orbit-br {
-  0%   { transform: rotate(0deg);   }
-  60%  { transform: rotate(360deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.therefore-spin .therefore-dot {
-  transform-origin: 13px 13.17px;
-  transform-box: fill-box;
-  transform-origin: 13px 13.17px;
-}
-.therefore-spin .therefore-dot-top {
-  animation: therefore-orbit-top 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  transform-origin: 13px 13.17px;
-}
-.therefore-spin .therefore-dot-bl {
-  animation: therefore-orbit-bl 500ms cubic-bezier(0.22, 1, 0.36, 1) 30ms forwards;
-  transform-origin: 13px 13.17px;
-}
-.therefore-spin .therefore-dot-br {
-  animation: therefore-orbit-br 500ms cubic-bezier(0.22, 1, 0.36, 1) 60ms forwards;
-  transform-origin: 13px 13.17px;
-}
-
-/* Hover spin — when mark is inside a link */
-a:hover .therefore-dot,
-a:focus-visible .therefore-dot {
-  transform-origin: 13px 13.17px;
-}
-a:hover .therefore-dot-top {
-  animation: therefore-orbit-top 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  transform-origin: 13px 13.17px;
-}
-a:hover .therefore-dot-bl {
-  animation: therefore-orbit-bl 500ms cubic-bezier(0.22, 1, 0.36, 1) 30ms forwards;
-  transform-origin: 13px 13.17px;
-}
-a:hover .therefore-dot-br {
-  animation: therefore-orbit-br 500ms cubic-bezier(0.22, 1, 0.36, 1) 60ms forwards;
-  transform-origin: 13px 13.17px;
-}
-
-/* --- 6c: Ellipsis — dots rearrange to a horizontal row, hold, spring back --- */
-/* Target positions for horizontal ellipsis: top→(5.2, 11), bl→(13, 11), br→(20.8, 11) */
-@keyframes therefore-ellipsis-top {
-  0%   { cx: 13;   cy: 4.5;  }
-  33%  { cx: 5.2;  cy: 11;   }
-  58%  { cx: 5.2;  cy: 11;   }
-  100% { cx: 13;   cy: 4.5;  }
-}
-@keyframes therefore-ellipsis-bl {
-  0%   { cx: 5.2;  cy: 17.5; }
-  33%  { cx: 13;   cy: 11;   }
-  58%  { cx: 13;   cy: 11;   }
-  100% { cx: 5.2;  cy: 17.5; }
-}
-@keyframes therefore-ellipsis-br {
-  0%   { cx: 20.8; cy: 17.5; }
-  33%  { cx: 20.8; cy: 11;   }
-  58%  { cx: 20.8; cy: 11;   }
-  100% { cx: 20.8; cy: 17.5; }
-}
-
-.therefore-ellipsis .therefore-dot-top {
-  animation: therefore-ellipsis-top 600ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-.therefore-ellipsis .therefore-dot-bl {
-  animation: therefore-ellipsis-bl 600ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-.therefore-ellipsis .therefore-dot-br {
-  animation: therefore-ellipsis-br 600ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-/* Respect reduced motion preference */
-@media (prefers-reduced-motion: reduce) {
-  .therefore-spin .therefore-dot,
-  .therefore-ellipsis .therefore-dot,
-  a:hover .therefore-dot {
-    animation: none !important;
-  }
-}
-
-@layer utilities {
-  .sharp { border-radius: 0 !important; }
-}
-
-/* =============================================================================
-   Print Stylesheet
-   Clean article printing — hides chrome, expands body, sets print-friendly type.
-   ============================================================================= */
+/* ── Print ───────────────────────────────────────────────────────────────────── */
 
 @media print {
   nav,
+  footer,
   .paywall-gate-marker,
   .comments,
   .vote-controls,
@@ -508,7 +421,6 @@ a:hover .therefore-dot-br {
   .report-button,
   button,
   .sticky,
-  .ornament,
   [class*="NoteComposer"],
   [class*="ReplySection"],
   [class*="AllowanceExhausted"] {

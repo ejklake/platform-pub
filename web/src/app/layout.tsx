@@ -6,7 +6,7 @@ import { AuthProvider } from '../components/layout/AuthProvider'
 import { LayoutShell } from '../components/layout/LayoutShell'
 
 export const metadata: Metadata = {
-  title: 'Platform',
+  title: 'all.haus',
   description: 'A publishing platform for writers and readers',
 }
 
@@ -19,12 +19,14 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="preload" href="/fonts/jost-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preload" href="/fonts/literata-latin-400.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preload" href="/fonts/literata-latin-400-italic.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/ibm-plex-mono-latin-400.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link
           rel="alternate"
           type="application/rss+xml"
-          title="Platform — recent articles"
+          title="all.haus — recent articles"
           href="/rss"
         />
       </head>
@@ -32,7 +34,7 @@ export default function RootLayout({
         <AuthProvider>
           <LayoutShell>
             <Nav />
-            <main className="min-h-screen pt-[56px]">
+            <main className="min-h-screen pt-[60px]">
               {children}
             </main>
             <Footer />

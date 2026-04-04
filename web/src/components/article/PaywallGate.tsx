@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ThereforeMark } from '../icons/ThereforeMark'
+import { ForAllMark } from '../icons/ForAllMark'
 
 interface PaywallGateProps {
   pricePounds: string | null
@@ -99,11 +99,11 @@ export function PaywallGate({
 
       <div
         className="px-8 py-12 text-center"
-        style={{ borderTop: '3px solid #B5242A', borderBottom: '3px solid #B5242A' }}
+        style={{ borderTop: '4px solid #B5242A', borderBottom: '4px solid #B5242A' }}
       >
         {/* Ornament */}
         <div className="text-center mb-6">
-          <ThereforeMark size={24} weight="heavy" className="text-crimson inline-block" animate={animateEllipsis ? 'ellipsis' : undefined} />
+          <ForAllMark size={24} className="text-crimson inline-block" />
         </div>
 
         <h2 className="font-serif text-[26px] font-normal text-black mb-3">{heading}</h2>
@@ -114,7 +114,7 @@ export function PaywallGate({
         )}
 
         {error && (
-          <div className="mb-6 px-4 py-3 text-[12px] font-sans max-w-sm mx-auto bg-grey-50 text-black border border-grey-200">
+          <div className="mb-6 px-4 py-3 text-[12px] font-sans max-w-sm mx-auto bg-grey-100 text-black">
             {error}
           </div>
         )}
@@ -125,7 +125,7 @@ export function PaywallGate({
 
         {/* Subscribe option */}
         {showSubscribeOption && (
-          <div className="mt-6 pt-6 border-t border-grey-200 max-w-sm mx-auto">
+          <div className="mt-6 pt-6 max-w-sm mx-auto" style={{ borderTop: '4px solid #F0F0F0' }}>
             <p className="font-sans text-[14px] text-grey-600 mb-4">
               Or subscribe to {writerName ?? writerUsername} for <strong>£{subPricePounds}/mo</strong> to read everything
             </p>

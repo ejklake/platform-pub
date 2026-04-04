@@ -59,7 +59,7 @@ export function ConversationList({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       {conv.unreadCount > 0 && (
-                        <span className="w-2 h-2 rounded-full bg-crimson flex-shrink-0" />
+                        <span className="w-2 h-2  bg-crimson flex-shrink-0" />
                       )}
                       <p className={`text-[14px] font-sans truncate ${conv.unreadCount > 0 ? 'font-semibold text-black' : 'text-black'}`}>
                         {displayName}

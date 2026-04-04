@@ -7,29 +7,29 @@ import { useAuth } from '../../stores/auth'
 import type { MeResponse } from '../../lib/api'
 import { useLayoutModeContext } from './LayoutShell'
 import { ExportModal } from '../ExportModal'
-import { ThereforeMark } from '../icons/ThereforeMark'
+import { ForAllMark } from '../icons/ForAllMark'
 
-// ─── Nav link styling (Plex Mono, uppercase) ─────────────────────────────────
+// ─── Nav link styling (Plex Mono, uppercase, on black) ──────────────────────
 
 function navLinkClass(active: boolean) {
   return [
-    'font-mono text-[12px] uppercase tracking-[0.04em] transition-colors px-3 py-1',
+    'font-mono text-[11px] uppercase tracking-[0.06em] transition-colors px-3 py-1',
     active
-      ? 'text-black border-b-2 border-crimson'
-      : 'text-grey-400 hover:text-black',
+      ? 'text-white border-b-4 border-crimson'
+      : 'text-grey-400 hover:text-white',
   ].join(' ')
 }
 
-// ─── Avatar ──────────────────────────────────────────────────────────────────
+// ─── Avatar (square, no border-radius) ──────────────────────────────────────
 
-function Avatar({ user, size = 32 }: { user: { avatar: string | null; displayName: string | null; username: string | null }; size?: number }) {
+function NavAvatar({ user, size = 28 }: { user: { avatar: string | null; displayName: string | null; username: string | null }; size?: number }) {
   const px = `${size}px`
   if (user.avatar) {
-    return <img src={user.avatar} alt="" className="rounded-full object-cover" style={{ width: px, height: px }} />
+    return <img src={user.avatar} alt="" className="object-cover" style={{ width: px, height: px }} />
   }
   return (
     <span
-      className="flex items-center justify-center rounded-full bg-grey-100 text-grey-400 font-mono uppercase"
+      className="flex items-center justify-center bg-grey-200 text-grey-400 font-mono uppercase"
       style={{ width: px, height: px, fontSize: `${Math.round(size * 0.38)}px` }}
     >
       {(user.displayName ?? user.username ?? '?')[0]}
@@ -37,7 +37,7 @@ function Avatar({ user, size = 32 }: { user: { avatar: string | null; displayNam
   )
 }
 
-// ─── Avatar dropdown (the "me" menu) ─────────────────────────────────────────
+// ─── Avatar dropdown ────────────────────────────────────────────────────────
 
 function AvatarDropdown({ user, onLogout, onClose }: {
   user: MeResponse
@@ -59,28 +59,35 @@ function AvatarDropdown({ user, onLogout, onClose }: {
 
   return (
     <>
-      <div ref={ref} className="absolute right-0 top-full mt-2 w-56 bg-white border border-grey-200 shadow-lg z-50">
+      <div ref={ref} className="absolute right-0 top-full mt-2 w-56 bg-white shadow-lg z-50">
         {/* Identity */}
-        <div className="px-4 py-3 border-b border-grey-200">
-          <p className="text-[14px] font-semibold text-black font-sans">{user.displayName ?? user.username}</p>
-          {user.username && (
-            <p className="text-[12px] text-grey-400 font-mono">@{user.username}</p>
-          )}
+        <div className="px-4 py-3" style={{ borderBottom: '4px solid #111111' }}>
+          <div className="flex items-center gap-2">
+            <NavAvatar user={user} size={32} />
+            <div>
+              <p className="text-[14px] font-semibold text-black font-sans">{user.displayName ?? user.username}</p>
+              {user.username && (
+                <p className="text-[11px] text-grey-600 font-mono uppercase tracking-[0.02em]">@{user.username}</p>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Group 1: Identity — who I am, who's talking to me */}
-        <div className="py-1 border-b border-grey-200">
+        {/* Group 1 */}
+        <div className="py-1">
           <Link href="/profile" onClick={onClose} className={linkClass}>Profile</Link>
           <Link href="/messages" onClick={onClose} className={linkClass}>Messages</Link>
           <Link href="/notifications" onClick={onClose} className={linkClass}>Notifications</Link>
         </div>
 
-        {/* Group 2: Money & content */}
-        <div className="py-1 border-b border-grey-200">
+        <div style={{ height: '4px', background: '#F0F0F0' }} />
+
+        {/* Group 2 */}
+        <div className="py-1">
           <Link href="/account" onClick={onClose} className={linkClass}>
             <span className="flex items-center justify-between">
               <span>Account</span>
-              <span className="text-[12px] text-grey-400 tabular-nums font-mono">
+              <span className="text-[11px] text-grey-600 tabular-nums font-mono uppercase tracking-[0.02em]">
                 £{(user.freeAllowanceRemainingPence / 100).toFixed(2)}
               </span>
             </span>
@@ -88,7 +95,9 @@ function AvatarDropdown({ user, onLogout, onClose }: {
           <Link href="/history" onClick={onClose} className={linkClass}>Reading history</Link>
         </div>
 
-        {/* Group 3: Meta */}
+        <div style={{ height: '4px', background: '#F0F0F0' }} />
+
+        {/* Group 3 */}
         <div className="py-1">
           <Link href="/settings" onClick={onClose} className={linkClass}>Settings</Link>
           <button
@@ -111,7 +120,7 @@ function AvatarDropdown({ user, onLogout, onClose }: {
   )
 }
 
-// ─── Mobile sheet ────────────────────────────────────────────────────────────
+// ─── Mobile sheet ───────────────────────────────────────────────────────────
 
 function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
   user: MeResponse | null
@@ -129,8 +138,8 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
   }
 
   const linkClass = (path: string) => [
-    'block py-3 font-mono text-[12px] uppercase tracking-[0.04em] transition-colors',
-    isActive(path) ? 'text-black font-medium' : 'text-grey-400 hover:text-black',
+    'block py-3 font-mono text-[11px] uppercase tracking-[0.06em] transition-colors',
+    isActive(path) ? 'text-white font-medium' : 'text-grey-400 hover:text-white',
   ].join(' ')
 
   function handleSearch(e: React.FormEvent) {
@@ -142,9 +151,9 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
   }
 
   return (
-    <div className="fixed inset-x-0 top-[60px] bg-white border-b border-grey-200 z-40 px-6 py-4 shadow-sm">
+    <div className="fixed inset-x-0 top-[60px] bg-black z-40 px-6 py-4">
       {loading ? (
-        <div className="h-4 w-24 animate-pulse bg-grey-100" />
+        <div className="h-4 w-24 animate-pulse bg-grey-600" />
       ) : user ? (
         <>
           <Link href="/feed" onClick={onClose} className={linkClass('/feed')}>Feed</Link>
@@ -152,35 +161,35 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
           <Link href="/dashboard" onClick={onClose} className={linkClass('/dashboard')}>Dashboard</Link>
           <Link href="/following" onClick={onClose} className={linkClass('/following')}>Following</Link>
 
-          <div className="border-t border-grey-200 my-2" />
+          <div style={{ height: '4px', background: '#333' }} className="my-3" />
 
           <form onSubmit={handleSearch} className="py-2">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search…"
-              className="w-full bg-grey-100 px-3 py-2 text-[13px] text-black placeholder-grey-300 font-mono"
+              placeholder="SEARCH…"
+              className="w-full bg-grey-600/20 px-3 py-2 text-[11px] text-white placeholder-grey-400 font-mono uppercase tracking-[0.06em] border-none"
             />
           </form>
 
-          <div className="border-t border-grey-200 my-2" />
+          <div style={{ height: '4px', background: '#333' }} className="my-3" />
 
           <Link href="/messages" onClick={onClose} className={linkClass('/messages')}>Messages</Link>
           <Link href="/notifications" onClick={onClose} className={linkClass('/notifications')}>Notifications</Link>
 
-          <div className="border-t border-grey-200 my-2" />
+          <div style={{ height: '4px', background: '#333' }} className="my-3" />
 
           <Link href="/profile" onClick={onClose} className={linkClass('/profile')}>Profile</Link>
           <Link href="/account" onClick={onClose} className={linkClass('/account')}>Account</Link>
           <Link href="/history" onClick={onClose} className={linkClass('/history')}>Reading history</Link>
           <Link href="/settings" onClick={onClose} className={linkClass('/settings')}>Settings</Link>
 
-          <div className="border-t border-grey-200 my-2" />
+          <div style={{ height: '4px', background: '#333' }} className="my-3" />
 
           <button
             onClick={() => { onLogout(); onClose() }}
-            className="block py-3 font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
+            className="block py-3 font-mono text-[11px] uppercase tracking-[0.06em] text-grey-400 hover:text-white transition-colors"
           >
             Log out
           </button>
@@ -190,17 +199,17 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
           <Link href="/feed" onClick={onClose} className={linkClass('/feed')}>Feed</Link>
           <Link href="/about" onClick={onClose} className={linkClass('/about')}>About</Link>
 
-          <div className="border-t border-grey-200 my-2" />
+          <div style={{ height: '4px', background: '#333' }} className="my-3" />
 
-          <Link href="/auth?mode=login" onClick={onClose} className="block py-3 font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors">Log in</Link>
-          <Link href="/auth?mode=signup" onClick={onClose} className="inline-block mt-1 btn text-center text-sm">Sign up</Link>
+          <Link href="/auth?mode=login" onClick={onClose} className="block py-3 font-mono text-[11px] uppercase tracking-[0.06em] text-grey-400 hover:text-white transition-colors">Log in</Link>
+          <Link href="/auth?mode=signup" onClick={onClose} className="inline-block mt-1 btn-accent text-center text-sm py-2 px-6">Sign up</Link>
         </>
       )}
     </div>
   )
 }
 
-// ─── Main Nav ────────────────────────────────────────────────────────────────
+// ─── Main Nav ───────────────────────────────────────────────────────────────
 
 export function Nav() {
   const { user, loading, logout } = useAuth()
@@ -211,7 +220,6 @@ export function Nav() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  // Close mobile sheet on route change
   useEffect(() => { setMenuOpen(false); setDropdownOpen(false) }, [pathname])
 
   function isActive(path: string) {
@@ -236,31 +244,22 @@ export function Nav() {
 
   const logoHref = user ? '/feed' : '/'
 
-  // ── Canvas mode: minimal bar ───────────────────────────────────────────────
+  // ── Canvas mode: minimal black bar, white ∀ ────────────────────────────────
 
   if (mode === 'canvas') {
     return (
       <>
-        <header className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur-sm border-b border-grey-100">
+        <header className="fixed top-0 inset-x-0 z-50 bg-black">
           <div className="flex items-center justify-between px-6 h-[60px] max-w-content mx-auto">
-            {/* Logo — mark only, grey */}
-            <Link
-              href={logoHref}
-              className="flex-shrink-0"
-            >
-              <ThereforeMark
-                size={29}
-                weight="heavy"
-                className="text-grey-400 hover:text-grey-600 transition-colors"
-              />
+            <Link href={logoHref} className="flex-shrink-0">
+              <ForAllMark size={18} className="text-white hover:text-grey-300 transition-colors" />
             </Link>
 
-            {/* Avatar (if logged in) */}
             <div className="flex items-center">
               {!loading && user && (
                 <div className="relative">
                   <button onClick={() => setDropdownOpen(!dropdownOpen)}>
-                    <Avatar user={user} size={28} />
+                    <NavAvatar user={user} size={28} />
                   </button>
                   {dropdownOpen && (
                     <AvatarDropdown
@@ -281,36 +280,34 @@ export function Nav() {
     )
   }
 
-  // ── Platform mode: full top bar ────────────────────────────────────────────
+  // ── Platform mode: full black beam ─────────────────────────────────────────
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-50 bg-white border-b border-grey-200 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <header className="fixed top-0 inset-x-0 z-50 bg-black">
         <div className="flex items-center justify-between px-6 h-[60px] max-w-content mx-auto">
 
           {/* Left: logo + nav links */}
           <div className="flex items-center gap-6">
-            {/* Logo — mark + wordmark lockup */}
             <Link
               href={logoHref}
-              className="flex items-center gap-[7px] flex-shrink-0 group"
+              className="flex items-center gap-[8px] flex-shrink-0 group"
             >
-              <ThereforeMark
-                size={29}
-                weight="heavy"
+              <ForAllMark
+                size={18}
                 className="text-crimson group-hover:text-crimson-dark transition-colors"
               />
-              <span className="font-serif text-[26px] font-medium italic text-crimson group-hover:text-crimson-dark transition-colors leading-none"
-                style={{ letterSpacing: '-0.01em', transform: 'translateY(-1px)' }}
+              <span
+                className="font-sans text-[18px] font-medium text-white leading-none"
+                style={{ letterSpacing: '-0.01em' }}
               >
-                Platform
+                all.haus
               </span>
             </Link>
 
-            {/* Nav links — hidden on mobile */}
             <nav className="hidden md:flex items-center gap-1">
               {loading ? (
-                <div className="h-3 w-32 animate-pulse bg-grey-100" />
+                <div className="h-3 w-32 animate-pulse bg-grey-600" />
               ) : user ? (
                 <>
                   <Link href="/feed" className={navLinkClass(isActive('/feed'))}>Feed</Link>
@@ -329,24 +326,22 @@ export function Nav() {
 
           {/* Right: search + auth/avatar */}
           <div className="flex items-center gap-4">
-            {/* Search — hidden on mobile */}
             <form onSubmit={handleSearch} className="hidden md:block">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search…"
-                className="w-36 bg-grey-100 px-3 py-1.5 text-[12px] text-black placeholder-grey-300 font-mono focus:w-52 transition-all border-none"
+                placeholder="SEARCH…"
+                className="w-36 bg-white/10 px-3 py-1.5 text-[11px] text-white placeholder-grey-400 font-mono uppercase tracking-[0.06em] focus:w-52 transition-all border-none"
               />
             </form>
 
             {loading ? (
-              <div className="h-8 w-8 animate-pulse bg-grey-100 rounded-full" />
+              <div className="h-7 w-7 animate-pulse bg-grey-600" />
             ) : user ? (
-              /* Avatar + dropdown */
               <div className="relative hidden md:block">
                 <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center">
-                  <Avatar user={user} size={32} />
+                  <NavAvatar user={user} size={28} />
                 </button>
                 {dropdownOpen && (
                   <AvatarDropdown
@@ -357,15 +352,14 @@ export function Nav() {
                 )}
               </div>
             ) : (
-              /* Logged-out auth links */
               <div className="hidden md:flex items-center gap-3">
                 <Link
                   href="/auth?mode=login"
-                  className="font-mono text-[12px] uppercase tracking-[0.04em] text-grey-400 hover:text-black transition-colors"
+                  className="font-mono text-[11px] uppercase tracking-[0.06em] text-grey-400 hover:text-white transition-colors"
                 >
                   Log in
                 </Link>
-                <Link href="/auth?mode=signup" className="btn btn-sm">
+                <Link href="/auth?mode=signup" className="btn-accent btn-sm">
                   Sign up
                 </Link>
               </div>
@@ -377,15 +371,14 @@ export function Nav() {
               className="flex flex-col justify-center gap-[5px] w-6 h-6 md:hidden"
               aria-label="Menu"
             >
-              <span className={`block w-full h-[2px] bg-black transition-transform ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
-              <span className={`block w-full h-[2px] bg-black transition-opacity ${menuOpen ? 'opacity-0' : ''}`} />
-              <span className={`block w-full h-[2px] bg-black transition-transform ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+              <span className={`block w-full h-[2px] bg-white transition-transform ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+              <span className={`block w-full h-[2px] bg-white transition-opacity ${menuOpen ? 'opacity-0' : ''}`} />
+              <span className={`block w-full h-[2px] bg-white transition-transform ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile sheet */}
       {menuOpen && (
         <MobileSheet user={user} loading={loading} onLogout={logout} onClose={() => setMenuOpen(false)} onSearch={handleMobileSearch} />
       )}

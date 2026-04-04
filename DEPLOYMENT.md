@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v4.9.1
+# all.haus — Deployment Reference v5.0.0
 
-**Date:** 3 April 2026
-**Replaces:** v4.9.0 (see bottom for change log)
+**Date:** 4 April 2026
+**Replaces:** v4.9.1 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,66 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v4.9.1
+
+No new migrations. Services changed: **web**, **gateway**. Deploy order: **rebuild web + gateway**.
+
+This is the all.haus rebrand release — a complete visual overhaul implementing the design specification in `ALLHAUS-DESIGN.md`.
+
+**Frontend (web):**
+- **Identity**: ∀ (ForAllMark) replaces ∴ (ThereforeMark). Crimson in platform mode, white in canvas mode.
+- **Typography**: Jost (geometric sans) replaces system-ui as `font-sans`. IBM Plex Mono retained (was already in use). All three fonts self-hosted as woff2: `jost-latin.woff2`, `jost-latin-ext.woff2`, `ibm-plex-mono-latin-400.woff2`.
+- **Colour**: `black` changed from `#1A1A1A` to `#111111`. `grey-50` removed from palette. All text on white backgrounds uses grey-600 minimum for WCAG AA compliance.
+- **Nav + Footer**: solid black beams on every page (including canvas mode). Nav: crimson ∀ + "all.haus" wordmark (Jost 18px), mono-caps links, 4px crimson active indicators. Canvas mode: white ∀, no wordmark, no links.
+- **No hairlines**: all `1px` dividers replaced with 4–6px slab rules or whitespace. Ghost button border replaced with grey-100 fill. Feed tab underlines bumped to 4px.
+- **Feed**: tab bar (For You / Following) removed. Single global feed. Feed customisation deferred to user-defined rules in Settings.
+- **Article cards**: 6px left border (crimson=paid, black=free), 28px indent, Literata italic 28px headline, mono-caps grey-600 metadata.
+- **Note cards**: Jost body text, square 28px avatars, 4px left-border quote blocks (bar code system).
+- **Quote cards**: 4px bar code (crimson/black/grey-300), no background fill.
+- **Avatars**: square everywhere (no `border-radius`).
+- **Buttons**: Jost font, no border-radius. Ghost variant: grey-100 fill, no border.
+- **Paywall gate**: 4px crimson borders (was 3px).
+- **Homepage**: Jost hero (clamp 52–92px), 6px slab rule, manifesto with black label column + 4px dividers, how-it-works with section-label-bar + grey-100 grid.
+
+**New files:**
+- `web/src/components/icons/ForAllMark.tsx`
+- `web/public/fonts/jost-latin.woff2`, `jost-latin-ext.woff2`, `ibm-plex-mono-latin-400.woff2`
+
+**Removed:**
+- `web/src/components/icons/ThereforeMark.tsx` (no longer imported; file remains for git history)
+- ThereforeMark CSS animations from `globals.css`
+- Legacy green/surface/card/parchment colour tokens from `tailwind.config.js`
+- `.ornament`, `.rule`, `.rule-inset` classes (replaced by `.slab-rule` variants; legacy aliases kept for unmodified pages)
+- Feed tab bar and following-feed data path from `FeedView.tsx`
+
+**Backend (gateway):**
+- **Reading tab auto-creation**: gate-pass endpoint now creates `reading_tabs` row on demand (was hard-failing with "No reading tab found" for accounts missing the row).
+- **Rate limiting**: global blanket rate limit disabled. Per-route limits on sensitive endpoints (signup: 5/min, login: 5/min, gate-pass: 20/min, search: 30/min, messages: 10/min) remain. The global limit caused cascading auth failures in Docker dev (containers share a single bridge IP, exhausting the bucket on SSR fetches).
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+docker compose build web gateway
+docker compose up -d web gateway
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+
+# Verify fonts are served
+curl -sI http://localhost:3010/fonts/jost-latin.woff2 | head -3
+curl -sI http://localhost:3010/fonts/ibm-plex-mono-latin-400.woff2 | head -3
+# Both should return 200
+
+# Verify nav renders black beam (visual check at /feed)
+# Verify article cards show 6px left borders (visual check at /feed)
+# Verify paywall unlock works on a paywalled article
+```
+
+---
 
 ### From v4.9.0
 
@@ -934,9 +994,11 @@ curl -s http://localhost:3000/health
 docker exec platform-pub-web-1 sh -c "grep -r 'nostr-dev-kit' /app/.next/static 2>/dev/null | wc -l"
 # Should return 0
 
-# Verify self-hosted fonts are served
+# Verify self-hosted fonts are served (Literata, Jost, IBM Plex Mono)
 curl -sI http://localhost:3010/fonts/literata-latin-400.woff2 | head -5
-# Should return 200
+curl -sI http://localhost:3010/fonts/jost-latin.woff2 | head -5
+curl -sI http://localhost:3010/fonts/ibm-plex-mono-latin-400.woff2 | head -5
+# All should return 200
 
 # Verify new gateway endpoints
 curl -s http://localhost:3000/api/v1/articles/by-event/test 2>&1 | head -1
@@ -1340,7 +1402,7 @@ This is a major frontend redesign — the entire visual language has been overha
 - **Navigation**: fixed left sidebar replaced with horizontal top bar (4 mono-caps links: FEED, WRITE, DASHBOARD, ABOUT) + avatar dropdown ("me" menu) + mobile hamburger sheet
 - **Two layout registers**: `useLayoutMode()` hook returns `'platform'` or `'canvas'` based on route. Canvas mode (article reader, writer profiles) shows a minimal grey wordmark and back link. Platform mode shows full branded nav
 - **LayoutShell**: new context provider wrapping all content, exposing layout mode via `useLayoutModeContext()`
-- **Typography system**: three fonts with distinct roles — Literata (serif, literary content: headlines, body, excerpts), Instrument Sans (sans, social/UI: notes, replies, buttons, forms), IBM Plex Mono (mono, infrastructure: nav, bylines, metadata, timestamps, action labels). Replaces Source Sans 3 everywhere
+- **Typography system**: three fonts with distinct roles — Literata (serif, literary content: headlines, body, excerpts), Jost (geometric sans, platform voice: notes, replies, buttons, forms), IBM Plex Mono (mono, infrastructure: nav, bylines, metadata, timestamps, action labels)
 - **Colour palette**: green/cream palette (`#EDF5F0`, `#DDEEE4`, `#FFFAEF`, `#0F1F18`) replaced with white/grey/crimson. White background everywhere. Grey scale (50–600) for text hierarchy. Crimson only on logo, paywalled borders, prices, and CTAs. Canvas mode is fully neutral except paywall gate
 - **Buttons**: no border-radius, no 3D bottom-border effect. `opacity: 0.85` hover. New `btn-ghost` variant (replaces `btn-soft`)
 - **Drop cap**: black, not crimson (writer's neutral space)

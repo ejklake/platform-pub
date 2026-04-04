@@ -26,21 +26,19 @@ interface QuoteCardProps {
 function ArticlePennant({ data }: { data: ResolvedContent }) {
   const router = useRouter()
   const authorIsProfile = data.author.username.length < 40
+  const barColor = data.isPaywalled ? '#B5242A' : '#111111'
 
   return (
     <Link
       href={`/article/${data.dTag}`}
       onClick={e => e.stopPropagation()}
-      className="block mt-2.5"
+      className="block mt-2.5 ml-[38px]"
     >
       <div
-        className="py-3 px-4"
-        style={{
-          background: '#FAFAFA',
-          borderLeft: data.isPaywalled ? '3px solid #B5242A' : '3px solid #E5E5E5',
-        }}
+        className="py-3 px-5"
+        style={{ borderLeft: `4px solid ${barColor}` }}
       >
-        <p className="font-mono text-[12px] uppercase tracking-[0.06em] text-grey-300 mb-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.06em] text-grey-600 mb-1">
           {authorIsProfile ? (
             <span
               className="hover:underline underline-offset-2 cursor-pointer"
@@ -50,7 +48,7 @@ function ArticlePennant({ data }: { data: ResolvedContent }) {
             </span>
           ) : data.author.displayName}
         </p>
-        <p className="font-serif text-[14px] font-medium italic text-black leading-[1.25] tracking-[-0.015em]">
+        <p className="font-serif text-[16px] font-medium italic text-black leading-[1.25] tracking-[-0.015em]">
           {data.title}
         </p>
         {data.content && (
@@ -87,7 +85,7 @@ export function QuoteCard({ eventId }: QuoteCardProps) {
 
   if (loading) {
     return (
-      <div className="mt-2.5 p-3 animate-pulse bg-grey-100">
+      <div className="mt-2.5 ml-[38px] p-3 animate-pulse bg-grey-100">
         <div className="h-3 w-1/3 mb-2 bg-grey-200" />
         <div className="h-3 w-2/3 bg-grey-200" />
       </div>
@@ -100,28 +98,28 @@ export function QuoteCard({ eventId }: QuoteCardProps) {
     return <ArticlePennant data={data} />
   }
 
-  // Quoted note — grey-50 bg with grey border
+  // Quoted note — 4px grey-300 left border
   const noteHref = data.author.username.length < 40 ? `/${data.author.username}` : null
   return (
     <Link
       href={noteHref ?? '#'}
       onClick={e => { e.stopPropagation(); if (!noteHref) e.preventDefault() }}
-      className="block mt-2.5 hover:opacity-90 transition-opacity"
-      style={{ background: '#FAFAFA', borderLeft: '3px solid #E5E5E5', padding: '12px 16px' }}
+      className="block mt-2.5 ml-[38px] hover:opacity-90 transition-opacity"
+      style={{ borderLeft: '4px solid #BBBBBB', padding: '8px 20px' }}
     >
       <div className="flex items-center gap-2 mb-1">
         {data.author.avatar ? (
-          <img src={data.author.avatar} alt="" className="h-4 w-4 rounded-full object-cover flex-shrink-0" />
+          <img src={data.author.avatar} alt="" className="h-[18px] w-[18px] object-cover flex-shrink-0" />
         ) : (
-          <span className="flex h-4 w-4 items-center justify-center text-[8px] font-mono uppercase flex-shrink-0 rounded-full bg-grey-100 text-grey-400">
+          <span className="flex h-[18px] w-[18px] items-center justify-center text-[8px] font-mono uppercase flex-shrink-0 bg-grey-200 text-grey-400">
             {(data.author.displayName?.[0] ?? '?').toUpperCase()}
           </span>
         )}
-        <span className="font-sans text-[12px] font-semibold text-grey-300">
+        <span className="font-sans text-[12px] font-semibold text-grey-600">
           {data.author.displayName}
         </span>
       </div>
-      <p className="line-clamp-3 font-sans text-[13px] text-grey-600 leading-[1.55]">
+      <p className="line-clamp-3 font-sans text-[14px] text-grey-600 leading-[1.55]">
         {data.content}
       </p>
     </Link>

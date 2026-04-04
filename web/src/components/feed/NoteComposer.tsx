@@ -77,11 +77,11 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
   }
 
   return (
-    <div className="border border-grey-200 p-[0.875rem_1.25rem]">
+    <div className="bg-grey-100 p-[0.875rem_1.25rem]">
       <div className="flex gap-3">
         {user.avatar
-          ? <img src={user.avatar} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
-          : <span className="flex h-9 w-9 items-center justify-center text-[10px] font-mono uppercase flex-shrink-0 rounded-full bg-grey-100 text-grey-400">
+          ? <img src={user.avatar} alt="" className="h-9 w-9  object-cover flex-shrink-0" />
+          : <span className="flex h-9 w-9 items-center justify-center text-[10px] font-mono uppercase flex-shrink-0  bg-grey-100 text-grey-400">
               {initial}
             </span>
         }
@@ -93,19 +93,19 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePost() } }}
             placeholder={activeQuote ? 'Add your thoughts...' : "What's on your mind?"}
             rows={2}
-            className="w-full resize-none bg-transparent text-[15px] font-sans text-black placeholder:text-grey-300 focus:outline-none leading-relaxed border-none"
+            className="w-full resize-none bg-transparent text-[15px] font-sans text-black placeholder:text-grey-600 focus:outline-none leading-relaxed border-none"
           />
 
           {/* Quote preview */}
           {activeQuote && (
-            <div className="mt-2 bg-grey-50 border-l-2 border-crimson p-3 flex items-start gap-2">
+            <div className="mt-2 p-3 flex items-start gap-2" style={{ borderLeft: '4px solid #B5242A' }}>
               <div className="flex-1 min-w-0">
                 {activeQuote.highlightedText ? (
                   <>
                     <p className="font-serif italic text-sm text-grey-600 leading-relaxed line-clamp-3 mt-0.5">
                       {activeQuote.highlightedText.trim().split(/\s+/).slice(0, 80).join(' ')}
                     </p>
-                    <p className="font-mono text-[12px] uppercase tracking-[0.02em] text-grey-300 mt-1">
+                    <p className="font-mono text-[12px] uppercase tracking-[0.02em] text-grey-600 mt-1">
                       {activeQuote.previewTitle && <span>{activeQuote.previewTitle}</span>}
                       {activeQuote.previewTitle && activeQuote.previewAuthorName && ' — '}
                       {activeQuote.previewAuthorName}
@@ -126,14 +126,14 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
                         {activeQuote.previewContent}
                       </p>
                     ) : (
-                      <p className="text-[12px] font-sans text-grey-300 italic mt-0.5">Note</p>
+                      <p className="text-[12px] font-sans text-grey-600 italic mt-0.5">Note</p>
                     )}
                   </>
                 )}
               </div>
               <button
                 onClick={handleClearQuote}
-                className="text-grey-300 hover:text-grey-400 text-sm transition-colors flex-shrink-0 leading-none mt-0.5"
+                className="text-grey-600 hover:text-grey-400 text-sm transition-colors flex-shrink-0 leading-none mt-0.5"
                 title="Remove quote"
               >
                 ×
@@ -144,12 +144,12 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
           {error && (
             <div className="mt-2 bg-grey-100 text-crimson px-3 py-2 text-[12px] font-sans flex items-center justify-between">
               <span>{error}</span>
-              <button onClick={() => setError(null)} className="ml-2 text-grey-300 hover:text-crimson">×</button>
+              <button onClick={() => setError(null)} className="ml-2 text-grey-600 hover:text-crimson">×</button>
             </div>
           )}
 
           <div className="mt-3 flex items-center justify-between">
-            <span className={`font-mono text-[12px] transition-colors ${isOver ? 'text-crimson font-medium' : charCount > NOTE_CHAR_LIMIT - 50 ? 'text-crimson' : 'text-grey-300'}`}>
+            <span className={`font-mono text-[12px] transition-colors ${isOver ? 'text-crimson font-medium' : charCount > NOTE_CHAR_LIMIT - 50 ? 'text-crimson' : 'text-grey-600'}`}>
               {charCount > 0 && `${charCount}/${NOTE_CHAR_LIMIT}`}
             </span>
             <div className="flex items-center gap-2">
@@ -174,7 +174,7 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
                   input.click()
                 }}
                 disabled={uploading}
-                className="text-grey-300 hover:text-grey-400 disabled:opacity-40 transition-colors p-1.5 hover:bg-grey-100"
+                className="text-grey-600 hover:text-grey-400 disabled:opacity-40 transition-colors p-1.5 hover:bg-grey-100"
                 title="Add image"
               >
                 <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

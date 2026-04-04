@@ -68,10 +68,10 @@ export function CommentItem({
             <img
               src={comment.author.avatar}
               alt=""
-              className="h-6 w-6 rounded-full object-cover"
+              className="h-6 w-6  object-cover"
             />
           ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-grey-100 text-[10px] font-medium text-grey-400">
+            <div className="flex h-6 w-6 items-center justify-center  bg-grey-100 text-[10px] font-medium text-grey-400">
               {initial}
             </div>
           )}

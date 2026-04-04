@@ -74,11 +74,13 @@ async function start() {
     },
   })
 
-  // Rate limiting — global default + per-route overrides
+  // Rate limiting — per-route limits on sensitive endpoints only.
+  // The global blanket limit caused cascading auth failures in dev (Docker
+  // containers share a single IP, exhausting the bucket on every SSR fetch).
+  // Sensitive routes (signup, login, gate-pass, search, messages) keep their
+  // own per-route limits registered inline.
   await app.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
-    keyGenerator: (req) => req.session?.sub ?? req.ip,
+    global: false,
   })
 
   // Auth routes

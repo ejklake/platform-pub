@@ -75,7 +75,7 @@ export function UserSearch({ onSelect, placeholder = 'Search users…', classNam
       />
       {loading && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          <div className="h-3 w-3 border border-grey-300 border-t-transparent rounded-full animate-spin" />
+          <div className="h-3 w-3 border border-grey-300 border-t-transparent  animate-spin" />
         </div>
       )}
       {open && results.length > 0 && (
@@ -84,7 +84,7 @@ export function UserSearch({ onSelect, placeholder = 'Search users…', classNam
             <button
               key={user.id}
               onClick={() => handleSelect(user)}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-grey-50 transition-colors text-left"
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-grey-100 transition-colors text-left"
             >
               <Avatar src={user.avatar} name={user.displayName ?? user.username} size={24} />
               <div className="min-w-0">

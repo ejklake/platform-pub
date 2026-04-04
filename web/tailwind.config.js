@@ -6,18 +6,14 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['system-ui', '-apple-system', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        sans: ['"Jost"', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
         serif: ['"Literata"', 'Georgia', '"Times New Roman"', 'serif'],
-        mono: ['ui-monospace', '"SF Mono"', 'SFMono-Regular', 'Menlo', 'Consolas', '"Liberation Mono"', 'monospace'],
-        // Legacy alias — remove once all components are migrated
-        'source': ['"Source Sans 3"', '"Source Sans Pro"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', '"SF Mono"', 'Menlo', 'Consolas', 'monospace'],
       },
       colors: {
-        // ── v2 design tokens (DESIGN.md) ──
         white: '#FFFFFF',
-        black: '#1A1A1A',
+        black: '#111111',
         grey: {
-          50:  '#FAFAFA',
           100: '#F0F0F0',
           200: '#E5E5E5',
           300: '#BBBBBB',
@@ -28,39 +24,6 @@ module.exports = {
           DEFAULT: '#B5242A',
           dark: '#921D22',
         },
-
-        // ── Legacy tokens (keep until component migration) ──
-        surface: {
-          DEFAULT: '#EDF5F0',
-          deep: '#DDEEE4',
-        },
-        card: {
-          DEFAULT: '#FFFAEF',
-        },
-        rule: '#B8D2C1',
-        accent: {
-          DEFAULT: '#B5242A',
-          dark: '#921D22',
-        },
-        ink: {
-          DEFAULT: '#0F1F18',
-        },
-        nav: {
-          DEFAULT: '#DDEEE4',
-          hover: '#82A890',
-        },
-        content: {
-          DEFAULT: '#0F1F18',
-          primary: '#0F1F18',
-          secondary: '#263D32',
-          muted: '#3D5E4D',
-          faint: '#6B8E7A',
-          'card-muted': '#8A8578',
-          'card-faint': '#ACA69C',
-        },
-        avatar: {
-          bg: '#C2DBC9',
-        },
       },
       typography: {
         DEFAULT: {
@@ -68,14 +31,14 @@ module.exports = {
             maxWidth: '640px',
             fontSize: '1.0625rem',
             lineHeight: '1.8',
-            color: '#1A1A1A',
+            color: '#111111',
             fontFamily: '"Literata", Georgia, serif',
             h1: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', letterSpacing: '-0.025em', fontSize: '2.25rem', lineHeight: '1.15' },
             h2: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', letterSpacing: '-0.02em', fontSize: '1.75rem', lineHeight: '1.2' },
             h3: { fontFamily: '"Literata", Georgia, serif', fontWeight: '500', fontSize: '1.35rem', lineHeight: '1.3' },
-            a: { color: '#1A1A1A', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationThickness: '1px', '&:hover': { color: '#666666' } },
-            blockquote: { borderLeftColor: '#E5E5E5', borderLeftWidth: '2px', fontStyle: 'italic', color: '#666666' },
-            code: { fontFamily: 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace', fontSize: '0.875em' },
+            a: { color: '#111111', textDecoration: 'underline', textUnderlineOffset: '3px', textDecorationThickness: '1px', '&:hover': { color: '#666666' } },
+            blockquote: { borderLeftColor: '#BBBBBB', borderLeftWidth: '4px', fontStyle: 'italic', color: '#666666' },
+            code: { fontFamily: '"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace', fontSize: '0.875em' },
             p: { marginTop: '1.5em', marginBottom: '1.5em' },
           },
         },
@@ -88,17 +51,13 @@ module.exports = {
         content: '960px',
       },
       letterSpacing: {
-        'mono-tight': '-0.01em',
-        'mono-wide': '0.05em',
-        // v2 mono-caps spacing (DESIGN.md)
-        'mono-nav': '0.04em',
+        'mono-nav': '0.06em',
         'mono-byline': '0.06em',
         'mono-meta': '0.02em',
       },
       fontSize: {
-        'mono-xs': ['0.8125rem', { lineHeight: '1.5', letterSpacing: '0.03em' }],
+        'mono-xs': ['0.6875rem', { lineHeight: '1.5', letterSpacing: '0.06em' }],
         'mono-sm': ['0.9375rem', { lineHeight: '1.5', letterSpacing: '0.01em' }],
-        'mono-base': ['1rem', { lineHeight: '1.6' }],
         'ui-xs': ['0.75rem', { lineHeight: '1.5' }],
         'ui-sm': ['0.875rem', { lineHeight: '1.5' }],
       },

@@ -52,54 +52,56 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
 
   const authorHref = writerInfo?.username ? `/${writerInfo.username}` : null
   const isPaid = article.isPaywalled
+  const barColor = isPaid ? '#B5242A' : '#111111'
 
   return (
     <div
       onClick={handleCardClick}
-      className="group py-7 px-6 cursor-pointer bg-white border border-grey-200 rounded-sm mb-4 transition-all duration-200 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:border-grey-300"
+      className="group mt-9 cursor-pointer"
+      style={{ borderLeft: `6px solid ${barColor}`, paddingLeft: '28px' }}
     >
-      {/* Byline + date */}
+      {/* Byline — mono-caps, grey-600 */}
       <div className="flex items-center gap-2 mb-3">
         {authorHref ? (
           <Link
             href={authorHref}
             onClick={(e) => e.stopPropagation()}
-            className="font-mono text-[12px] uppercase tracking-[0.06em] text-grey-400 hover:text-grey-600 transition-colors"
+            className="font-mono text-[11px] uppercase tracking-[0.06em] text-grey-600 hover:text-black transition-colors"
           >
             {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
           </Link>
         ) : (
-          <span className="font-mono text-[12px] uppercase tracking-[0.06em] text-grey-400">
+          <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-grey-600">
             {writerInfo?.displayName ?? article.pubkey.slice(0, 12) + '...'}
           </span>
         )}
-        <span className="font-mono text-[12px] text-grey-300">·</span>
+        <span className="font-mono text-[11px] text-grey-600">·</span>
         <time
           dateTime={new Date(article.publishedAt * 1000).toISOString()}
-          className="font-mono text-[12px] tracking-[0.02em] text-grey-300"
+          className="font-mono text-[11px] tracking-[0.02em] text-grey-600"
         >
           {formatDateRelative(article.publishedAt)}
         </time>
         {isPaid && article.pricePence && (
           <>
-            <span className="font-mono text-[12px] text-grey-300">·</span>
-            <span className="font-mono text-[12px] tracking-[0.02em] text-crimson">£{(article.pricePence / 100).toFixed(2)}</span>
+            <span className="font-mono text-[11px] text-grey-600">·</span>
+            <span className="font-mono text-[11px] tracking-[0.02em] text-crimson">£{(article.pricePence / 100).toFixed(2)}</span>
           </>
         )}
       </div>
 
-      {/* Headline — Literata italic */}
-      <h2 className="font-serif text-[22px] font-medium italic text-black leading-[1.25] tracking-[-0.02em] mb-2 group-hover:text-crimson-dark transition-colors">
+      {/* Headline — Literata italic, 28px */}
+      <h2 className="font-serif text-[28px] font-medium italic text-black leading-[1.18] tracking-[-0.02em] mb-2 group-hover:text-crimson-dark transition-colors">
         {article.title}
       </h2>
 
-      {/* Standfirst — Literata roman */}
-      <p className="font-serif text-[15px] text-grey-500 leading-[1.65] mb-4">
+      {/* Excerpt — Literata roman, 15.5px */}
+      <p className="font-serif text-[15.5px] text-grey-600 leading-[1.65] mb-4" style={{ maxWidth: '540px' }}>
         {excerpt}
       </p>
 
-      {/* Footer — read time, replies, actions */}
-      <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.02em] text-grey-300">
+      {/* Footer — mono-caps, grey-600 */}
+      <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.02em] text-grey-600">
         <span>{readMinutes} min read</span>
         {replyCount !== null && replyCount > 0 && (
           <><span className="opacity-50">·</span><span>{replyCount} {replyCount !== 1 ? 'replies' : 'reply'}</span></>
@@ -108,7 +110,7 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
         {user && onQuote && (
           <button
             onClick={handleQuote}
-            className="text-grey-300 hover:text-black transition-colors"
+            className="text-grey-600 hover:text-black transition-colors"
           >
             Quote
           </button>
@@ -129,4 +131,3 @@ export function ArticleCard({ article, onQuote, voteTally, myVoteCounts }: Artic
     </div>
   )
 }
-

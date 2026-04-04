@@ -419,14 +419,26 @@ export async function articleRoutes(app: FastifyInstance) {
           })
         }
 
-        // Get reader's tab
-        const tabRow = await pool.query<{ id: string }>(
+        // Get or create reader's tab
+        let tabRow = await pool.query<{ id: string }>(
           'SELECT id FROM reading_tabs WHERE reader_id = $1',
           [readerId]
         )
 
         if (tabRow.rows.length === 0) {
-          return reply.status(400).send({ error: 'No reading tab found' })
+          tabRow = await pool.query<{ id: string }>(
+            `INSERT INTO reading_tabs (reader_id)
+             VALUES ($1)
+             ON CONFLICT (reader_id) DO NOTHING
+             RETURNING id`,
+            [readerId]
+          )
+          if (tabRow.rows.length === 0) {
+            tabRow = await pool.query<{ id: string }>(
+              'SELECT id FROM reading_tabs WHERE reader_id = $1',
+              [readerId]
+            )
+          }
         }
 
         const tabId = tabRow.rows[0].id

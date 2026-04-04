@@ -137,7 +137,7 @@ export default function SearchPage() {
             {writerResults.map(w => (
               <Link key={w.id} href={`/${w.username}`} className="flex items-center gap-4 bg-white p-4 group">
                 {w.avatar ? (
-                  <img src={w.avatar} alt="" className="h-9 w-9 rounded-full object-cover" />
+                  <img src={w.avatar} alt="" className="h-9 w-9  object-cover" />
                 ) : (
                   <span className="flex h-9 w-9 items-center justify-center bg-grey-100 text-xs font-medium text-grey-400">
                     {(w.displayName ?? w.username)[0].toUpperCase()}

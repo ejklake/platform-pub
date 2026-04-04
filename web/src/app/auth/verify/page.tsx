@@ -57,7 +57,7 @@ export default function VerifyPage() {
     <div className="mx-auto max-w-sm px-6 py-24 text-center">
       {status === 'verifying' && (
         <>
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-grey-200 border-t-grey-600" />
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin  border-2 border-grey-200 border-t-grey-600" />
           <h1 className="font-serif text-xl font-bold text-black mb-2">
             Logging you in...
           </h1>
@@ -67,7 +67,7 @@ export default function VerifyPage() {
 
       {status === 'success' && (
         <>
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center  bg-green-100 text-green-600">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>

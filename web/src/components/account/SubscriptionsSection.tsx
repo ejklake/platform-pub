@@ -41,9 +41,9 @@ export function SubscriptionsSection() {
           <div key={s.id} className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-3 min-w-0">
               {s.writerAvatar ? (
-                <img src={s.writerAvatar} alt="" className="h-8 w-8 rounded-full object-cover flex-shrink-0" />
+                <img src={s.writerAvatar} alt="" className="h-8 w-8  object-cover flex-shrink-0" />
               ) : (
-                <span className="flex h-8 w-8 items-center justify-center bg-grey-100 text-[12px] font-mono text-grey-400 rounded-full flex-shrink-0">
+                <span className="flex h-8 w-8 items-center justify-center bg-grey-100 text-[12px] font-mono text-grey-400  flex-shrink-0">
                   {(s.writerDisplayName ?? s.writerUsername ?? '?')[0].toUpperCase()}
                 </span>
               )}

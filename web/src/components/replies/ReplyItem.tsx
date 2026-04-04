@@ -81,11 +81,11 @@ export function ReplyItem({
             <img
               src={reply.author.avatar}
               alt=""
-              className="h-5 w-5 rounded-full object-cover flex-shrink-0 mt-0.5"
+              className="h-5 w-5  object-cover flex-shrink-0 mt-0.5"
             />
           ) : (
             <span
-              className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-medium flex-shrink-0 mt-0.5"
+              className="flex h-5 w-5 items-center justify-center  text-[9px] font-medium flex-shrink-0 mt-0.5"
               style={{ background: '#F0F0F0', color: '#999999' }}
             >
               {initial}
