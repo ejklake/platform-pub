@@ -26,7 +26,7 @@ export function ConversationList({
 }) {
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-grey-200">
+      <div className="flex items-center justify-between px-4 py-3">
         <p className="font-mono text-[12px] uppercase tracking-[0.04em] text-black">Messages</p>
         <button
           onClick={onNewMessage}
@@ -51,8 +51,8 @@ export function ConversationList({
               <button
                 key={conv.id}
                 onClick={() => onSelect(conv.id)}
-                className={`w-full text-left px-4 py-3 border-b border-grey-100 transition-colors ${
-                  isActive ? 'bg-grey-100' : 'hover:bg-grey-100/50'
+                className={`w-full text-left px-4 py-3 transition-colors ${
+                  isActive ? 'bg-grey-200/60' : 'hover:bg-grey-200/40'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">

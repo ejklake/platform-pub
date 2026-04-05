@@ -30,12 +30,15 @@ export default function MessagesPage() {
   useEffect(() => { if (user) fetchConversations() }, [user])
 
   // Auto-select conversation from hash (for deep-linking from /messages/:id redirect)
+  // or default to the most recent conversation
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash) {
       const hash = window.location.hash.slice(1)
       if (hash) setActiveConvId(hash)
+    } else if (conversations.length > 0 && !activeConvId) {
+      setActiveConvId(conversations[0].id)
     }
-  }, [])
+  }, [conversations])
 
   async function handleNewConversation(e: React.FormEvent) {
     e.preventDefault()
@@ -73,9 +76,9 @@ export default function MessagesPage() {
 
   return (
     <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
-      <div className="border border-grey-200 bg-white h-[calc(100vh-160px)] min-h-[400px] flex">
+      <div className="bg-white h-[calc(100vh-160px)] min-h-[400px] flex">
         {/* Conversation list — hidden on mobile when a conversation is active */}
-        <div className={`w-full md:w-[280px] md:border-r md:border-grey-200 flex-shrink-0 ${activeConvId ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
+        <div className={`w-full md:w-[280px] bg-grey-100 flex-shrink-0 ${activeConvId ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
           <ConversationList
             conversations={conversations}
             activeId={activeConvId}
@@ -88,7 +91,7 @@ export default function MessagesPage() {
         <div className={`flex-1 ${!activeConvId ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>
           {showNewMessage ? (
             <div className="flex flex-col h-full">
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-grey-200">
+              <div className="flex items-center gap-3 px-4 py-3 mb-1">
                 <button
                   onClick={() => setShowNewMessage(false)}
                   className="font-mono text-[12px] text-grey-400 hover:text-black uppercase tracking-[0.04em]"
@@ -105,7 +108,7 @@ export default function MessagesPage() {
                     value={newRecipient}
                     onChange={(e) => setNewRecipient(e.target.value)}
                     placeholder="Username"
-                    className="flex-1 border border-grey-200 px-3 py-2 text-[14px] font-sans text-black placeholder-grey-300"
+                    className="flex-1 bg-grey-100 px-3 py-2 text-[14px] font-sans text-black placeholder-grey-300"
                     autoFocus
                   />
                   <button type="submit" disabled={creating} className="btn text-sm disabled:opacity-50">

@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.7.0
+# all.haus — Deployment Reference v5.8.0
 
 **Date:** 5 April 2026
-**Replaces:** v5.6.0 (see bottom for change log)
+**Replaces:** v5.7.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -4509,6 +4509,58 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.8.0 — 5 April 2026
+
+**DM page redesign, auto-select newest conversation, remove NoteComposer avatar**
+
+**DM page visual refresh:**
+
+- Removed all borders from the DM layout — outer container, sidebar divider, conversation list item separators, thread header, send box, input fields, and DM pricing banner. Layout relies on background colour contrast (`grey-100` sidebar vs `white` thread panel) instead of explicit borders.
+- Conversation list active/hover states adjusted to `bg-grey-200/60` and `bg-grey-200/40` to compensate for removed borders.
+- Input fields use `bg-grey-100` fill instead of border styling.
+
+**DM conversation auto-select:**
+
+- The most recent conversation is now automatically selected when landing on `/messages` (unless a deep-link hash is present). Previously the thread panel showed an empty "Select a conversation" prompt.
+
+**NoteComposer — remove profile picture:**
+
+- Removed the avatar / initials element from the note composer. The composer is now a single-column layout without the left-side profile image.
+
+**Changes:**
+
+- `web/src/app/messages/page.tsx`: removed `border`, `border-grey-200`, `md:border-r` classes from outer container, sidebar, and new-message header. Auto-select first conversation in `useEffect` when no hash is present and conversations have loaded.
+- `web/src/components/messages/ConversationList.tsx`: removed `border-b` from header and list items. Updated active/hover background colours.
+- `web/src/components/messages/MessageThread.tsx`: removed `border-b` from header, `border-t` from send box and DM pricing banner, `border` from input. Preserved `console.error` on markRead failures.
+- `web/src/components/feed/NoteComposer.tsx`: removed avatar/initials element and unused `initial` variable.
+
+**Files changed:** `web/src/app/messages/page.tsx`, `web/src/components/messages/ConversationList.tsx`, `web/src/components/messages/MessageThread.tsx`, `web/src/components/feed/NoteComposer.tsx`
+
+---
+
+### v5.7.0 — 5 April 2026
+
+**Codebase audit — 25 fixes across security, reliability, and code quality**
+
+Systematic audit addressing 1 critical, 4 high, 12 medium, and 8 low severity findings. Key changes: `schema.sql` sync with migrations 026–033, advisory locks on background workers, fail-fast env var validation, payment endpoint auth hardening, silent error swallowing replaced with logging, ArticleReader decomposition, and configurable platform params.
+
+**Changes:**
+
+- `schema.sql`: synced with all migrations through 033. Added `dm_likes`, `platform_config`, and missing columns/indexes.
+- `migrations/033_admin_account_ids_config.sql`: new migration for `platform_config` table seeding admin account IDs.
+- `gateway/src/index.ts`: fail-fast validation for required env vars (`STRIPE_SECRET_KEY`, `KEY_SERVICE_URL`, `PAYMENT_SERVICE_URL`). Advisory lock on background cron workers.
+- `gateway/src/lib/errors.ts`: new structured error class for consistent API error responses.
+- `gateway/src/routes/moderation.ts`: admin check reads from `platform_config` table with env var fallback.
+- `payment-service/src/routes/payment.ts`: auth hardening — internal endpoints require `INTERNAL_SERVICE_TOKEN`.
+- `payment-service/src/routes/webhook.ts`: Stripe signature validation moved before body parsing.
+- `web/src/components/article/ArticleReader.tsx`: decomposed into `GiftLinkModal.tsx` and `QuoteSelector.tsx`.
+- `web/src/lib/signPublishAndIndex.ts`: extracted shared sign-publish-index logic from `publishNote.ts`, `comments.ts`, and `replies.ts`.
+- Multiple frontend components: replaced silent `catch {}` with logged errors where appropriate.
+
+**Files changed:** `schema.sql`, `migrations/033_admin_account_ids_config.sql`, `gateway/src/index.ts`, `gateway/src/lib/errors.ts`, `gateway/src/routes/articles.ts`, `gateway/src/routes/auth.ts`, `gateway/src/routes/comments.ts`, `gateway/src/routes/drives.ts`, `gateway/src/routes/messages.ts`, `gateway/src/routes/moderation.ts`, `gateway/src/routes/replies.ts`, `gateway/src/routes/subscriptions.ts`, `key-service/src/services/vault.ts`, `payment-service/src/routes/payment.ts`, `payment-service/src/routes/webhook.ts`, `payment-service/src/services/payout.ts`, `payment-service/src/services/settlement.ts`, `shared/src/db/client.ts`, `shared/src/types/config.ts`, `web/src/app/following/page.tsx`, `web/src/app/history/page.tsx`, `web/src/app/notifications/page.tsx`, `web/src/components/article/ArticleReader.tsx`, `web/src/components/article/GiftLinkModal.tsx`, `web/src/components/article/PaywallGate.tsx`, `web/src/components/article/QuoteSelector.tsx`, `web/src/components/feed/ArticleCard.tsx`, `web/src/components/feed/FeedView.tsx`, `web/src/components/feed/NoteCard.tsx`, `web/src/components/home/FeaturedWriters.tsx`, `web/src/components/messages/MessageThread.tsx`, `web/src/components/payment/CardSetup.tsx`, `web/src/components/ui/NotificationBell.tsx`, `web/src/components/ui/VoteControls.tsx`, `web/src/hooks/useWriterName.ts`, `web/src/lib/comments.ts`, `web/src/lib/publishNote.ts`, `web/src/lib/replies.ts`, `web/src/lib/signPublishAndIndex.ts`, `AUDIT.md`
+
+---
 
 ### v5.6.0 — 5 April 2026
 

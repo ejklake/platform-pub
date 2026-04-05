@@ -124,7 +124,7 @@ export function MessageThread({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-grey-200 flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0">
         {onBack && (
           <button onClick={onBack} className="font-mono text-[12px] text-grey-400 hover:text-black uppercase tracking-[0.04em]">
             &#8592;
@@ -197,7 +197,7 @@ export function MessageThread({
 
       {/* DM pricing warning */}
       {dmPriceError !== null && (
-        <div className="px-4 py-2 bg-grey-100 border-t border-grey-200">
+        <div className="px-4 py-2 bg-grey-100">
           <p className="text-[13px] font-sans text-crimson">
             This user charges £{(dmPriceError / 100).toFixed(2)} for DMs. Send anyway?
           </p>
@@ -205,13 +205,13 @@ export function MessageThread({
       )}
 
       {/* Send box */}
-      <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3 border-t border-grey-200 flex-shrink-0">
+      <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3 flex-shrink-0">
         <input
           type="text"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Write a message…"
-          className="flex-1 border border-grey-200 px-3 py-2 text-[14px] font-sans text-black placeholder-grey-300"
+          className="flex-1 bg-grey-100 px-3 py-2 text-[14px] font-sans text-black placeholder-grey-300"
         />
         <button
           type="submit"

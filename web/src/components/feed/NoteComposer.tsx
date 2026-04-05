@@ -44,8 +44,6 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
   const isOver = charCount > NOTE_CHAR_LIMIT
   const isEmpty = content.trim().length === 0
   const canPost = !isEmpty && !isOver && !publishing
-  const initial = user.displayName?.[0]?.toUpperCase() ?? user.username?.[0]?.toUpperCase() ?? '?'
-
   async function handlePost() {
     if (!canPost || !user) return
     setPublishing(true); setError(null)
@@ -78,13 +76,7 @@ export function NoteComposer({ onPublished, onClearQuote, quoteTarget }: NoteCom
 
   return (
     <div className="bg-grey-100 p-[0.875rem_1.25rem]">
-      <div className="flex gap-3">
-        {user.avatar
-          ? <img src={user.avatar} alt="" className="h-9 w-9  object-cover flex-shrink-0" />
-          : <span className="flex h-9 w-9 items-center justify-center text-[10px] font-mono uppercase flex-shrink-0  bg-grey-100 text-grey-400">
-              {initial}
-            </span>
-        }
+      <div>
         <div className="flex-1 min-w-0">
           <textarea
             ref={ref}
