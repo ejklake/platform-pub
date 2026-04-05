@@ -576,7 +576,7 @@ export interface DirectMessage {
   senderId: string
   senderUsername: string
   senderDisplayName: string | null
-  senderPubkey: string
+  counterpartyPubkey: string
   contentEnc: string
   createdAt: string
 }
@@ -609,7 +609,7 @@ export const messages = {
       body: JSON.stringify({ memberIds }),
     }),
 
-  decryptBatch: (msgs: { id: string; senderPubkey: string; ciphertext: string }[]) =>
+  decryptBatch: (msgs: { id: string; counterpartyPubkey: string; ciphertext: string }[]) =>
     request<{ results: { id: string; plaintext: string | null; error?: string }[] }>('/dm/decrypt-batch', {
       method: 'POST',
       body: JSON.stringify({ messages: msgs }),

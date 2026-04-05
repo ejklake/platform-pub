@@ -35,7 +35,7 @@ export function MessageThread({
     if (encrypted.length === 0) return []
     try {
       const { results } = await messagesApi.decryptBatch(
-        encrypted.map(m => ({ id: m.id, senderPubkey: m.senderPubkey, ciphertext: m.contentEnc }))
+        encrypted.map(m => ({ id: m.id, counterpartyPubkey: m.counterpartyPubkey, ciphertext: m.contentEnc }))
       )
       const plaintextMap = new Map(results.map(r => [r.id, r.plaintext]))
       return encrypted.map(m => ({ ...m, content: plaintextMap.get(m.id) ?? null }))

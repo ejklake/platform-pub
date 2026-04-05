@@ -32,7 +32,7 @@ const HEX64_RE_NIP = /^[0-9a-f]{64}$/
 const DecryptBatchSchema = z.object({
   messages: z.array(z.object({
     id: z.string(),
-    senderPubkey: z.string().regex(HEX64_RE_NIP),
+    counterpartyPubkey: z.string().regex(HEX64_RE_NIP),
     ciphertext: z.string().min(1),
   })).min(1).max(100),
 })
@@ -229,16 +229,19 @@ export async function messageRoutes(app: FastifyInstance) {
         sender_username: string | null
         sender_display_name: string | null
         sender_pubkey: string
+        recipient_pubkey: string
         content_enc: string
         read_at: Date | null
         created_at: Date
       }>(
-        `SELECT dm.id, dm.sender_id, a.username AS sender_username,
-                a.display_name AS sender_display_name,
-                a.nostr_pubkey AS sender_pubkey,
+        `SELECT dm.id, dm.sender_id, sa.username AS sender_username,
+                sa.display_name AS sender_display_name,
+                sa.nostr_pubkey AS sender_pubkey,
+                ra.nostr_pubkey AS recipient_pubkey,
                 dm.content_enc, dm.read_at, dm.created_at
          FROM direct_messages dm
-         JOIN accounts a ON a.id = dm.sender_id
+         JOIN accounts sa ON sa.id = dm.sender_id
+         JOIN accounts ra ON ra.id = dm.recipient_id
          WHERE ${whereClause}
          ORDER BY dm.created_at DESC
          LIMIT $3`,
@@ -251,7 +254,10 @@ export async function messageRoutes(app: FastifyInstance) {
           senderId: r.sender_id,
           senderUsername: r.sender_username,
           senderDisplayName: r.sender_display_name,
-          senderPubkey: r.sender_pubkey,
+          // For NIP-44 decryption the client needs the counterparty pubkey:
+          // the sender's pubkey when the reader is the recipient, or the
+          // recipient's pubkey when the reader is the sender.
+          counterpartyPubkey: r.sender_id === userId ? r.recipient_pubkey : r.sender_pubkey,
           contentEnc: r.content_enc,
           readAt: r.read_at?.toISOString() ?? null,
           createdAt: r.created_at.toISOString(),
@@ -404,7 +410,7 @@ export async function messageRoutes(app: FastifyInstance) {
   //
   // The client receives NIP-44 encrypted messages and calls this endpoint to
   // decrypt them. Each message is decrypted using the reader's custodial
-  // private key and the sender's public key via key-custody.
+  // private key and the counterparty's public key via key-custody.
   // ---------------------------------------------------------------------------
 
   app.post('/dm/decrypt-batch', { preHandler: requireAuth }, async (req, reply) => {
@@ -416,7 +422,7 @@ export async function messageRoutes(app: FastifyInstance) {
     const readerId = req.session!.sub!
     const results = await Promise.allSettled(
       parsed.data.messages.map(async (msg) => {
-        const { plaintext } = await nip44Decrypt(readerId, msg.senderPubkey, msg.ciphertext)
+        const { plaintext } = await nip44Decrypt(readerId, msg.counterpartyPubkey, msg.ciphertext)
         return { id: msg.id, plaintext }
       })
     )

@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.4.1
+# all.haus — Deployment Reference v5.5.0
 
 **Date:** 5 April 2026
-**Replaces:** v5.4.0 (see bottom for change log)
+**Replaces:** v5.4.1 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -4353,6 +4353,43 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.5.0 — 5 April 2026
+
+**Fix: DM decryption failure + article unlock failure**
+
+Two bugs fixed: (1) DM messages appeared as "Could not decrypt" black blocks because the decryption step used the wrong NIP-44 counterparty pubkey, and (2) article unlocks failed because the content-key unwrap call bypassed the Next.js rewrite and made a cross-origin request that could not carry the session cookie.
+
+**Bug 1 — DM "Could not decrypt"**
+
+**Root cause:** When a sender's own messages were fetched (via `dm.sender_id = $2` in the WHERE clause), the `senderPubkey` returned was the sender's own pubkey. Decryption then derived the NIP-44 conversation key as `getConversationKey(sender_priv, sender_pub)` — but the message was encrypted with `getConversationKey(sender_priv, recipient_pub)`. Different ECDH shared secret, so decryption failed for every message the sender had sent.
+
+**Fix:** The GET messages query now joins the recipient's account and returns a `counterpartyPubkey` field — the recipient's pubkey when the reader is the sender, or the sender's pubkey when the reader is the recipient. The decrypt-batch endpoint and client use this instead of `senderPubkey`.
+
+**Bug 2 — Article unlock "Internal error"**
+
+**Root cause:** `web/src/lib/vault.ts` used `NEXT_PUBLIC_GATEWAY_URL` (baked in at build time as `http://localhost:3000`) for the `/unwrap-key` call. In the browser this is a cross-origin request (`localhost:3010` → `localhost:3000` in dev, or `all.haus` → `localhost:3000` in prod). The session cookie is not sent cross-origin, so the gateway returns 401 or the fetch fails entirely. The rest of the client (`api.ts`) uses relative `/api/v1/...` paths that go through the Next.js rewrite and stay same-origin.
+
+**Fix:** Changed `vault.ts` to use the same relative `/api/v1/unwrap-key` path, matching the rest of the client.
+
+**Changes:**
+
+- `gateway/src/routes/messages.ts`: GET messages query now joins `accounts ra ON ra.id = dm.recipient_id` and computes `counterpartyPubkey` (recipient pubkey for sent messages, sender pubkey for received messages). `DecryptBatchSchema` field renamed from `senderPubkey` to `counterpartyPubkey`. Decrypt handler passes `msg.counterpartyPubkey` to key-custody.
+- `web/src/lib/api.ts`: `DirectMessage` interface field renamed from `senderPubkey` to `counterpartyPubkey`. `decryptBatch` parameter updated to match.
+- `web/src/components/messages/MessageThread.tsx`: passes `counterpartyPubkey` instead of `senderPubkey` to decrypt-batch.
+- `web/src/lib/vault.ts`: replaced `NEXT_PUBLIC_GATEWAY_URL`-based URL with relative `/api/v1/unwrap-key` path to stay same-origin through the Next.js rewrite.
+
+**Files changed:** `gateway/src/routes/messages.ts`, `web/src/lib/api.ts`, `web/src/components/messages/MessageThread.tsx`, `web/src/lib/vault.ts`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose build gateway web`
+3. `docker compose up -d gateway web`
+
+No new env vars. No schema changes.
+
+---
 
 ### v5.4.1 — 5 April 2026
 

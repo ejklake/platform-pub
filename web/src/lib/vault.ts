@@ -24,7 +24,10 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha'
 // touches the server after decryption.
 // =============================================================================
 
-const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL ?? ''
+// Use relative URLs so requests go through the Next.js rewrite (same origin).
+// Using NEXT_PUBLIC_GATEWAY_URL here would make a cross-origin request that
+// fails in production and hits CORS/cookie issues in dev.
+const API_BASE = '/api/v1'
 
 // =============================================================================
 // Decryption — XChaCha20-Poly1305 (current algorithm)
@@ -105,7 +108,7 @@ export async function decryptVaultContent(
 export async function unwrapContentKey(
   encryptedKey: string
 ): Promise<string> {
-  const res = await fetch(`${GATEWAY_URL}/api/v1/unwrap-key`, {
+  const res = await fetch(`${API_BASE}/unwrap-key`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
