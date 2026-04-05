@@ -110,12 +110,13 @@ export async function feedRoutes(app: FastifyInstance) {
 // =============================================================================
 
 async function followingFeed(readerId: string, cursor: number | undefined, limit: number) {
-  const cursorClause = cursor ? `AND EXTRACT(EPOCH FROM sub.published_at) < $3` : ''
+  const cursorClause = cursor ? `AND EXTRACT(EPOCH FROM a.published_at)::bigint < $3` : ''
+  const noteCursorClause = cursor ? `AND EXTRACT(EPOCH FROM n.published_at)::bigint < $3` : ''
   const params: any[] = cursor ? [readerId, limit, cursor] : [readerId, limit]
 
-  const { rows } = await pool.query(`
-    SELECT * FROM (
-      SELECT ${ARTICLE_COLS}, NULL::float AS score, 'article' AS item_type
+  const [articlesRes, notesRes] = await Promise.all([
+    pool.query(`
+      SELECT ${ARTICLE_COLS}
       FROM articles a
       JOIN accounts acc ON acc.id = a.writer_id
       WHERE a.deleted_at IS NULL
@@ -123,23 +124,30 @@ async function followingFeed(readerId: string, cursor: number | undefined, limit
         AND (a.writer_id IN (SELECT followee_id FROM follows WHERE follower_id = $1) OR a.writer_id = $1)
         AND ${BLOCK_FILTER('a.writer_id', 1)}
         AND ${MUTE_FILTER('a.writer_id', 1)}
-
-      UNION ALL
-
-      SELECT ${NOTE_COLS}, NULL::float AS score, 'note' AS item_type
+        ${cursorClause}
+      ORDER BY a.published_at DESC
+      LIMIT $2
+    `, params),
+    pool.query(`
+      SELECT ${NOTE_COLS}
       FROM notes n
       JOIN accounts acc ON acc.id = n.author_id
       WHERE n.reply_to_event_id IS NULL
         AND (n.author_id IN (SELECT followee_id FROM follows WHERE follower_id = $1) OR n.author_id = $1)
         AND ${BLOCK_FILTER('n.author_id', 1)}
         AND ${MUTE_FILTER('n.author_id', 1)}
-    ) sub
-    ${cursorClause ? `WHERE ${cursorClause.replace('AND ', '')}` : ''}
-    ORDER BY sub.published_at DESC
-    LIMIT $2
-  `, params)
+        ${noteCursorClause}
+      ORDER BY n.published_at DESC
+      LIMIT $2
+    `, params),
+  ])
 
-  return rows.map(row => row.item_type === 'article' ? articleToItem(row) : noteToItem(row))
+  const items = [
+    ...articlesRes.rows.map(articleToItem),
+    ...notesRes.rows.map(noteToItem),
+  ]
+  items.sort((a, b) => b.publishedAt - a.publishedAt)
+  return items.slice(0, limit)
 }
 
 // =============================================================================
