@@ -81,7 +81,7 @@ export default function HistoryPage() {
 
   if (loading || !user) {
     return (
-      <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
+      <div className="mx-auto max-w-article pt-16 lg:pt-0 px-4 sm:px-6 py-8">
         <div className="h-7 w-36 animate-pulse bg-grey-100 mb-2 rounded" />
         <div className="h-4 w-48 animate-pulse bg-grey-100 mb-8 rounded" />
       </div>
@@ -89,7 +89,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
+    <div className="mx-auto max-w-article pt-16 lg:pt-0 px-4 sm:px-6 py-8">
       <h1 className="font-serif text-3xl sm:text-4xl font-light text-black mb-1">Reading History</h1>
       <p className="text-ui-sm text-grey-400 mb-8">Articles you've read</p>
 

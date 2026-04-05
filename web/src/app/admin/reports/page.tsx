@@ -36,14 +36,14 @@ export default function AdminReportsPage() {
 
   if (loading || !user?.isAdmin) {
     return (
-      <div className="mx-auto max-w-content px-6 py-10">
+      <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
         <div className="h-32 animate-pulse bg-white" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-content px-6 py-10">
+    <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
       <h1 className="font-serif text-2xl font-light text-black mb-8 tracking-tight">Reports</h1>
 
       {/* Filter tabs */}

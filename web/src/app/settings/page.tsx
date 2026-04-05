@@ -23,10 +23,10 @@ export default function SettingsPage() {
     catch { setUpgradeError('Failed to start writer setup.'); setUpgrading(false) }
   }
 
-  if (loading || !user) return <div className="mx-auto max-w-lg px-6 py-12"><div className="h-7 w-20 animate-pulse bg-white mb-10" /><div className="h-28 w-full animate-pulse bg-white mb-8" /></div>
+  if (loading || !user) return <div className="mx-auto max-w-lg px-4 sm:px-6 py-12"><div className="h-7 w-20 animate-pulse bg-white mb-10" /><div className="h-28 w-full animate-pulse bg-white mb-8" /></div>
 
   return (
-    <div className="mx-auto max-w-lg px-6 py-12">
+    <div className="mx-auto max-w-lg px-4 sm:px-6 py-12">
       <h1 className="font-serif text-2xl font-light text-black mb-10 tracking-tight">Settings</h1>
 
       {!user.stripeConnectKycComplete && (

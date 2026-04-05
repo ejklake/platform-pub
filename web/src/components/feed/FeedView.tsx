@@ -197,7 +197,7 @@ function NewUserCard({ item }: { item: NewUserItem }) {
 
 function FeedSkeleton() {
   return (
-    <div className="mx-auto max-w-feed pt-16 lg:pt-0 px-6 py-10 space-y-[10px]">
+    <div className="mx-auto max-w-feed pt-16 lg:pt-0 px-4 sm:px-6 py-10 space-y-[10px]">
       {[1, 2, 3].map(i => (
         <div key={i} className="bg-white bg-grey-100 p-5">
           <div className="h-3 w-24 animate-pulse bg-grey-100 mb-4" />

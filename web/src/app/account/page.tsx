@@ -36,7 +36,7 @@ export default function AccountPage() {
 
   if (loading || !user) {
     return (
-      <div className="mx-auto max-w-content px-6 py-10">
+      <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
         <div className="h-32 animate-pulse bg-white mb-8" />
         <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-10 animate-pulse bg-white" />)}</div>
       </div>
@@ -49,7 +49,7 @@ export default function AccountPage() {
   const netBalance = earningsPence - tabBalance
 
   return (
-    <div className="mx-auto max-w-content px-6 py-10">
+    <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
       <h1 className="font-serif text-2xl font-light text-black mb-8 tracking-tight">Your account</h1>
 
       {dataLoading ? (

@@ -60,7 +60,7 @@ export default function SearchPage() {
   const writerCount = writerResults.length
 
   return (
-    <div className="mx-auto max-w-article px-6 py-12">
+    <div className="mx-auto max-w-article px-4 sm:px-6 py-12">
       <h1 className="font-serif text-2xl font-light text-black mb-8 tracking-tight">Search</h1>
 
       {/* Search input */}

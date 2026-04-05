@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.3.0
+# all.haus — Deployment Reference v5.3.1
 
 **Date:** 5 April 2026
-**Replaces:** v5.2.0 (see bottom for change log)
+**Replaces:** v5.3.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -4353,6 +4353,29 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.3.1 — 5 April 2026
+
+**Scale tuning: bump desktop base font, reduce mobile prose size and page gutters**
+
+The UI chrome felt small on desktop (users needed ~133% zoom to match comparable apps like WhatsApp Web or Claude). On mobile, article text was too large relative to the narrow viewport, producing short ~6-word lines.
+
+**Changes:**
+
+- `web/src/app/globals.css`: body base font-size bumped from `1rem` (16px) to `1.0625rem` (17px) — lifts all rem-based UI elements proportionally on desktop. Added `@media (max-width: 767px)` override for `.prose` and `.prose-lg`: font-size reduced from 18px to `1rem` (16px at the new base) and paragraph margins tightened from `1.5em` to `1.25em` for better mobile line length (~10-12 words per line on a 390px screen).
+- 25 page-level containers across `web/src/app/` and `web/src/components/`: outer horizontal padding changed from `px-6` (24px) to `px-4 sm:px-6` (16px on mobile, 24px from `sm` breakpoint up). This recovers 16px of text width on small screens. Only `mx-auto max-w-*` page wrappers were changed — internal card, button, and nav padding is untouched.
+
+**Files changed:** `web/src/app/globals.css`, `web/src/app/page.tsx`, `web/src/app/about/page.tsx`, `web/src/app/account/page.tsx`, `web/src/app/admin/page.tsx`, `web/src/app/admin/reports/page.tsx`, `web/src/app/article/error.tsx`, `web/src/app/auth/page.tsx`, `web/src/app/auth/verify/page.tsx`, `web/src/app/dashboard/error.tsx`, `web/src/app/dashboard/page.tsx`, `web/src/app/error.tsx`, `web/src/app/feed/error.tsx`, `web/src/app/following/page.tsx`, `web/src/app/history/page.tsx`, `web/src/app/messages/page.tsx`, `web/src/app/messages/[conversationId]/page.tsx`, `web/src/app/notifications/page.tsx`, `web/src/app/profile/page.tsx`, `web/src/app/search/page.tsx`, `web/src/app/settings/page.tsx`, `web/src/app/write/page.tsx`, `web/src/components/article/ArticleReader.tsx`, `web/src/components/editor/ArticleEditor.tsx`, `web/src/components/feed/FeedView.tsx`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose build web`
+3. `docker compose up -d web`
+
+No migrations. No env vars. CSS-only change plus Tailwind class adjustments.
+
+---
 
 ### v5.3.0 — 5 April 2026
 

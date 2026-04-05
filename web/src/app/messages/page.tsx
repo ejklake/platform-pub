@@ -65,14 +65,14 @@ export default function MessagesPage() {
 
   if (loading || !user) {
     return (
-      <div className="mx-auto max-w-content px-6 py-10">
+      <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
         <div className="h-[600px] animate-pulse bg-white" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-content px-6 py-10">
+    <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
       <div className="border border-grey-200 bg-white h-[calc(100vh-160px)] min-h-[400px] flex">
         {/* Conversation list — hidden on mobile when a conversation is active */}
         <div className={`w-full md:w-[280px] md:border-r md:border-grey-200 flex-shrink-0 ${activeConvId ? 'hidden md:flex md:flex-col' : 'flex flex-col'}`}>

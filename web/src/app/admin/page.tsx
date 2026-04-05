@@ -18,7 +18,7 @@ export default function AdminPage() {
   }, [user, loading, router])
 
   return (
-    <div className="mx-auto max-w-content px-6 py-10">
+    <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
       <p className="text-[14px] font-sans text-grey-300">Redirecting…</p>
     </div>
   )

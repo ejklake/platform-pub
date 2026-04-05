@@ -27,7 +27,7 @@ export default async function WriterProfilePage({ params }: { params: { username
   if (!writer) return notFound()
 
   return (
-    <div className="mx-auto max-w-article-frame px-6 py-12">
+    <div className="mx-auto max-w-article-frame px-4 sm:px-6 py-12">
       {/* Static profile header — arrives as HTML */}
       <div className="mb-12">
         <div className="flex items-center gap-4 mb-4">

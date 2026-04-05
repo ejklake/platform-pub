@@ -202,7 +202,7 @@ export function ArticleEditor({
   const gateInserted = hasGateMarker()
 
   return (
-    <div className="mx-auto max-w-editor-frame px-6 pt-16 lg:pt-8 pb-8">
+    <div className="mx-auto max-w-editor-frame px-4 sm:px-6 pt-16 lg:pt-8 pb-8">
       {/* Sticky title + toolbar — stays visible while scrolling the body */}
       <div className="sticky top-[53px] lg:top-0 z-20 bg-white pb-4 mb-6">
       {/* Title input */}

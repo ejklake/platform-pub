@@ -78,7 +78,7 @@ export default function AuthPage() {
 
   if (magicLinkSent) {
     return (
-      <div className="mx-auto max-w-sm px-6 py-28 text-center">
+      <div className="mx-auto max-w-sm px-4 sm:px-6 py-28 text-center">
         <div className="flex justify-center mb-8">
           <ForAllMark size={24} className="text-grey-300" />
         </div>
@@ -100,7 +100,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="mx-auto max-w-sm px-6 py-28">
+    <div className="mx-auto max-w-sm px-4 sm:px-6 py-28">
       <h1 className="font-serif font-medium text-black mb-2 tracking-tight" style={{ fontSize: '28px' }}>
         {mode === 'signup' ? 'Create your account' : 'Welcome back'}
       </h1>

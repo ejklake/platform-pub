@@ -38,7 +38,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-article px-6 py-12">
+      <div className="mx-auto max-w-article px-4 sm:px-6 py-12">
         <div className="h-6 w-32 animate-pulse bg-white mb-8" />
       </div>
     )
@@ -88,7 +88,7 @@ export default function ProfilePage() {
   const initial = (displayName || user.username || '?')[0].toUpperCase()
 
   return (
-    <div className="mx-auto max-w-article px-6 py-12">
+    <div className="mx-auto max-w-article px-4 sm:px-6 py-12">
       <h1 className="font-serif text-2xl font-light text-black tracking-tight mb-8">
         Profile
       </h1>

@@ -85,7 +85,7 @@ export default function FollowingPage() {
   ].join(' ')
 
   return (
-    <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
+    <div className="mx-auto max-w-article pt-16 lg:pt-0 px-4 sm:px-6 py-8">
       <h1 className="font-serif text-3xl sm:text-4xl font-light text-black mb-6">Network</h1>
 
       {/* Tabs */}
@@ -201,7 +201,7 @@ function ListSkeleton() {
 
 function PageSkeleton() {
   return (
-    <div className="mx-auto max-w-article pt-16 lg:pt-0 px-6 py-8">
+    <div className="mx-auto max-w-article pt-16 lg:pt-0 px-4 sm:px-6 py-8">
       <div className="h-7 w-36 animate-pulse bg-grey-100 mb-6 rounded" />
       <div className="flex gap-6 border-b border-grey-200 mb-8">
         <div className="h-4 w-20 animate-pulse bg-grey-100 rounded" />

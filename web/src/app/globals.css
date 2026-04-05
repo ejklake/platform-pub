@@ -71,7 +71,7 @@
 @layer base {
   body {
     @apply bg-white text-black antialiased font-sans;
-    font-size: 1rem;
+    font-size: 1.0625rem;
     line-height: 1.6;
     padding-top: 0;
   }
@@ -350,6 +350,17 @@
     margin: 0.05em 0.08em 0 0;
     color: #111111;
     font-weight: 500;
+  }
+
+  /* ----- Mobile prose scaling ----- */
+  @media (max-width: 767px) {
+    .prose, .prose-lg {
+      font-size: 1rem;
+    }
+    .prose p, .prose-lg p {
+      margin-top: 1.25em;
+      margin-bottom: 1.25em;
+    }
   }
 
   /* ----- Editor selection highlight ----- */

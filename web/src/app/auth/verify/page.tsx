@@ -54,7 +54,7 @@ export default function VerifyPage() {
   }, [searchParams, router, fetchMe])
 
   return (
-    <div className="mx-auto max-w-sm px-6 py-24 text-center">
+    <div className="mx-auto max-w-sm px-4 sm:px-6 py-24 text-center">
       {status === 'verifying' && (
         <>
           <div className="mx-auto mb-4 h-8 w-8 animate-spin  border-2 border-grey-200 border-t-grey-600" />

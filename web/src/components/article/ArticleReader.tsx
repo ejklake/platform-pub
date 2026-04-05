@@ -319,7 +319,7 @@ export function ArticleReader({ article, articleDbId, writerName, writerUsername
       )}
 
       {/* Article content */}
-      <div className="mx-auto max-w-article-frame px-6">
+      <div className="mx-auto max-w-article-frame px-4 sm:px-6">
         <div className="px-5 py-6 sm:px-10 sm:py-8 md:px-[72px] md:py-10">
           {/* Hero image */}
           {heroImage && (

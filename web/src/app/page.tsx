@@ -4,7 +4,7 @@ import { ForAllMark } from '../components/icons/ForAllMark'
 
 export default function HomePage() {
   return (
-    <div className="mx-auto max-w-article-frame px-6 py-24">
+    <div className="mx-auto max-w-article-frame px-4 sm:px-6 py-24">
 
       {/* ── Section 1: Hero ── */}
       <section>

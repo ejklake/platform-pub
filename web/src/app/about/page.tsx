@@ -8,7 +8,7 @@ export default function AboutPage() {
   const { user, loading } = useAuth()
 
   return (
-    <div className="mx-auto max-w-article px-6 pt-16 pb-16 lg:pt-8">
+    <div className="mx-auto max-w-article px-4 sm:px-6 pt-16 pb-16 lg:pt-8">
       <h1 className="font-serif text-4xl font-medium text-black mb-4" style={{ letterSpacing: '-0.02em' }}>
         all.haus
       </h1>
