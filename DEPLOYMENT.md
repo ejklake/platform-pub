@@ -1,4 +1,4 @@
-# all.haus — Deployment Reference v5.8.2
+# all.haus — Deployment Reference v5.8.3
 
 **Date:** 5 April 2026
 **Replaces:** v5.8.1 (see bottom for change log)
@@ -249,6 +249,23 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.8.2
+
+Bug fix: paywalled article re-publish fails — relay rejects v2 replacement event. The double-publish flow (v1 free → vault encrypt → v2 with payload) could produce two events with identical `created_at` timestamps. strfry rejects the second as "replaced: have newer event". Services changed: **web only**.
+
+```bash
+cd ~/platform-pub
+git pull origin master
+docker compose build web
+docker compose up -d web
+```
+
+Verify: edit and re-publish any paywalled article. Both events should land on the relay without error. Check gateway logs for two successive "Event signed and published" lines.
+
+No migrations, no env changes.
+
+---
 
 ### From v5.8.1
 
@@ -4562,6 +4579,27 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.8.3 — 5 April 2026
+
+**Fix: paywalled article publish — relay rejects v2 replacement event**
+
+When publishing a paywalled article, the platform uses a double-publish pattern: v1 (free content only) is published first to get a relay-accepted event ID, then after vault encryption, v2 (with encrypted payload tag) replaces it. Both events share the same NIP-23 `d-tag`, so strfry uses `created_at` to determine which version to keep.
+
+If v1 and v2 were signed within the same second, they received identical `created_at` timestamps. strfry rejected v2 with "replaced: have newer event" because it was not strictly newer. This left the article on the relay without its encrypted payload, and surfaced as "Sign-and-publish failed: 500" in the editor.
+
+**Root cause:** `web/src/lib/sign.ts` stripped the optional `created_at` field from the request body sent to the gateway, making it impossible for the client to control event timestamps. The publish pipeline in `web/src/lib/publish.ts` relied on the gateway assigning `created_at = now` independently for each event, creating a same-second race.
+
+**Changes:**
+
+- `web/src/lib/sign.ts`: pass `created_at` through to the gateway in both `signViaGateway()` and `signAndPublish()` when present on the event template. When omitted, the gateway falls back to `Math.floor(Date.now() / 1000)` as before.
+- `web/src/lib/publish.ts`: set v2's `created_at` to `signedV1.created_at + 1`, guaranteeing the replacement event is strictly newer.
+
+**Files changed:** `web/src/lib/sign.ts`, `web/src/lib/publish.ts`
+
+**No env changes.** Web-only rebuild required.
+
+---
 
 ### v5.8.2 — 5 April 2026
 

@@ -80,8 +80,10 @@ export async function publishArticle(
   )
 
   // Step 4: Build NIP-23 v2 with embedded payload tag, sign and publish
+  // Replaceable events (kind 30023) require strictly newer created_at to replace
+  // the prior version on the relay. Pin v2 one second ahead of v1.
   const v2 = buildNip23Event(data, dTag, { ciphertext, algorithm })
-  const signedV2 = await signAndPublish(v2)
+  const signedV2 = await signAndPublish({ ...v2, created_at: signedV1.created_at + 1 })
 
   // Step 5: Re-index with v2 event ID (upsert on nostr_event_id)
   await articlesApi.index({

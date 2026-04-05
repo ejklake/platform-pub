@@ -30,6 +30,7 @@ export async function signViaGateway(event: NostrEventTemplate): Promise<SignedN
       kind: event.kind,
       content: event.content,
       tags: event.tags,
+      created_at: event.created_at,
     }),
   })
 
@@ -60,6 +61,7 @@ export async function signAndPublish(event: NostrEventTemplate): Promise<SignedN
       kind: event.kind,
       content: event.content,
       tags: event.tags,
+      created_at: event.created_at,
     }),
   })
 
