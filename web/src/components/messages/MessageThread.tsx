@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { messages as messagesApi, type DirectMessage, type DecryptedMessage } from '../../lib/api'
 import { useAuth } from '../../stores/auth'
 import { useUnreadCounts } from '../../stores/unread'
+
+const POLL_INTERVAL = 5_000
 
 function timeStamp(iso: string): string {
   const d = new Date(iso)
@@ -14,10 +16,12 @@ export function MessageThread({
   conversationId,
   memberName,
   onBack,
+  onMessagesRead,
 }: {
   conversationId: string
   memberName: string
   onBack?: () => void
+  onMessagesRead?: () => void
 }) {
   const { user } = useAuth()
   const refreshUnread = useUnreadCounts((s) => s.fetch)
@@ -29,43 +33,63 @@ export function MessageThread({
   const [content, setContent] = useState('')
   const [sending, setSending] = useState(false)
   const [dmPriceError, setDmPriceError] = useState<number | null>(null)
+  const [replyTo, setReplyTo] = useState<DecryptedMessage | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const latestCreatedAt = useRef<string | null>(null)
 
   async function decryptMessages(encrypted: DirectMessage[]): Promise<DecryptedMessage[]> {
     if (encrypted.length === 0) return []
+
+    // Collect all ciphertexts to decrypt: message bodies + reply previews
+    const toDecrypt: { id: string; counterpartyPubkey: string; ciphertext: string }[] = []
+    for (const m of encrypted) {
+      toDecrypt.push({ id: m.id, counterpartyPubkey: m.counterpartyPubkey, ciphertext: m.contentEnc })
+      if (m.replyTo?.contentEnc && m.replyTo.counterpartyPubkey) {
+        toDecrypt.push({
+          id: `reply:${m.id}`,
+          counterpartyPubkey: m.replyTo.counterpartyPubkey,
+          ciphertext: m.replyTo.contentEnc,
+        })
+      }
+    }
+
     try {
-      const { results } = await messagesApi.decryptBatch(
-        encrypted.map(m => ({ id: m.id, counterpartyPubkey: m.counterpartyPubkey, ciphertext: m.contentEnc }))
-      )
+      const { results } = await messagesApi.decryptBatch(toDecrypt)
       const plaintextMap = new Map(results.map(r => [r.id, r.plaintext]))
-      return encrypted.map(m => ({ ...m, content: plaintextMap.get(m.id) ?? null }))
+      return encrypted.map(m => ({
+        ...m,
+        content: plaintextMap.get(m.id) ?? null,
+        replyToContent: plaintextMap.get(`reply:${m.id}`) ?? null,
+      }))
     } catch {
-      return encrypted.map(m => ({ ...m, content: null }))
+      return encrypted.map(m => ({ ...m, content: null, replyToContent: null }))
     }
   }
 
-  async function fetchMessages(cursor?: string) {
-    const isInitial = !cursor
+  const fetchMessages = useCallback(async (before?: string) => {
+    const isInitial = !before
     if (isInitial) setLoading(true)
     else setLoadingMore(true)
 
-    // Capture scroll position before loading older messages
     const scrollEl = scrollRef.current
     const prevScrollHeight = scrollEl?.scrollHeight ?? 0
 
     try {
-      const data = await messagesApi.getMessages(conversationId, cursor)
+      const data = await messagesApi.getMessages(conversationId, before)
       setDecrypting(true)
       const decrypted = await decryptMessages(data.messages)
-      // API returns newest-first; reverse to chronological (oldest at top, newest at bottom)
       const chronological = decrypted.reverse()
+
       if (isInitial) {
         setMsgs(chronological)
+        if (chronological.length > 0) {
+          latestCreatedAt.current = chronological[chronological.length - 1].createdAt
+        }
       } else {
-        // Prepend older messages at the top
         setMsgs(prev => [...chronological, ...prev])
-        // Restore scroll position after older messages are prepended
         requestAnimationFrame(() => {
           if (scrollEl) {
             scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight
@@ -76,32 +100,132 @@ export function MessageThread({
 
       // Mark unread messages as read
       const unreadMsgs = data.messages.filter(msg => msg.senderId !== user?.id)
-      for (const msg of unreadMsgs) {
-        messagesApi.markRead(msg.id).catch(err => console.error('Failed to mark message read', err))
+      if (unreadMsgs.length > 0) {
+        await Promise.all(
+          unreadMsgs.map(msg => messagesApi.markRead(msg.id).catch(() => {}))
+        )
+        refreshUnread()
+        onMessagesRead?.()
       }
-      if (unreadMsgs.length > 0) refreshUnread()
     } catch {}
     finally { setLoading(false); setLoadingMore(false); setDecrypting(false) }
-  }
+  }, [conversationId, user?.id])
 
+  // Poll for new messages in the active thread
+  const pollForNew = useCallback(async () => {
+    if (!latestCreatedAt.current) return
+    try {
+      // Fetch messages newer than what we have by getting the first page
+      // and filtering to only truly new ones
+      const data = await messagesApi.getMessages(conversationId)
+      if (data.messages.length === 0) return
+
+      // Find messages newer than our latest
+      const newMsgs = data.messages.filter(m =>
+        new Date(m.createdAt) > new Date(latestCreatedAt.current!)
+      )
+      if (newMsgs.length === 0) return
+
+      const decrypted = await decryptMessages(newMsgs)
+      const chronological = decrypted.reverse()
+
+      setMsgs(prev => {
+        const existingIds = new Set(prev.map(m => m.id))
+        const unique = chronological.filter(m => !existingIds.has(m.id))
+        if (unique.length === 0) return prev
+        return [...prev, ...unique]
+      })
+
+      latestCreatedAt.current = chronological[chronological.length - 1].createdAt
+
+      // Mark new messages from others as read
+      const unreadMsgs = newMsgs.filter(msg => msg.senderId !== user?.id)
+      if (unreadMsgs.length > 0) {
+        await Promise.all(
+          unreadMsgs.map(msg => messagesApi.markRead(msg.id).catch(() => {}))
+        )
+        refreshUnread()
+        onMessagesRead?.()
+      }
+    } catch {}
+  }, [conversationId, user?.id])
+
+  // Initial fetch + set up polling
   useEffect(() => {
     setMsgs([])
+    setReplyTo(null)
+    latestCreatedAt.current = null
     fetchMessages()
+
+    pollRef.current = setInterval(pollForNew, POLL_INTERVAL)
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
   }, [conversationId])
 
+  // Auto-scroll when new messages appear
   useEffect(() => {
-    if (!loading) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!loading) {
+      const el = scrollRef.current
+      if (!el) return
+      // Only auto-scroll if user is near the bottom (within 150px)
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150
+      if (isNearBottom) {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
+    }
   }, [msgs.length, loading])
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
     if (!content.trim() || sending) return
-    setSending(true); setDmPriceError(null)
+    const text = content.trim()
+    const replyToId = replyTo?.id
+
+    // Optimistic update: add the message to the UI immediately
+    const optimisticId = `optimistic-${Date.now()}`
+    const optimisticMsg: DecryptedMessage = {
+      id: optimisticId,
+      conversationId,
+      senderId: user!.id,
+      senderUsername: user!.username ?? '',
+      senderDisplayName: user!.displayName ?? null,
+      counterpartyPubkey: '',
+      contentEnc: '',
+      replyTo: replyTo ? {
+        id: replyTo.id,
+        senderUsername: replyTo.senderUsername,
+        contentEnc: null,
+        counterpartyPubkey: null,
+      } : null,
+      content: text,
+      replyToContent: replyTo?.content ?? null,
+      readAt: null,
+      createdAt: new Date().toISOString(),
+      likeCount: 0,
+      likedByMe: false,
+    } as any
+
+    setMsgs(prev => [...prev, optimisticMsg])
+    setContent('')
+    setReplyTo(null)
+    setSending(true)
+    setDmPriceError(null)
+
     try {
-      await messagesApi.send(conversationId, content.trim())
-      setContent('')
-      fetchMessages()
+      const result = await messagesApi.send(conversationId, text, replyToId)
+      // Replace optimistic message with real ID
+      if (result.messageIds?.[0]) {
+        setMsgs(prev => prev.map(m =>
+          m.id === optimisticId ? { ...m, id: result.messageIds[0] } : m
+        ))
+        latestCreatedAt.current = new Date().toISOString()
+      }
     } catch (err: any) {
+      // Remove optimistic message on failure
+      setMsgs(prev => prev.filter(m => m.id !== optimisticId))
+      setContent(text) // Restore the text so user doesn't lose it
+      if (replyToId && replyTo) setReplyTo(replyTo)
       if (err?.status === 402) {
         setDmPriceError(err.body?.pricePence ?? 0)
       }
@@ -111,14 +235,31 @@ export function MessageThread({
   }
 
   async function handleToggleLike(messageId: string) {
+    // Snapshot current state for rollback
+    const prev = msgs.find(m => m.id === messageId)
+    if (!prev) return
+
+    // Optimistic toggle
+    setMsgs(ms => ms.map(m =>
+      m.id === messageId
+        ? { ...m, likedByMe: !m.likedByMe, likeCount: m.likeCount + (m.likedByMe ? -1 : 1) }
+        : m
+    ))
     try {
-      const { liked } = await messagesApi.toggleLike(messageId)
-      setMsgs(prev => prev.map(m =>
+      await messagesApi.toggleLike(messageId)
+    } catch {
+      // Revert to snapshot
+      setMsgs(ms => ms.map(m =>
         m.id === messageId
-          ? { ...m, likedByMe: liked, likeCount: m.likeCount + (liked ? 1 : -1) }
+          ? { ...m, likedByMe: prev.likedByMe, likeCount: prev.likeCount }
           : m
       ))
-    } catch {}
+    }
+  }
+
+  function handleReply(msg: DecryptedMessage) {
+    setReplyTo(msg)
+    inputRef.current?.focus()
   }
 
   return (
@@ -142,7 +283,7 @@ export function MessageThread({
               disabled={loadingMore}
               className="text-[12px] font-sans text-grey-300 hover:text-black"
             >
-              {loadingMore ? 'Loading…' : 'Load older messages'}
+              {loadingMore ? 'Loading\u2026' : 'Load older messages'}
             </button>
           </div>
         )}
@@ -157,6 +298,20 @@ export function MessageThread({
             return (
               <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] group`}>
+                  {/* Reply context */}
+                  {msg.replyTo && (
+                    <div className={`flex items-start gap-1.5 mb-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                      <div className="bg-grey-100/60 px-3 py-1.5 border-l-2 border-grey-300">
+                        <p className="text-[11px] font-sans font-semibold text-grey-400">
+                          {msg.replyTo.senderUsername ?? 'Unknown'}
+                        </p>
+                        <p className="text-[12px] font-sans text-grey-400 truncate max-w-[200px]">
+                          {msg.replyToContent ?? <span className="italic">Encrypted message</span>}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className={`${isMine ? 'bg-black text-white' : 'bg-grey-100 text-black'} px-4 py-2.5`}>
                     {!isMine && (
                       <p className={`text-[12px] font-sans font-semibold mb-0.5 text-grey-600`}>
@@ -170,8 +325,15 @@ export function MessageThread({
                       {timeStamp(msg.createdAt)}
                     </p>
                   </div>
-                  {/* Like button */}
-                  <div className={`flex items-center gap-1 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+
+                  {/* Like + Reply buttons */}
+                  <div className={`flex items-center gap-2 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                    <button
+                      onClick={() => handleReply(msg)}
+                      className="text-[11px] font-sans text-grey-200 opacity-0 group-hover:opacity-100 transition-opacity hover:text-black"
+                    >
+                      Reply
+                    </button>
                     <button
                       onClick={() => handleToggleLike(msg.id)}
                       className={`text-[12px] transition-colors ${
@@ -181,7 +343,7 @@ export function MessageThread({
                       }`}
                       aria-label={msg.likedByMe ? 'Unlike' : 'Like'}
                     >
-                      {msg.likedByMe ? '♥' : '♡'}
+                      {msg.likedByMe ? '\u2665' : '\u2661'}
                     </button>
                     {msg.likeCount > 0 && (
                       <span className="text-[11px] font-mono text-grey-300">{msg.likeCount}</span>
@@ -199,18 +361,40 @@ export function MessageThread({
       {dmPriceError !== null && (
         <div className="px-4 py-2 bg-grey-100">
           <p className="text-[13px] font-sans text-crimson">
-            This user charges £{(dmPriceError / 100).toFixed(2)} for DMs. Send anyway?
+            This user charges \u00a3{(dmPriceError / 100).toFixed(2)} for DMs. Send anyway?
           </p>
+        </div>
+      )}
+
+      {/* Reply preview bar */}
+      {replyTo && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-grey-100/80 border-t border-grey-200">
+          <div className="flex-1 min-w-0 border-l-2 border-crimson pl-2">
+            <p className="text-[11px] font-sans font-semibold text-grey-500">
+              Replying to {replyTo.senderDisplayName ?? replyTo.senderUsername}
+            </p>
+            <p className="text-[12px] font-sans text-grey-400 truncate">
+              {replyTo.content ?? 'Encrypted message'}
+            </p>
+          </div>
+          <button
+            onClick={() => setReplyTo(null)}
+            className="text-[12px] text-grey-400 hover:text-black flex-shrink-0"
+            aria-label="Cancel reply"
+          >
+            &#10005;
+          </button>
         </div>
       )}
 
       {/* Send box */}
       <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3 flex-shrink-0">
         <input
+          ref={inputRef}
           type="text"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Write a message…"
+          placeholder={replyTo ? 'Write a reply\u2026' : 'Write a message\u2026'}
           className="flex-1 bg-grey-100 px-3 py-2 text-[14px] font-sans text-black placeholder-grey-300"
         />
         <button
@@ -218,7 +402,7 @@ export function MessageThread({
           disabled={sending || !content.trim()}
           className="btn text-sm disabled:opacity-50"
         >
-          {sending ? '…' : 'Send'}
+          {sending ? '\u2026' : 'Send'}
         </button>
       </form>
     </div>

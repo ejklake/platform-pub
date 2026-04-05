@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../stores/auth'
 import { useRouter } from 'next/navigation'
 import { messages as messagesApi, type Conversation } from '../../lib/api'
@@ -26,6 +26,14 @@ export default function MessagesPage() {
     } catch {}
     finally { setDataLoading(false) }
   }
+
+  // When messages are read in a thread, clear that conversation's unread count locally
+  const handleMessagesRead = useCallback(() => {
+    if (!activeConvId) return
+    setConversations(prev => prev.map(c =>
+      c.id === activeConvId ? { ...c, unreadCount: 0 } : c
+    ))
+  }, [activeConvId])
 
   useEffect(() => { if (user) fetchConversations() }, [user])
 
@@ -122,6 +130,7 @@ export default function MessagesPage() {
               conversationId={activeConvId}
               memberName={activeMemberName}
               onBack={() => setActiveConvId(null)}
+              onMessagesRead={handleMessagesRead}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">

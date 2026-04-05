@@ -571,6 +571,13 @@ export interface Conversation {
   members: { id: string; username: string; displayName: string | null; avatar: string | null }[]
 }
 
+export interface ReplyTo {
+  id: string
+  senderUsername: string | null
+  contentEnc: string | null
+  counterpartyPubkey: string | null
+}
+
 export interface DirectMessage {
   id: string
   conversationId: string
@@ -579,6 +586,7 @@ export interface DirectMessage {
   senderDisplayName: string | null
   counterpartyPubkey: string
   contentEnc: string
+  replyTo: ReplyTo | null
   createdAt: string
   likeCount: number
   likedByMe: boolean
@@ -586,21 +594,22 @@ export interface DirectMessage {
 
 export interface DecryptedMessage extends DirectMessage {
   content: string | null
+  replyToContent: string | null
 }
 
 export const messages = {
   listConversations: () =>
     request<{ conversations: Conversation[] }>('/messages'),
 
-  getMessages: (conversationId: string, cursor?: string) =>
+  getMessages: (conversationId: string, before?: string) =>
     request<{ messages: DirectMessage[]; nextCursor: string | null }>(
-      `/messages/${conversationId}${cursor ? `?cursor=${cursor}` : ''}`
+      `/messages/${conversationId}${before ? `?before=${before}` : ''}`
     ),
 
-  send: (conversationId: string, content: string) =>
-    request<{ messageId: string }>(`/messages/${conversationId}`, {
+  send: (conversationId: string, content: string, replyToId?: string) =>
+    request<{ messageIds: string[] }>(`/messages/${conversationId}`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, ...(replyToId && { replyToId }) }),
     }),
 
   markRead: (messageId: string) =>

@@ -484,3 +484,13 @@
     page-break-after: avoid;
   }
 }
+
+/* ── Logo spin on hover ────────────────────────────────────────────────────── */
+
+.logo-spin svg {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.logo-spin:hover svg {
+  transform: rotate(360deg);
+}

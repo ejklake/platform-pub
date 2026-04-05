@@ -784,6 +784,7 @@ CREATE TABLE direct_messages (
   recipient_id     UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   content_enc      TEXT NOT NULL,  -- NIP-44 encrypted to recipient's pubkey
   nostr_event_id   TEXT UNIQUE,
+  reply_to_id      UUID REFERENCES direct_messages(id) ON DELETE SET NULL,
   read_at          TIMESTAMPTZ,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -791,6 +792,7 @@ CREATE TABLE direct_messages (
 CREATE INDEX idx_dm_conversation ON direct_messages(conversation_id, created_at DESC);
 CREATE INDEX idx_dm_sender ON direct_messages(sender_id);
 CREATE INDEX idx_dm_recipient ON direct_messages(recipient_id);
+CREATE INDEX idx_dm_reply_to ON direct_messages(reply_to_id) WHERE reply_to_id IS NOT NULL;
 
 CREATE TABLE dm_pricing (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -943,5 +945,6 @@ INSERT INTO _migrations (filename) VALUES
   ('030_commissions_expansion.sql'),
   ('031_fix_media_urls_domain.sql'),
   ('032_dm_likes.sql'),
-  ('033_admin_account_ids_config.sql')
+  ('033_admin_account_ids_config.sql'),
+  ('034_dm_replies.sql')
 ON CONFLICT (filename) DO NOTHING;

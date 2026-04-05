@@ -290,7 +290,7 @@ export function Nav() {
       <>
         <header className="fixed top-0 inset-x-0 z-50 bg-black">
           <div className="flex items-center justify-between px-6 h-[60px] max-w-content mx-auto">
-            <Link href={logoHref} className="flex-shrink-0">
+            <Link href={logoHref} className="flex-shrink-0 logo-spin">
               <ForAllMark size={18} className="text-white hover:text-grey-300 transition-colors" />
             </Link>
 

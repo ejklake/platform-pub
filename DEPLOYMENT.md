@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.8.3
+# all.haus — Deployment Reference v5.9.0
 
 **Date:** 5 April 2026
-**Replaces:** v5.8.1 (see bottom for change log)
+**Replaces:** v5.8.3 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -158,7 +158,7 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v5.7.0, `schema.sql` includes all structural changes through migration 033; the `_migrations` table is pre-seeded accordingly.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v5.9.0, `schema.sql` includes all structural changes through migration 034; the `_migrations` table is pre-seeded accordingly.
 
 For **fresh** databases: no action needed — the schema and `_migrations` seed handle everything.
 
@@ -189,7 +189,7 @@ Verify:
 docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c "\dt"
 ```
 
-You should see 33+ tables.
+You should see 34+ tables.
 
 ### 5. Build and start all services
 
@@ -249,6 +249,72 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.8.3
+
+New migration (034). Services changed: **gateway**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+This release adds DM replies (reply to specific messages), fixes DM notification badges not clearing when messages are read, adds in-thread polling for new messages (5-second interval), adds optimistic message sending (messages appear instantly), fixes broken pagination in message threads, and adds a logo spin animation on hover in canvas mode.
+
+**Database migration:**
+
+- Migration 034: Adds `reply_to_id` column to `direct_messages` table (nullable FK to self, ON DELETE SET NULL). Adds index `idx_dm_reply_to`.
+
+**Backend (gateway):**
+
+- `POST /messages/:conversationId` now accepts optional `replyToId` in the request body.
+- `GET /messages/:conversationId` now returns `replyTo` object on each message (with `id`, `senderUsername`, `contentEnc`, `counterpartyPubkey` for client-side decryption of the reply preview).
+- `GET /messages/:conversationId` now returns `nextCursor` for pagination (previously missing — the "Load older messages" button never appeared).
+
+**Frontend (web):**
+
+- **Reply to messages:** hover a message to see a "Reply" button. Clicking shows a reply preview bar above the input with the quoted message. Reply context renders above the message bubble with a left-border indicator.
+- **Notification clearing:** conversation unread badges (red dot) now clear immediately when you open a conversation, instead of waiting for the next 60-second poll.
+- **Smooth sending:** messages appear instantly via optimistic UI. On failure, the message is removed and text is restored to the input.
+- **In-thread polling:** new messages from other participants appear automatically every 5 seconds (previously required manual page refresh or navigating away and back).
+- **Pagination fix:** the frontend now sends `?before=` (matching the backend parameter) instead of `?cursor=`. Combined with the backend `nextCursor` fix, "Load older messages" now works.
+- **Logo spin:** the white ForAllMark (∀) logo in canvas mode spins 360 degrees on hover.
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply migration
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/034_dm_replies.sql
+
+# 2. Rebuild and restart
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Verify migration applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT filename FROM _migrations ORDER BY filename" | grep '034'
+
+# Verify reply_to_id column exists
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "\d direct_messages" | grep reply_to_id
+
+# Visual checks:
+# - Open a DM conversation — hover a message, "Reply" button should appear
+# - Click Reply — reply preview bar shows above input; send includes the reply context
+# - Reply context should render above the message bubble with a left-border indicator
+# - Send a message — it should appear instantly (no flicker/reload)
+# - Have another user send a message — it should appear within 5 seconds
+# - Open a conversation with unread messages — red dot should clear immediately
+# - Scroll up in a long conversation — "Load older messages" button should appear
+# - Hover the white ∀ logo (canvas mode pages like editor) — it should spin once
+```
+
+No new env vars.
+
+---
 
 ### From v5.8.2
 
@@ -4579,6 +4645,48 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.9.0 — 5 April 2026
+
+**DM enhancements: replies, smooth sending, in-thread polling, notification fixes**
+
+New migration (034). Services changed: gateway, web.
+
+**Reply to specific messages:**
+
+- `direct_messages.reply_to_id` (UUID, nullable FK to self, ON DELETE SET NULL) — links a message to the message it replies to.
+- `gateway/src/routes/messages.ts`: `SendMessageSchema` accepts optional `replyToId`. GET messages query joins reply context (`reply_to_sender_username`, `reply_to_content_enc`, `reply_to_counterparty_pubkey`) for client-side decryption.
+- `web/src/lib/api.ts`: new `ReplyTo` interface; `DirectMessage` gains `replyTo` field; `DecryptedMessage` gains `replyToContent` field; `send()` accepts optional `replyToId`.
+- `web/src/components/messages/MessageThread.tsx`: "Reply" button on hover; reply preview bar above input; reply context rendered above message bubble with left-border indicator. Decrypt pipeline decrypts reply preview ciphertexts in the same batch call.
+
+**Smooth message sending (optimistic UI):**
+
+- Sent messages appear instantly in the thread; on success the optimistic ID is swapped for the real one; on failure the message is removed and text is restored.
+- Like toggle is also optimistic with snapshot-based rollback.
+
+**In-thread polling:**
+
+- Active conversation polls for new messages every 5 seconds. New messages are deduplicated and appended. Unread messages from others are auto-marked as read.
+- Smart auto-scroll: only scrolls to bottom if user is within 150px of the bottom.
+
+**Notification clearing:**
+
+- `MessageThread` accepts `onMessagesRead` callback, fired after marking messages as read.
+- `MessagesPage` passes a handler that sets `unreadCount: 0` on the active conversation immediately — sidebar red dot clears without waiting for the next poll cycle.
+
+**Pagination fix:**
+
+- Frontend API client now sends `?before=` parameter (previously sent `?cursor=`, which the backend ignored).
+- Backend now returns `nextCursor` (last message's `created_at` ISO string when results fill the page limit). Previously returned nothing, so "Load older messages" never appeared.
+
+**Logo spin:**
+
+- `web/src/components/layout/Nav.tsx`: canvas-mode ForAllMark link gains `logo-spin` class.
+- `web/src/app/globals.css`: `.logo-spin svg` rotates 360 degrees on hover (0.5s cubic-bezier ease-out).
+
+**Files changed:** `migrations/034_dm_replies.sql`, `schema.sql`, `gateway/src/routes/messages.ts`, `web/src/lib/api.ts`, `web/src/components/messages/MessageThread.tsx`, `web/src/app/messages/page.tsx`, `web/src/components/layout/Nav.tsx`, `web/src/app/globals.css`
+
+---
 
 ### v5.8.3 — 5 April 2026
 

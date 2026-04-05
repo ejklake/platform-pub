@@ -25,6 +25,7 @@ const CreateConversationSchema = z.object({
 
 const SendMessageSchema = z.object({
   content: z.string().min(1).max(10_000),
+  replyToId: z.string().regex(UUID_RE).optional(),
 })
 
 const HEX64_RE_NIP = /^[0-9a-f]{64}$/
@@ -231,6 +232,10 @@ export async function messageRoutes(app: FastifyInstance) {
         sender_pubkey: string
         recipient_pubkey: string
         content_enc: string
+        reply_to_id: string | null
+        reply_to_sender_username: string | null
+        reply_to_content_enc: string | null
+        reply_to_counterparty_pubkey: string | null
         read_at: Date | null
         created_at: Date
         like_count: string
@@ -240,17 +245,29 @@ export async function messageRoutes(app: FastifyInstance) {
                 sa.display_name AS sender_display_name,
                 sa.nostr_pubkey AS sender_pubkey,
                 ra.nostr_pubkey AS recipient_pubkey,
-                dm.content_enc, dm.read_at, dm.created_at,
+                dm.content_enc, dm.reply_to_id, dm.read_at, dm.created_at,
+                rsa.username AS reply_to_sender_username,
+                rdm.content_enc AS reply_to_content_enc,
+                CASE WHEN rdm.sender_id = $2 THEN rra.nostr_pubkey ELSE rsa2.nostr_pubkey END AS reply_to_counterparty_pubkey,
                 (SELECT COUNT(*) FROM dm_likes dl WHERE dl.message_id = dm.id) AS like_count,
                 EXISTS(SELECT 1 FROM dm_likes dl WHERE dl.message_id = dm.id AND dl.user_id = $2) AS liked_by_me
          FROM direct_messages dm
          JOIN accounts sa ON sa.id = dm.sender_id
          JOIN accounts ra ON ra.id = dm.recipient_id
+         LEFT JOIN direct_messages rdm ON rdm.id = dm.reply_to_id
+         LEFT JOIN accounts rsa ON rsa.id = rdm.sender_id
+         LEFT JOIN accounts rra ON rra.id = rdm.recipient_id
+         LEFT JOIN accounts rsa2 ON rsa2.id = rdm.sender_id
          WHERE ${whereClause}
          ORDER BY dm.created_at DESC
          LIMIT $3`,
         params
       )
+
+      // Determine next cursor for pagination
+      const nextCursor = rows.length === limit
+        ? rows[rows.length - 1].created_at.toISOString()
+        : null
 
       return reply.status(200).send({
         messages: rows.map(r => ({
@@ -260,11 +277,18 @@ export async function messageRoutes(app: FastifyInstance) {
           senderDisplayName: r.sender_display_name,
           counterpartyPubkey: r.sender_id === userId ? r.recipient_pubkey : r.sender_pubkey,
           contentEnc: r.content_enc,
+          replyTo: r.reply_to_id ? {
+            id: r.reply_to_id,
+            senderUsername: r.reply_to_sender_username,
+            contentEnc: r.reply_to_content_enc,
+            counterpartyPubkey: r.reply_to_counterparty_pubkey,
+          } : null,
           readAt: r.read_at?.toISOString() ?? null,
           createdAt: r.created_at.toISOString(),
           likeCount: parseInt(r.like_count, 10),
           likedByMe: r.liked_by_me,
         })),
+        nextCursor,
       })
     }
   )
@@ -353,9 +377,9 @@ export async function messageRoutes(app: FastifyInstance) {
         const { ciphertext } = await nip44Encrypt(senderId, recipientPubkey, parsed.data.content)
 
         const result = await pool.query<{ id: string }>(
-          `INSERT INTO direct_messages (conversation_id, sender_id, recipient_id, content_enc)
-           VALUES ($1, $2, $3, $4) RETURNING id`,
-          [conversationId, senderId, recipientId, ciphertext]
+          `INSERT INTO direct_messages (conversation_id, sender_id, recipient_id, content_enc, reply_to_id)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [conversationId, senderId, recipientId, ciphertext, parsed.data.replyToId ?? null]
         )
         messageIds.push(result.rows[0].id)
       }
