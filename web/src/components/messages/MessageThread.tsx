@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { messages as messagesApi, type DirectMessage, type DecryptedMessage } from '../../lib/api'
 import { useAuth } from '../../stores/auth'
+import { useUnreadCounts } from '../../stores/unread'
 
 function timeStamp(iso: string): string {
   const d = new Date(iso)
@@ -19,6 +20,7 @@ export function MessageThread({
   onBack?: () => void
 }) {
   const { user } = useAuth()
+  const refreshUnread = useUnreadCounts((s) => s.fetch)
   const [msgs, setMsgs] = useState<DecryptedMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [decrypting, setDecrypting] = useState(false)
@@ -58,11 +60,11 @@ export function MessageThread({
       setNextCursor(data.nextCursor)
 
       // Mark unread messages as read
-      for (const msg of data.messages) {
-        if (msg.senderId !== user?.id) {
-          messagesApi.markRead(msg.id).catch(() => {})
-        }
+      const unreadMsgs = data.messages.filter(msg => msg.senderId !== user?.id)
+      for (const msg of unreadMsgs) {
+        messagesApi.markRead(msg.id).catch(() => {})
       }
+      if (unreadMsgs.length > 0) refreshUnread()
     } catch {}
     finally { setLoading(false); setLoadingMore(false); setDecrypting(false) }
   }

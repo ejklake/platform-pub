@@ -8,6 +8,16 @@ import type { MeResponse } from '../../lib/api'
 import { useLayoutModeContext } from './LayoutShell'
 import { ExportModal } from '../ExportModal'
 import { ForAllMark } from '../icons/ForAllMark'
+import { useUnreadCounts } from '../../stores/unread'
+
+function Badge({ count, className = '' }: { count: number; className?: string }) {
+  if (count <= 0) return null
+  return (
+    <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-crimson text-white text-[11px] font-sans font-semibold leading-none rounded-full ${className}`}>
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
 
 // ─── Nav link styling (Plex Mono, uppercase, on black) ──────────────────────
 
@@ -46,6 +56,8 @@ function AvatarDropdown({ user, onLogout, onClose }: {
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [showExport, setShowExport] = useState(false)
+  const dmCount = useUnreadCounts((s) => s.dmCount)
+  const notificationCount = useUnreadCounts((s) => s.notificationCount)
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -76,8 +88,18 @@ function AvatarDropdown({ user, onLogout, onClose }: {
         {/* Group 1 */}
         <div className="py-1">
           <Link href="/profile" onClick={onClose} className={linkClass}>Profile</Link>
-          <Link href="/messages" onClick={onClose} className={linkClass}>Messages</Link>
-          <Link href="/notifications" onClick={onClose} className={linkClass}>Notifications</Link>
+          <Link href="/messages" onClick={onClose} className={linkClass}>
+            <span className="flex items-center justify-between">
+              <span>Messages</span>
+              <Badge count={dmCount} />
+            </span>
+          </Link>
+          <Link href="/notifications" onClick={onClose} className={linkClass}>
+            <span className="flex items-center justify-between">
+              <span>Notifications</span>
+              <Badge count={notificationCount} />
+            </span>
+          </Link>
         </div>
 
         <div style={{ height: '4px', background: '#F0F0F0' }} />
@@ -131,6 +153,8 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
 }) {
   const pathname = usePathname()
   const [query, setQuery] = useState('')
+  const dmCount = useUnreadCounts((s) => s.dmCount)
+  const notificationCount = useUnreadCounts((s) => s.notificationCount)
 
   function isActive(path: string) {
     if (path === '/feed') return pathname === '/feed' || pathname === '/'
@@ -175,8 +199,12 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
 
           <div style={{ height: '4px', background: '#333' }} className="my-3" />
 
-          <Link href="/messages" onClick={onClose} className={linkClass('/messages')}>Messages</Link>
-          <Link href="/notifications" onClick={onClose} className={linkClass('/notifications')}>Notifications</Link>
+          <Link href="/messages" onClick={onClose} className={linkClass('/messages')}>
+            <span className="flex items-center gap-2">Messages<Badge count={dmCount} /></span>
+          </Link>
+          <Link href="/notifications" onClick={onClose} className={linkClass('/notifications')}>
+            <span className="flex items-center gap-2">Notifications<Badge count={notificationCount} /></span>
+          </Link>
 
           <div style={{ height: '4px', background: '#333' }} className="my-3" />
 
@@ -219,6 +247,9 @@ export function Nav() {
   const [searchQuery, setSearchQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dmCount = useUnreadCounts((s) => s.dmCount)
+  const notificationCount = useUnreadCounts((s) => s.notificationCount)
+  const totalUnread = dmCount + notificationCount
 
   useEffect(() => { setMenuOpen(false); setDropdownOpen(false) }, [pathname])
 
@@ -258,8 +289,13 @@ export function Nav() {
             <div className="flex items-center">
               {!loading && user && (
                 <div className="relative">
-                  <button onClick={() => setDropdownOpen(!dropdownOpen)}>
+                  <button onClick={() => setDropdownOpen(!dropdownOpen)} className="relative">
                     <NavAvatar user={user} size={28} />
+                    {totalUnread > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-[16px] px-0.5 bg-crimson text-white text-[10px] font-sans font-semibold leading-none rounded-full">
+                        {totalUnread > 99 ? '99+' : totalUnread}
+                      </span>
+                    )}
                   </button>
                   {dropdownOpen && (
                     <AvatarDropdown
@@ -340,8 +376,13 @@ export function Nav() {
               <div className="h-7 w-7 animate-pulse bg-grey-600" />
             ) : user ? (
               <div className="relative hidden md:block">
-                <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center">
+                <button onClick={() => setDropdownOpen(!dropdownOpen)} className="relative flex items-center">
                   <NavAvatar user={user} size={28} />
+                  {totalUnread > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-[16px] px-0.5 bg-crimson text-white text-[10px] font-sans font-semibold leading-none rounded-full">
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </span>
+                  )}
                 </button>
                 {dropdownOpen && (
                   <AvatarDropdown

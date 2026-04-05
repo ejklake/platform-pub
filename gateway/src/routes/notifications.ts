@@ -99,6 +99,26 @@ export async function notificationRoutes(app: FastifyInstance) {
   })
 
   // ---------------------------------------------------------------------------
+  // GET /unread-counts — lightweight counts for nav badge
+  // ---------------------------------------------------------------------------
+
+  app.get('/unread-counts', { preHandler: requireAuth }, async (req, reply) => {
+    const userId = req.session!.sub!
+
+    const { rows } = await pool.query<{ notification_count: string; dm_count: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM notifications WHERE recipient_id = $1 AND read = false) AS notification_count,
+         (SELECT COUNT(*) FROM direct_messages WHERE recipient_id = $1 AND read_at IS NULL) AS dm_count`,
+      [userId]
+    )
+
+    return reply.status(200).send({
+      notificationCount: parseInt(rows[0].notification_count, 10),
+      dmCount: parseInt(rows[0].dm_count, 10),
+    })
+  })
+
+  // ---------------------------------------------------------------------------
   // POST /notifications/:id/read — mark a single notification as read
   // ---------------------------------------------------------------------------
 

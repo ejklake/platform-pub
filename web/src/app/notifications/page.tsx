@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../stores/auth'
+import { useUnreadCounts } from '../../stores/unread'
 import { notifications as notificationsApi, type Notification } from '../../lib/api'
 
 // =============================================================================
@@ -107,6 +108,7 @@ function NotificationRow({ n, onDismiss }: { n: Notification; onDismiss: (id: st
 export default function NotificationsPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const refreshUnread = useUnreadCounts((s) => s.fetch)
   const [items, setItems] = useState<Notification[]>([])
   const [dataLoading, setDataLoading] = useState(true)
 
@@ -125,6 +127,7 @@ export default function NotificationsPage() {
   async function handleDismiss(id: string, href: string) {
     setItems((prev) => prev.filter((n) => n.id !== id))
     await notificationsApi.markRead(id).catch(() => {})
+    refreshUnread()
     router.push(href)
   }
 

@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.1.0
+# all.haus — Deployment Reference v5.3.0
 
-**Date:** 4 April 2026
-**Replaces:** v5.0.3 (see bottom for change log)
+**Date:** 5 April 2026
+**Replaces:** v5.2.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -4353,6 +4353,34 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.3.0 — 5 April 2026
+
+**Unread badges on nav avatar for DMs and notifications**
+
+The user's avatar in the nav bar now displays a red badge showing the total count of unread DMs plus unchecked notifications. Clicking the avatar opens the dropdown where Messages and Notifications each show their own individual badge count. Badges disappear when all items are read. Counts poll every 60 seconds and refresh immediately after marking messages read or dismissing notifications.
+
+**Changes:**
+
+- `gateway/src/routes/notifications.ts`: added `GET /unread-counts` endpoint — returns `{ dmCount, notificationCount }` via two subselect counts (from `notifications` and `direct_messages` tables) in a single query. Requires auth.
+- `web/src/lib/api.ts`: added `notifications.unreadCounts()` API client method.
+- `web/src/stores/unread.ts` (new): Zustand store holding `dmCount` and `notificationCount` with a `fetch()` action that calls the unread-counts endpoint.
+- `web/src/components/layout/AuthProvider.tsx`: starts polling unread counts every 60 seconds when user is logged in; cleans up interval on logout.
+- `web/src/components/layout/Nav.tsx`: added `Badge` component (red rounded pill with count, hidden when zero); avatar button in both platform and canvas modes shows combined total badge; `AvatarDropdown` shows per-item badges next to Messages and Notifications links; `MobileSheet` shows the same per-item badges.
+- `web/src/components/messages/MessageThread.tsx`: calls `refreshUnread()` after marking received messages as read when opening a conversation.
+- `web/src/app/notifications/page.tsx`: calls `refreshUnread()` after dismissing (marking read) each notification.
+
+**Files changed:** `gateway/src/routes/notifications.ts`, `web/src/lib/api.ts`, `web/src/stores/unread.ts`, `web/src/components/layout/AuthProvider.tsx`, `web/src/components/layout/Nav.tsx`, `web/src/components/messages/MessageThread.tsx`, `web/src/app/notifications/page.tsx`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose build gateway web`
+3. `docker compose up -d gateway web`
+
+No new migrations. No new env vars. The new `/unread-counts` endpoint uses existing `notifications` and `direct_messages` tables.
+
+---
 
 ### v5.2.0 — 5 April 2026
 

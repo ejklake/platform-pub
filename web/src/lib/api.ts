@@ -511,6 +511,9 @@ export const notifications = {
 
   readAll: () =>
     request<{ ok: boolean }>('/notifications/read-all', { method: 'POST' }),
+
+  unreadCounts: () =>
+    request<{ dmCount: number; notificationCount: number }>('/unread-counts'),
 }
 
 // =============================================================================
