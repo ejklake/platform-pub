@@ -94,14 +94,14 @@ export async function mediaRoutes(app: FastifyInstance) {
       const { createHash } = await import('crypto')
       const sha256 = createHash('sha256').update(fileBuffer).digest('hex')
 
-      // 4. Check for duplicate
-      const existing = await pool.query<{ blossom_url: string }>(
-        'SELECT blossom_url FROM media_uploads WHERE sha256 = $1 LIMIT 1',
+      // 4. Check for duplicate — always return current PUBLIC_MEDIA_URL
+      const existing = await pool.query<{ id: string }>(
+        'SELECT id FROM media_uploads WHERE sha256 = $1 LIMIT 1',
         [sha256]
       )
       if (existing.rows.length > 0) {
         return reply.status(200).send({
-          url: existing.rows[0].blossom_url,
+          url: `${PUBLIC_MEDIA_URL}/${sha256}.webp`,
           sha256,
           duplicate: true,
         })

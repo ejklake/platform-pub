@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.4.0
+# all.haus — Deployment Reference v5.4.1
 
 **Date:** 5 April 2026
-**Replaces:** v5.3.1 (see bottom for change log)
+**Replaces:** v5.4.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -4353,6 +4353,30 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.4.1 — 5 April 2026
+
+**Fix: broken images after domain rename (platform.pub → all.haus)**
+
+**Root cause:** The domain rename at commit `e448996` updated `PUBLIC_MEDIA_URL` in code but did not update image URLs already stored in the database. All images uploaded before the rename have `https://platform.pub/media/...` URLs in `media_uploads.blossom_url` and `accounts.avatar_blossom_url`, which no longer resolve. Additionally, the duplicate-upload check in `media.ts` returned the stale stored URL rather than constructing a fresh one from the current `PUBLIC_MEDIA_URL`, so re-uploading an existing image also returned the broken old-domain URL.
+
+**Changes:**
+
+- `migrations/031_fix_media_urls_domain.sql` (new): updates all `platform.pub/media/` URLs to `all.haus/media/` in `media_uploads.blossom_url` and `accounts.avatar_blossom_url`.
+- `gateway/src/routes/media.ts`: duplicate-upload check now returns `${PUBLIC_MEDIA_URL}/${sha256}.webp` instead of the stored `blossom_url`, preventing stale URLs from being returned after future domain changes.
+
+**Files changed:** `migrations/031_fix_media_urls_domain.sql` (new), `gateway/src/routes/media.ts`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. Run migration: `psql $DATABASE_URL -f migrations/031_fix_media_urls_domain.sql`
+3. `docker compose build gateway`
+4. `docker compose up -d gateway`
+
+No new env vars. The migration is idempotent (safe to re-run).
+
+---
 
 ### v5.4.0 — 5 April 2026
 
