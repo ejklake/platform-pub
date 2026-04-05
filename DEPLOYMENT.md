@@ -4354,6 +4354,40 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 
 ## Change log
 
+### v5.2.0 — 5 April 2026
+
+**NIP-44 E2E encryption for Direct Messages + DM bug fixes**
+
+DMs are now encrypted at rest using NIP-44. Each message is encrypted per-recipient using NIP-44 conversation keys (sender privkey + recipient pubkey). The gateway encrypts on send via key-custody; the client decrypts on read via a new batch-decrypt endpoint. This protects message content in the event of a database breach — decryption requires key-custody.
+
+Also fixes two DM bugs from `DIAGNOSIS.md`:
+- **§1a (silent send failure):** `SendMessageSchema` expected `contentEnc` but the client sent `content`. Now the gateway accepts plaintext `content` and handles encryption server-side.
+- **§1b (user not found):** Username search in the new-message flow read `data.writers?.[0]` but the search endpoint returns `data.results`. Fixed to `data.results?.[0]`.
+
+**Changes:**
+
+- `key-custody/src/lib/crypto.ts`: added `nip44Encrypt(accountId, recipientPubkey, plaintext)` and `nip44Decrypt(accountId, senderPubkey, ciphertext)` — general-purpose NIP-44 encrypt/decrypt using an account's custodial private key with an arbitrary counterparty pubkey.
+- `key-custody/src/routes/keypairs.ts`: added `POST /keypairs/nip44-encrypt` and `POST /keypairs/nip44-decrypt` internal endpoints (require `X-Internal-Secret`).
+- `gateway/src/lib/key-custody-client.ts`: added `nip44Encrypt` and `nip44Decrypt` client functions.
+- `gateway/src/routes/messages.ts`: `SendMessageSchema` changed from `{ contentEnc }` to `{ content }`; send handler now looks up recipient pubkeys and encrypts per-recipient via key-custody before storing; read handler now returns `senderPubkey` (joined from `accounts.nostr_pubkey`); added `POST /dm/decrypt-batch` endpoint for batch client-side decryption.
+- `web/src/lib/api.ts`: `DirectMessage` interface updated (`content` → `contentEnc`, added `senderPubkey`); added `DecryptedMessage` type; added `decryptBatch` method.
+- `web/src/components/messages/MessageThread.tsx`: messages are now decrypted after fetch via batch decrypt endpoint; shows loading state during decryption; renders "[Could not decrypt]" fallback on failure.
+- `web/src/app/messages/page.tsx`: fixed `data.writers?.[0]` → `data.results?.[0]` for username lookup.
+
+**Files changed:** `key-custody/src/lib/crypto.ts`, `key-custody/src/routes/keypairs.ts`, `gateway/src/lib/key-custody-client.ts`, `gateway/src/routes/messages.ts`, `web/src/lib/api.ts`, `web/src/components/messages/MessageThread.tsx`, `web/src/app/messages/page.tsx`
+
+**Upgrade steps:**
+
+1. `git pull origin master`
+2. `docker compose build key-custody gateway web`
+3. `docker compose up -d key-custody gateway web`
+
+No new migrations. No new env vars. Existing `INTERNAL_SECRET` and `ACCOUNT_KEY_HEX` are used by the new key-custody endpoints.
+
+> **Note:** Messages sent before this release were stored as plaintext in `content_enc`. The new client-side decrypt flow will fail to decrypt these (NIP-44 decrypt of plaintext will error), showing "[Could not decrypt]" for legacy messages.
+
+---
+
 ### v5.1.0 — 4 April 2026
 
 **Improve empty profile UX, add Message button to writer profiles**

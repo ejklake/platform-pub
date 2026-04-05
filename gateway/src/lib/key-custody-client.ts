@@ -56,4 +56,20 @@ export async function unwrapKey(
   return post('/api/v1/keypairs/unwrap', { accountId, encryptedKey })
 }
 
+export async function nip44Encrypt(
+  accountId: string,
+  recipientPubkey: string,
+  plaintext: string
+): Promise<{ ciphertext: string }> {
+  return post('/api/v1/keypairs/nip44-encrypt', { accountId, recipientPubkey, plaintext })
+}
+
+export async function nip44Decrypt(
+  accountId: string,
+  senderPubkey: string,
+  ciphertext: string
+): Promise<{ plaintext: string }> {
+  return post('/api/v1/keypairs/nip44-decrypt', { accountId, senderPubkey, ciphertext })
+}
+
 export { logger }

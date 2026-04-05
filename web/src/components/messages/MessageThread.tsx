@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { messages as messagesApi, type DirectMessage } from '../../lib/api'
+import { messages as messagesApi, type DirectMessage, type DecryptedMessage } from '../../lib/api'
 import { useAuth } from '../../stores/auth'
 
 function timeStamp(iso: string): string {
@@ -19,8 +19,9 @@ export function MessageThread({
   onBack?: () => void
 }) {
   const { user } = useAuth()
-  const [msgs, setMsgs] = useState<DirectMessage[]>([])
+  const [msgs, setMsgs] = useState<DecryptedMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [decrypting, setDecrypting] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [content, setContent] = useState('')
@@ -28,16 +29,31 @@ export function MessageThread({
   const [dmPriceError, setDmPriceError] = useState<number | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  async function decryptMessages(encrypted: DirectMessage[]): Promise<DecryptedMessage[]> {
+    if (encrypted.length === 0) return []
+    try {
+      const { results } = await messagesApi.decryptBatch(
+        encrypted.map(m => ({ id: m.id, senderPubkey: m.senderPubkey, ciphertext: m.contentEnc }))
+      )
+      const plaintextMap = new Map(results.map(r => [r.id, r.plaintext]))
+      return encrypted.map(m => ({ ...m, content: plaintextMap.get(m.id) ?? null }))
+    } catch {
+      return encrypted.map(m => ({ ...m, content: null }))
+    }
+  }
+
   async function fetchMessages(cursor?: string) {
     const isInitial = !cursor
     if (isInitial) setLoading(true)
     else setLoadingMore(true)
     try {
       const data = await messagesApi.getMessages(conversationId, cursor)
+      setDecrypting(true)
+      const decrypted = await decryptMessages(data.messages)
       if (isInitial) {
-        setMsgs(data.messages)
+        setMsgs(decrypted)
       } else {
-        setMsgs(prev => [...data.messages, ...prev])
+        setMsgs(prev => [...decrypted, ...prev])
       }
       setNextCursor(data.nextCursor)
 
@@ -48,7 +64,7 @@ export function MessageThread({
         }
       }
     } catch {}
-    finally { setLoading(false); setLoadingMore(false) }
+    finally { setLoading(false); setLoadingMore(false); setDecrypting(false) }
   }
 
   useEffect(() => {
@@ -104,7 +120,7 @@ export function MessageThread({
           </div>
         )}
 
-        {loading ? (
+        {loading || decrypting ? (
           <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-8 animate-pulse bg-grey-100 rounded" />)}</div>
         ) : msgs.length === 0 ? (
           <p className="text-center text-[13px] font-sans text-grey-300 py-8">No messages yet. Start the conversation.</p>
@@ -119,7 +135,9 @@ export function MessageThread({
                       {msg.senderDisplayName ?? msg.senderUsername}
                     </p>
                   )}
-                  <p className="text-[14px] font-sans leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  <p className="text-[14px] font-sans leading-relaxed whitespace-pre-wrap">
+                    {msg.content ?? <span className="italic text-grey-300">Could not decrypt</span>}
+                  </p>
                   <p className={`text-[10px] font-mono mt-1 ${isMine ? 'text-grey-400' : 'text-grey-300'}`}>
                     {timeStamp(msg.createdAt)}
                   </p>

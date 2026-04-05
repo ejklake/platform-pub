@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { generateKeypair, signEvent, unwrapKey } from '../lib/crypto.js'
+import { generateKeypair, signEvent, unwrapKey, nip44Encrypt, nip44Decrypt } from '../lib/crypto.js'
 import logger from '../lib/logger.js'
 
 // =============================================================================
@@ -44,6 +44,20 @@ const SignEventSchema = z.object({
 const UnwrapKeySchema = z.object({
   accountId: z.string().uuid(),
   encryptedKey: z.string().min(1),
+})
+
+const HEX64_RE = /^[0-9a-f]{64}$/
+
+const Nip44EncryptSchema = z.object({
+  accountId: z.string().uuid(),
+  recipientPubkey: z.string().regex(HEX64_RE),
+  plaintext: z.string().min(1),
+})
+
+const Nip44DecryptSchema = z.object({
+  accountId: z.string().uuid(),
+  senderPubkey: z.string().regex(HEX64_RE),
+  ciphertext: z.string().min(1),
 })
 
 export async function keypairRoutes(app: FastifyInstance) {
@@ -131,6 +145,56 @@ export async function keypairRoutes(app: FastifyInstance) {
     } catch (err) {
       logger.error({ err, accountId }, 'Key unwrapping failed')
       return reply.status(500).send({ error: 'Key unwrapping failed' })
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // POST /api/v1/keypairs/nip44-encrypt
+  //
+  // NIP-44 encrypt plaintext using the account's private key and a recipient
+  // public key. Used by the gateway for DM E2E encryption.
+  // ---------------------------------------------------------------------------
+
+  app.post('/keypairs/nip44-encrypt', { preHandler: requireInternalSecret }, async (req, reply) => {
+    const parsed = Nip44EncryptSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.flatten() })
+    }
+
+    const { accountId, recipientPubkey, plaintext } = parsed.data
+
+    try {
+      const ciphertext = await nip44Encrypt(accountId, recipientPubkey, plaintext)
+      logger.debug({ accountId }, 'NIP-44 encrypted for DM')
+      return reply.status(200).send({ ciphertext })
+    } catch (err) {
+      logger.error({ err, accountId }, 'NIP-44 encryption failed')
+      return reply.status(500).send({ error: 'Encryption failed' })
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // POST /api/v1/keypairs/nip44-decrypt
+  //
+  // NIP-44 decrypt ciphertext using the account's private key and the sender's
+  // public key. Used by the gateway for DM E2E decryption.
+  // ---------------------------------------------------------------------------
+
+  app.post('/keypairs/nip44-decrypt', { preHandler: requireInternalSecret }, async (req, reply) => {
+    const parsed = Nip44DecryptSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.flatten() })
+    }
+
+    const { accountId, senderPubkey, ciphertext } = parsed.data
+
+    try {
+      const plaintext = await nip44Decrypt(accountId, senderPubkey, ciphertext)
+      logger.debug({ accountId }, 'NIP-44 decrypted for DM')
+      return reply.status(200).send({ plaintext })
+    } catch (err) {
+      logger.error({ err, accountId }, 'NIP-44 decryption failed')
+      return reply.status(500).send({ error: 'Decryption failed' })
     }
   })
 }

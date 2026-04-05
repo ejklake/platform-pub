@@ -115,3 +115,40 @@ function getServicePubkey(): string {
   if (!privkeyHex) throw new Error('PLATFORM_SERVICE_PRIVKEY not set')
   return getPublicKey(Uint8Array.from(Buffer.from(privkeyHex, 'hex')))
 }
+
+// ---------------------------------------------------------------------------
+// NIP-44 encrypt/decrypt — general-purpose, for DM E2E encryption
+//
+// Unlike unwrapKey (which hardcodes the platform service pubkey as the
+// counterparty), these accept an arbitrary counterparty pubkey.
+// ---------------------------------------------------------------------------
+
+export async function nip44Encrypt(
+  accountId: string,
+  recipientPubkeyHex: string,
+  plaintext: string
+): Promise<string> {
+  const privkeyBytes = await getDecryptedPrivkey(accountId)
+  try {
+    const senderPrivkey = new Uint8Array(privkeyBytes)
+    const conversationKey = nip44.getConversationKey(senderPrivkey, recipientPubkeyHex)
+    return nip44.encrypt(plaintext, conversationKey)
+  } finally {
+    privkeyBytes.fill(0)
+  }
+}
+
+export async function nip44Decrypt(
+  accountId: string,
+  senderPubkeyHex: string,
+  ciphertext: string
+): Promise<string> {
+  const privkeyBytes = await getDecryptedPrivkey(accountId)
+  try {
+    const readerPrivkey = new Uint8Array(privkeyBytes)
+    const conversationKey = nip44.getConversationKey(readerPrivkey, senderPubkeyHex)
+    return nip44.decrypt(ciphertext, conversationKey)
+  } finally {
+    privkeyBytes.fill(0)
+  }
+}

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { pool } from '../../shared/src/db/client.js'
 import { requireAuth } from '../middleware/auth.js'
-import { signEvent } from '../lib/key-custody-client.js'
+import { signEvent, nip44Encrypt, nip44Decrypt } from '../lib/key-custody-client.js'
 import { publishToRelay } from '../lib/nostr-publisher.js'
 import logger from '../../shared/src/lib/logger.js'
 
@@ -24,7 +24,17 @@ const CreateConversationSchema = z.object({
 })
 
 const SendMessageSchema = z.object({
-  contentEnc: z.string().min(1),  // NIP-44 encrypted to recipient
+  content: z.string().min(1),
+})
+
+const HEX64_RE_NIP = /^[0-9a-f]{64}$/
+
+const DecryptBatchSchema = z.object({
+  messages: z.array(z.object({
+    id: z.string(),
+    senderPubkey: z.string().regex(HEX64_RE_NIP),
+    ciphertext: z.string().min(1),
+  })).min(1).max(100),
 })
 
 const AddMembersSchema = z.object({
@@ -218,12 +228,14 @@ export async function messageRoutes(app: FastifyInstance) {
         sender_id: string
         sender_username: string | null
         sender_display_name: string | null
+        sender_pubkey: string
         content_enc: string
         read_at: Date | null
         created_at: Date
       }>(
         `SELECT dm.id, dm.sender_id, a.username AS sender_username,
                 a.display_name AS sender_display_name,
+                a.nostr_pubkey AS sender_pubkey,
                 dm.content_enc, dm.read_at, dm.created_at
          FROM direct_messages dm
          JOIN accounts a ON a.id = dm.sender_id
@@ -239,6 +251,7 @@ export async function messageRoutes(app: FastifyInstance) {
           senderId: r.sender_id,
           senderUsername: r.sender_username,
           senderDisplayName: r.sender_display_name,
+          senderPubkey: r.sender_pubkey,
           contentEnc: r.content_enc,
           readAt: r.read_at?.toISOString() ?? null,
           createdAt: r.created_at.toISOString(),
@@ -312,13 +325,28 @@ export async function messageRoutes(app: FastifyInstance) {
         }
       }
 
-      // Insert one message row per recipient (E2E: ciphertext from client)
+      // Look up recipient pubkeys for NIP-44 encryption
+      const pubkeyRows = await pool.query<{ id: string; nostr_pubkey: string }>(
+        'SELECT id, nostr_pubkey FROM accounts WHERE id = ANY($1)',
+        [recipientIds]
+      )
+      const pubkeyMap = new Map(pubkeyRows.rows.map(r => [r.id, r.nostr_pubkey]))
+
+      // Encrypt and insert one message row per recipient (NIP-44 E2E)
       const messageIds: string[] = []
       for (const recipientId of recipientIds) {
+        const recipientPubkey = pubkeyMap.get(recipientId)
+        if (!recipientPubkey) {
+          logger.error({ recipientId }, 'Recipient has no pubkey — skipping')
+          continue
+        }
+
+        const { ciphertext } = await nip44Encrypt(senderId, recipientPubkey, parsed.data.content)
+
         const result = await pool.query<{ id: string }>(
           `INSERT INTO direct_messages (conversation_id, sender_id, recipient_id, content_enc)
            VALUES ($1, $2, $3, $4) RETURNING id`,
-          [conversationId, senderId, recipientId, parsed.data.contentEnc]
+          [conversationId, senderId, recipientId, ciphertext]
         )
         messageIds.push(result.rows[0].id)
 
@@ -371,6 +399,36 @@ export async function messageRoutes(app: FastifyInstance) {
       return reply.status(200).send({ ok: true })
     }
   )
+  // ---------------------------------------------------------------------------
+  // POST /dm/decrypt-batch — batch-decrypt messages for the reading client
+  //
+  // The client receives NIP-44 encrypted messages and calls this endpoint to
+  // decrypt them. Each message is decrypted using the reader's custodial
+  // private key and the sender's public key via key-custody.
+  // ---------------------------------------------------------------------------
+
+  app.post('/dm/decrypt-batch', { preHandler: requireAuth }, async (req, reply) => {
+    const parsed = DecryptBatchSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ error: parsed.error.flatten() })
+    }
+
+    const readerId = req.session!.sub!
+    const results = await Promise.allSettled(
+      parsed.data.messages.map(async (msg) => {
+        const { plaintext } = await nip44Decrypt(readerId, msg.senderPubkey, msg.ciphertext)
+        return { id: msg.id, plaintext }
+      })
+    )
+
+    return reply.status(200).send({
+      results: results.map((r, i) =>
+        r.status === 'fulfilled'
+          ? r.value
+          : { id: parsed.data.messages[i].id, plaintext: null, error: 'Decryption failed' }
+      ),
+    })
+  })
 }
 
 // =============================================================================

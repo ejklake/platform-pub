@@ -574,9 +574,13 @@ export interface DirectMessage {
   senderId: string
   senderUsername: string
   senderDisplayName: string | null
-  senderAvatar: string | null
-  content: string
+  senderPubkey: string
+  contentEnc: string
   createdAt: string
+}
+
+export interface DecryptedMessage extends DirectMessage {
+  content: string | null
 }
 
 export const messages = {
@@ -601,6 +605,12 @@ export const messages = {
     request<{ conversationId: string }>('/conversations', {
       method: 'POST',
       body: JSON.stringify({ memberIds }),
+    }),
+
+  decryptBatch: (msgs: { id: string; senderPubkey: string; ciphertext: string }[]) =>
+    request<{ results: { id: string; plaintext: string | null; error?: string }[] }>('/dm/decrypt-batch', {
+      method: 'POST',
+      body: JSON.stringify({ messages: msgs }),
     }),
 }
 

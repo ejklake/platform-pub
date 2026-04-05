@@ -46,7 +46,7 @@ export default function MessagesPage() {
       const res = await fetch(`/api/v1/search?q=${encodeURIComponent(newRecipient.trim())}&type=writers`, { credentials: 'include' })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      const writer = data.writers?.[0]
+      const writer = data.results?.[0]
       if (!writer) { alert('User not found.'); return }
 
       const result = await messagesApi.createConversation([writer.id])
