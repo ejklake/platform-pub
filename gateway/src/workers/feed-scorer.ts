@@ -1,0 +1,87 @@
+import { pool } from '../../shared/src/db/client.js'
+import logger from '../../shared/src/lib/logger.js'
+
+// =============================================================================
+// Feed Scoring Worker
+//
+// Refreshes the feed_scores table using an HN-style gravity formula.
+// Reads engagement data from feed_engagement (last 48 hours) and computes
+// a time-decayed score per content item.
+//
+// Designed to run on a 5-minute interval via advisory lock in gateway/index.ts.
+// =============================================================================
+
+interface FeedWeights {
+  gravity: number
+  reaction: number
+  reply: number
+  quoteComment: number
+  gatePass: number
+}
+
+async function loadFeedWeights(): Promise<FeedWeights> {
+  const { rows } = await pool.query<{ key: string; value: string }>(
+    `SELECT key, value FROM platform_config WHERE key LIKE 'feed_%'`
+  )
+  const map = new Map(rows.map(r => [r.key, r.value]))
+  return {
+    gravity: parseFloat(map.get('feed_gravity') ?? '1.5'),
+    reaction: parseFloat(map.get('feed_weight_reaction') ?? '1'),
+    reply: parseFloat(map.get('feed_weight_reply') ?? '2'),
+    quoteComment: parseFloat(map.get('feed_weight_quote_comment') ?? '3'),
+    gatePass: parseFloat(map.get('feed_weight_gate_pass') ?? '5'),
+  }
+}
+
+export async function refreshFeedScores(): Promise<void> {
+  const weights = await loadFeedWeights()
+
+  const result = await pool.query(
+    `
+    WITH engagement_counts AS (
+      SELECT
+        target_nostr_event_id,
+        target_author_id,
+        COUNT(*) FILTER (WHERE engagement_type = 'reaction')      AS reactions,
+        COUNT(*) FILTER (WHERE engagement_type = 'reply')          AS replies,
+        COUNT(*) FILTER (WHERE engagement_type = 'quote_comment')  AS quotes,
+        COUNT(*) FILTER (WHERE engagement_type = 'gate_pass')      AS gate_passes
+      FROM feed_engagement
+      WHERE engaged_at > now() - interval '48 hours'
+      GROUP BY target_nostr_event_id, target_author_id
+    ),
+    scored AS (
+      SELECT
+        ec.target_nostr_event_id AS nostr_event_id,
+        ec.target_author_id AS author_id,
+        COALESCE(a.published_at, n.published_at) AS published_at,
+        CASE WHEN a.id IS NOT NULL THEN 'article'::content_type ELSE 'note'::content_type END AS content_type,
+        (ec.reactions * $1 + ec.replies * $2 + ec.quotes * $3 + ec.gate_passes * $4)
+          / POWER(GREATEST(EXTRACT(EPOCH FROM (now() - COALESCE(a.published_at, n.published_at))) / 3600, 0) + 2, $5)
+          AS score,
+        (ec.reactions + ec.replies + ec.quotes + ec.gate_passes)::int AS engagement_count,
+        ec.gate_passes::int AS gate_pass_count
+      FROM engagement_counts ec
+      LEFT JOIN articles a ON a.nostr_event_id = ec.target_nostr_event_id AND a.deleted_at IS NULL
+      LEFT JOIN notes n ON n.nostr_event_id = ec.target_nostr_event_id
+      WHERE COALESCE(a.published_at, n.published_at) IS NOT NULL
+    )
+    INSERT INTO feed_scores (nostr_event_id, author_id, content_type, score, engagement_count, gate_pass_count, published_at, scored_at)
+    SELECT nostr_event_id, author_id, content_type, score, engagement_count, gate_pass_count, published_at, now()
+    FROM scored
+    ON CONFLICT (nostr_event_id) DO UPDATE SET
+      score = EXCLUDED.score,
+      engagement_count = EXCLUDED.engagement_count,
+      gate_pass_count = EXCLUDED.gate_pass_count,
+      scored_at = EXCLUDED.scored_at
+    `,
+    [weights.reaction, weights.reply, weights.quoteComment, weights.gatePass, weights.gravity]
+  )
+
+  // Prune stale low-score entries older than 7 days
+  await pool.query(
+    `DELETE FROM feed_scores WHERE published_at < now() - interval '7 days' AND score < 0.1`
+  )
+
+  logger.info({ upserted: result.rowCount }, 'Feed scores refreshed')
+}

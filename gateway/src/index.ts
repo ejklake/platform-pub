@@ -28,8 +28,10 @@ import { voteRoutes } from './routes/votes.js'
 import { historyRoutes } from './routes/history.js'
 import { giftLinkRoutes } from './routes/gift-links.js'
 import { messageRoutes } from './routes/messages.js'
+import { feedRoutes } from './routes/feed.js'
 import { driveRoutes, expireOverdueDrives } from './routes/drives.js'
 import { expireAndRenewSubscriptions } from './routes/subscriptions.js'
+import { refreshFeedScores } from './workers/feed-scorer.js'
 import { pool } from '../shared/src/db/client.js'
 import logger from '../shared/src/lib/logger.js'
 
@@ -147,6 +149,9 @@ async function start() {
   // Direct messages (NIP-17 E2E encrypted conversations)
   await app.register(messageRoutes, { prefix: '/api/v1' })
 
+  // Feed (unified endpoint with reach dial — following, explore)
+  await app.register(feedRoutes, { prefix: '/api/v1' })
+
   // Pledge drives (crowdfunding, commissions)
   await app.register(driveRoutes, { prefix: '/api/v1' })
 
@@ -183,8 +188,10 @@ async function start() {
   // Background workers — run periodically after startup
   // Advisory locks prevent duplicate execution when horizontally scaled
   const WORKER_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
+  const FEED_SCORE_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
   const LOCK_SUBSCRIPTIONS = 100001
   const LOCK_DRIVES = 100002
+  const LOCK_FEED_SCORES = 100003
 
   async function withAdvisoryLock(lockId: number, name: string, fn: () => Promise<unknown>) {
     const client = await pool.connect()
@@ -215,12 +222,21 @@ async function start() {
     )
   }, WORKER_INTERVAL_MS)
 
+  setInterval(() => {
+    withAdvisoryLock(LOCK_FEED_SCORES, 'Feed score refresh', refreshFeedScores).catch(err =>
+      logger.error({ err }, 'Feed score worker failed')
+    )
+  }, FEED_SCORE_INTERVAL_MS)
+
   // Run once on startup
   withAdvisoryLock(LOCK_SUBSCRIPTIONS, 'Subscription expiry', expireAndRenewSubscriptions).catch(err =>
     logger.error({ err }, 'Subscription expiry worker failed (startup)')
   )
   withAdvisoryLock(LOCK_DRIVES, 'Drive expiry', expireOverdueDrives).catch(err =>
     logger.error({ err }, 'Drive expiry worker failed (startup)')
+  )
+  withAdvisoryLock(LOCK_FEED_SCORES, 'Feed score refresh', refreshFeedScores).catch(err =>
+    logger.error({ err }, 'Feed score worker failed (startup)')
   )
 }
 

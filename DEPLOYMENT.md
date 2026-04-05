@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.9.0
+# all.haus — Deployment Reference v5.10.0
 
 **Date:** 5 April 2026
-**Replaces:** v5.8.3 (see bottom for change log)
+**Replaces:** v5.9.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,85 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.9.0
+
+New migration (035). Services changed: **gateway**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+This release adds the feed scoring backend (engagement-ranked "Explore" feed), a unified feed endpoint with a reach dial, and fixes images not rendering in quoted notes.
+
+**Database migration:**
+
+- Migration 035: Creates `feed_scores` table (pre-computed engagement scores for ranked feed modes). Adds `platform_config` rows for feed scoring weights: `feed_gravity`, `feed_weight_reaction`, `feed_weight_reply`, `feed_weight_quote_comment`, `feed_weight_gate_pass`.
+
+**Backend (gateway):**
+
+- **New endpoint:** `GET /api/v1/feed?reach=following|explore&cursor=<value>&limit=20` — unified feed endpoint replacing the separate `/feed/global` and `/feed/following` endpoints. `following` mode returns chronological content from followed authors. `explore` mode returns platform-wide content ranked by engagement score from `feed_scores`.
+- **New background worker:** Feed scoring worker runs every 5 minutes (advisory-locked). Reads `feed_engagement` data from the last 48 hours, computes HN-style gravity-decayed scores with configurable weights (gate passes weighted 5×), upserts into `feed_scores`, and prunes stale entries older than 7 days.
+- **Bug fix:** `GET /api/v1/content/resolve` no longer truncates note content to 200 characters. The full note content (max 1000 chars) is returned so the client can extract and render image URLs. Previously, image URLs past the 200-char cutoff were silently lost.
+- The old `for_you_engagement_weight` and `for_you_revenue_weight` config rows are superseded by the new `feed_weight_*` rows. They remain in the database but are no longer read by any code.
+
+**Frontend (web):**
+
+- **Feed reach selector:** the feed page now shows Following / Explore toggle buttons below the note composer. Selection persists to `localStorage` across sessions.
+- **Bug fix:** quoted notes now render images. Previously, image URLs in quoted note content were displayed as raw text. The `QuoteCard` component now extracts image URLs (using the same `extractUrls`/`isImageUrl` logic as `NoteCard`) and renders them as `<img>` tags.
+
+**New files:**
+
+- `gateway/src/workers/feed-scorer.ts` — scoring worker
+- `gateway/src/routes/feed.ts` — unified feed endpoint
+- `migrations/035_feed_scores.sql` — feed_scores table + config rows
+
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# 1. Apply migration
+docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub \
+  < migrations/035_feed_scores.sql
+
+# 2. Rebuild and restart
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Verify migration applied
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT filename FROM _migrations ORDER BY filename" | grep '035'
+
+# Verify feed_scores table exists
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "\d feed_scores"
+
+# Verify config rows exist
+docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
+  -c "SELECT key, value FROM platform_config WHERE key LIKE 'feed_%'"
+
+# The scoring worker runs on startup and then every 5 minutes.
+# Check gateway logs for "Feed scores refreshed":
+docker logs platform-pub-gateway-1 --tail 50 | grep -i "feed score"
+
+# Visual checks:
+# - Open the feed page — "Following" and "Explore" toggle should appear below the composer
+# - Click "Explore" — should show engagement-ranked content (may be empty if no engagement data yet)
+# - Switch back to "Following" — should show chronological feed from followed authors
+# - Reload page — selected reach mode should persist
+# - Find a note that quotes another note containing an image — the image should render in the quote card
+```
+
+No new env vars. Scoring weights are tunable via `platform_config` without redeployment:
+
+```sql
+-- Example: increase gate_pass weight to 8
+UPDATE platform_config SET value = '8' WHERE key = 'feed_weight_gate_pass';
+```
+
+---
 
 ### From v5.8.3
 
@@ -4645,6 +4724,49 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.10.0 — 5 April 2026
+
+**Feed scoring backend (Explore feed), unified feed endpoint, quoted note image fix**
+
+New migration (035). Services changed: gateway, web.
+
+**Feed scoring worker:**
+
+- New background worker in `gateway/src/workers/feed-scorer.ts`. Runs every 5 minutes via advisory lock (`LOCK_FEED_SCORES = 100003`), safe for horizontal scaling.
+- Reads `feed_engagement` data from the last 48 hours, computes engagement scores using the HN-style gravity formula: `score = (reactions×W₁ + replies×W₂ + quotes×W₃ + gate_passes×W₄) / (hours_since_publish + 2)^gravity`.
+- Gate passes (paid reads) are weighted 5× by default — Platform's strongest engagement signal.
+- Upserts results into `feed_scores` table. Prunes stale entries (>7 days, score < 0.1).
+- All weights and gravity are tunable via `platform_config` rows without redeployment.
+
+**Unified feed endpoint:**
+
+- New `GET /api/v1/feed?reach=following|explore&cursor=&limit=` endpoint in `gateway/src/routes/feed.ts`.
+- `following` mode: chronological feed from followed authors and own content, with block/mute exclusions.
+- `explore` mode: platform-wide content ranked by engagement score from `feed_scores`, 48-hour window, block/mute filtered.
+- Old `/feed/global` and `/feed/following` endpoints remain for backward compatibility.
+
+**Frontend reach selector:**
+
+- `web/src/components/feed/FeedView.tsx`: Following / Explore toggle buttons below the note composer. Selection persists to `localStorage`.
+- `web/src/lib/api.ts`: new `feed.get(reach, cursor?, limit?)` method and `FeedReach` type.
+
+**Quoted note image fix:**
+
+- `web/src/components/feed/QuoteCard.tsx`: quoted notes now extract image URLs from content and render them as `<img>` tags, matching `NoteCard` behaviour. Previously, image URLs were shown as raw text.
+- `gateway/src/routes/notes.ts`: `/content/resolve` no longer truncates note content to 200 characters. Full content (max 1000 chars) is returned so the client can extract image URLs.
+
+**Database:**
+
+- `feed_scores` table: `nostr_event_id` (PK), `author_id`, `content_type`, `score`, `engagement_count`, `gate_pass_count`, `published_at`, `scored_at`. Indexes on `score DESC`, `(author_id, score DESC)`, `published_at DESC`.
+- New `platform_config` rows: `feed_gravity` (1.5), `feed_weight_reaction` (1), `feed_weight_reply` (2), `feed_weight_quote_comment` (3), `feed_weight_gate_pass` (5).
+- Old `for_you_engagement_weight` and `for_you_revenue_weight` config rows are superseded but not removed.
+
+**Schema:** `schema.sql` updated with `feed_scores` table definition and new config rows replacing `for_you_*` rows.
+
+**Files changed:** `gateway/src/workers/feed-scorer.ts` (new), `gateway/src/routes/feed.ts` (new), `gateway/src/routes/notes.ts`, `gateway/src/index.ts`, `web/src/components/feed/FeedView.tsx`, `web/src/components/feed/QuoteCard.tsx`, `web/src/lib/api.ts`, `schema.sql`, `migrations/035_feed_scores.sql` (new).
+
+---
 
 ### v5.9.0 — 5 April 2026
 

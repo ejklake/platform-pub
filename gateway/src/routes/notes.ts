@@ -219,7 +219,7 @@ export async function noteRoutes(app: FastifyInstance) {
           return reply.send({
             type: 'note',
             eventId: row.nostr_event_id,
-            content: row.content.slice(0, 200),
+            content: row.content,
             publishedAt: Math.floor(new Date(row.published_at).getTime() / 1000),
             author: {
               username: row.username,

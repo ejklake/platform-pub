@@ -575,6 +575,28 @@ CREATE INDEX idx_feed_engagement_target ON feed_engagement (target_nostr_event_i
 CREATE INDEX idx_feed_engagement_author ON feed_engagement (target_author_id, engaged_at DESC);
 
 -- =============================================================================
+-- FEED SCORES
+-- Pre-computed engagement scores for ranked feed modes (explore, following_plus,
+-- extended). Refreshed by background worker every 5 minutes using HN-style
+-- gravity formula.
+-- =============================================================================
+
+CREATE TABLE feed_scores (
+  nostr_event_id  TEXT PRIMARY KEY,
+  author_id       UUID NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  content_type    content_type NOT NULL,
+  score           FLOAT NOT NULL DEFAULT 0,
+  engagement_count INT NOT NULL DEFAULT 0,
+  gate_pass_count INT NOT NULL DEFAULT 0,
+  published_at    TIMESTAMPTZ NOT NULL,
+  scored_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_feed_scores_score ON feed_scores (score DESC);
+CREATE INDEX idx_feed_scores_author ON feed_scores (author_id, score DESC);
+CREATE INDEX idx_feed_scores_published ON feed_scores (published_at DESC);
+
+-- =============================================================================
 -- MODERATION REPORTS
 -- =============================================================================
 
@@ -611,8 +633,11 @@ INSERT INTO platform_config (key, value, description) VALUES
   ('monthly_fallback_minimum_pence','200',  'Minimum balance for time-based settlement trigger (£2.00)'),
   ('writer_payout_threshold_pence', '2000', 'Writer balance threshold that triggers Stripe Connect transfer (£20.00)'),
   ('platform_fee_bps',              '800',  'Platform cut in basis points (800 = 8%)'),
-  ('for_you_engagement_weight',     '0.6',  'Weight of engagement velocity vs revenue conversion in For You ranking'),
-  ('for_you_revenue_weight',        '0.4',  'Weight of revenue conversion in For You ranking'),
+  ('feed_gravity',                   '1.5',  'Time-decay exponent for feed scoring (HN-style)'),
+  ('feed_weight_reaction',           '1',   'Score weight for reactions'),
+  ('feed_weight_reply',              '2',   'Score weight for replies'),
+  ('feed_weight_quote_comment',      '3',   'Score weight for quote comments'),
+  ('feed_weight_gate_pass',          '5',   'Score weight for gate passes (paid reads)'),
   ('note_char_limit',               '1000', 'Maximum characters for a note (kind 1)'),
   ('comment_char_limit',            '2000', 'Maximum characters for a comment'),
   ('media_max_size_bytes',          '10485760', 'Maximum upload file size (10 MB)'),

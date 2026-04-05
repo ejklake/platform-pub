@@ -268,7 +268,15 @@ export const content = {
 // Feed
 // =============================================================================
 
+export type FeedReach = 'following' | 'explore'
+
 export const feed = {
+  get: (reach: FeedReach, cursor?: number, limit?: number) =>
+    request<{ items: any[]; reach: FeedReach }>(
+      `/feed?reach=${reach}${cursor ? `&cursor=${cursor}` : ''}${limit ? `&limit=${limit}` : ''}`
+    ),
+
+  // Legacy endpoints (kept for backwards compat during migration)
   global: () =>
     request<{ items: any[] }>('/feed/global'),
 

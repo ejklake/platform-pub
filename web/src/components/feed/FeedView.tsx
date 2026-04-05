@@ -9,7 +9,7 @@ import { NoteCard } from '../feed/NoteCard'
 import { NoteComposer } from '../feed/NoteComposer'
 import type { FeedItem, NoteEvent } from '../../lib/ndk'
 import type { QuoteTarget } from '../../lib/publishNote'
-import { feed as feedApi, votes as votesApi, type VoteTally, type MyVoteCount } from '../../lib/api'
+import { feed as feedApi, votes as votesApi, type VoteTally, type MyVoteCount, type FeedReach } from '../../lib/api'
 
 interface NewUserItem {
   type: 'new_user'
@@ -31,9 +31,15 @@ function timeAgo(unixSeconds: number): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
+function getStoredReach(): FeedReach {
+  if (typeof window === 'undefined') return 'following'
+  return (localStorage.getItem('feedReach') as FeedReach) || 'following'
+}
+
 export function FeedView() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [reach, setReach] = useState<FeedReach>(getStoredReach)
   const [globalItems, setGlobalItems] = useState<GlobalFeedItem[]>([])
   const [globalLoading, setGlobalLoading] = useState(true)
   const [globalError, setGlobalError] = useState(false)
@@ -45,14 +51,20 @@ export function FeedView() {
 
   useEffect(() => { if (!loading && !user) router.push('/auth?mode=login') }, [user, loading, router])
 
-  // Load the global "For you" feed from the DB
+  function handleReachChange(newReach: FeedReach) {
+    setReach(newReach)
+    localStorage.setItem('feedReach', newReach)
+    setRetryKey(k => k + 1)
+  }
+
+  // Load feed from the unified endpoint
   useEffect(() => {
     if (!user) return
-    async function loadGlobalFeed() {
+    async function loadFeed() {
       setGlobalLoading(true)
       setGlobalError(false)
       try {
-        const data = await feedApi.global()
+        const data = await feedApi.get(reach)
         const items: GlobalFeedItem[] = (data.items ?? []).map((item: any) => {
           if (item.type === 'article') {
             return {
@@ -99,11 +111,11 @@ export function FeedView() {
           setVoteTallies(talliesRes.tallies ?? {})
           setMyVoteCounts(myVotesRes.voteCounts ?? {})
         }
-      } catch (err) { console.error('Global feed load error:', err); setGlobalError(true) }
+      } catch (err) { console.error('Feed load error:', err); setGlobalError(true) }
       finally { setGlobalLoading(false) }
     }
-    loadGlobalFeed()
-  }, [user, retryKey])
+    loadFeed()
+  }, [user, reach, retryKey])
 
   const handleNotePublished = useCallback((note: NoteEvent) => {
     setPendingQuote(null)
@@ -135,6 +147,24 @@ export function FeedView() {
             onPublished={handleNotePublished}
             onClearQuote={() => setPendingQuote(null)}
           />
+        </div>
+
+        {/* Reach selector */}
+        <div className="px-6 pb-3 flex gap-1">
+          {(['following', 'explore'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => handleReachChange(mode)}
+              className={[
+                'font-mono text-[11px] uppercase tracking-[0.06em] px-3 py-1.5 transition-colors',
+                reach === mode
+                  ? 'bg-black text-white'
+                  : 'bg-grey-100 text-grey-400 hover:text-black',
+              ].join(' ')}
+            >
+              {mode === 'following' ? 'Following' : 'Explore'}
+            </button>
+          ))}
         </div>
       </div>
 

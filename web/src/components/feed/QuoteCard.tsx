@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { isImageUrl, extractUrls } from '../../lib/media'
 
 interface ResolvedContent {
   type: 'note' | 'article'
@@ -100,6 +101,11 @@ export function QuoteCard({ eventId }: QuoteCardProps) {
 
   // Quoted note — 4px grey-300 left border
   const noteHref = data.author.username.length < 40 ? `/${data.author.username}` : null
+  const urls = extractUrls(data.content)
+  const imageUrls = urls.filter(isImageUrl)
+  let displayContent = data.content
+  for (const url of imageUrls) displayContent = displayContent.replace(url, '').trim()
+
   return (
     <Link
       href={noteHref ?? '#'}
@@ -119,9 +125,18 @@ export function QuoteCard({ eventId }: QuoteCardProps) {
           {data.author.displayName}
         </span>
       </div>
-      <p className="line-clamp-3 font-sans text-[14px] text-grey-600 leading-[1.55]">
-        {data.content}
-      </p>
+      {displayContent && (
+        <p className="line-clamp-3 font-sans text-[14px] text-grey-600 leading-[1.55]">
+          {displayContent}
+        </p>
+      )}
+      {imageUrls.length > 0 && (
+        <div className="mt-1.5 space-y-1.5">
+          {imageUrls.map((url, i) => (
+            <img key={i} src={url} alt="" className="max-w-full max-h-48 object-cover rounded-sm" loading="lazy" />
+          ))}
+        </div>
+      )}
     </Link>
   )
 }
