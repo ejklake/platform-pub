@@ -400,7 +400,7 @@ export async function messageRoutes(app: FastifyInstance) {
   )
 
   // ---------------------------------------------------------------------------
-  // POST /messages/:messageId/read — mark a message as read
+  // POST /messages/:messageId/read — mark a single message as read
   // ---------------------------------------------------------------------------
 
   app.post<{ Params: { messageId: string } }>(
@@ -421,6 +421,37 @@ export async function messageRoutes(app: FastifyInstance) {
       }
 
       return reply.status(200).send({ ok: true })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // POST /messages/:conversationId/read-all — mark all messages in a
+  // conversation as read (batch). Returns the count of newly-read messages.
+  // ---------------------------------------------------------------------------
+
+  app.post<{ Params: { conversationId: string } }>(
+    '/messages/:conversationId/read-all',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const userId = req.session!.sub!
+      const { conversationId } = req.params
+
+      // Verify caller is a member
+      const membership = await pool.query(
+        'SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND user_id = $2',
+        [conversationId, userId]
+      )
+      if (membership.rowCount === 0) {
+        return reply.status(403).send({ error: 'Not a member of this conversation' })
+      }
+
+      const result = await pool.query(
+        `UPDATE direct_messages SET read_at = now()
+         WHERE conversation_id = $1 AND recipient_id = $2 AND read_at IS NULL`,
+        [conversationId, userId]
+      )
+
+      return reply.status(200).send({ ok: true, markedRead: result.rowCount })
     }
   )
   // ---------------------------------------------------------------------------

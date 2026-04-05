@@ -595,6 +595,7 @@ export interface DirectMessage {
   counterpartyPubkey: string
   contentEnc: string
   replyTo: ReplyTo | null
+  readAt: string | null
   createdAt: string
   likeCount: number
   likedByMe: boolean
@@ -622,6 +623,9 @@ export const messages = {
 
   markRead: (messageId: string) =>
     request<void>(`/messages/${messageId}/read`, { method: 'POST' }),
+
+  markAllRead: (conversationId: string) =>
+    request<{ ok: boolean; markedRead: number }>(`/messages/${conversationId}/read-all`, { method: 'POST' }),
 
   toggleLike: (messageId: string) =>
     request<{ liked: boolean }>(`/messages/${messageId}/like`, { method: 'POST' }),

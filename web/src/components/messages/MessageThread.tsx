@@ -98,12 +98,10 @@ export function MessageThread({
       }
       setNextCursor(data.nextCursor)
 
-      // Mark unread messages as read
-      const unreadMsgs = data.messages.filter(msg => msg.senderId !== user?.id)
-      if (unreadMsgs.length > 0) {
-        await Promise.all(
-          unreadMsgs.map(msg => messagesApi.markRead(msg.id).catch(() => {}))
-        )
+      // Mark all messages in conversation as read (single batch call)
+      const hasUnread = data.messages.some(msg => msg.senderId !== user?.id && !msg.readAt)
+      if (hasUnread) {
+        await messagesApi.markAllRead(conversationId).catch(() => {})
         refreshUnread()
         onMessagesRead?.()
       }
@@ -138,12 +136,10 @@ export function MessageThread({
 
       latestCreatedAt.current = chronological[chronological.length - 1].createdAt
 
-      // Mark new messages from others as read
-      const unreadMsgs = newMsgs.filter(msg => msg.senderId !== user?.id)
-      if (unreadMsgs.length > 0) {
-        await Promise.all(
-          unreadMsgs.map(msg => messagesApi.markRead(msg.id).catch(() => {}))
-        )
+      // Mark new messages from others as read (batch)
+      const hasUnread = newMsgs.some(msg => msg.senderId !== user?.id)
+      if (hasUnread) {
+        await messagesApi.markAllRead(conversationId).catch(() => {})
         refreshUnread()
         onMessagesRead?.()
       }
@@ -330,7 +326,7 @@ export function MessageThread({
                   <div className={`flex items-center gap-2 mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
                     <button
                       onClick={() => handleReply(msg)}
-                      className="text-[11px] font-sans text-grey-200 opacity-0 group-hover:opacity-100 transition-opacity hover:text-black"
+                      className="text-[11px] font-sans text-grey-300 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:text-black"
                     >
                       Reply
                     </button>
@@ -339,7 +335,7 @@ export function MessageThread({
                       className={`text-[12px] transition-colors ${
                         msg.likedByMe
                           ? 'text-crimson'
-                          : 'text-grey-200 opacity-0 group-hover:opacity-100'
+                          : 'text-grey-300 md:opacity-0 md:group-hover:opacity-100'
                       }`}
                       aria-label={msg.likedByMe ? 'Unlike' : 'Like'}
                     >
