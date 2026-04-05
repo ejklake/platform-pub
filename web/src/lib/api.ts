@@ -18,13 +18,13 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = { ...options.headers as Record<string, string> }
+  if (options.body) headers['Content-Type'] = 'application/json'
+
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   })
 
   const body = await res.json().catch(() => null)
