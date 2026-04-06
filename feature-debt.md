@@ -3,7 +3,7 @@
 Consolidated from 19 planning documents, verified against the codebase as of 2026-04-06. The archived specs live in `planning-archive/`. Documents left in the project root are strategic specs that are still entirely ahead of us.
 
 Last audited: 2026-04-06. Items marked DONE were verified against the codebase in that audit.
-Last worked: 2026-04-06 (v5.12.0 session). Completed: gift link polish, DM commissions, DM pricing config, JWT hardening. Next up: subscription offers system (#3 in attack order).
+Last worked: 2026-04-06 (v5.13.0 session). Completed: subscription offers system (full build — migration 037, backend routes, dashboard Offers tab, redeem page, offer-aware renewal), plus editor bug fixes (stale closure, price overwrite, grey-card styling). Next up: writer analytics (#2 in attack order).
 
 ---
 
@@ -72,7 +72,7 @@ All high-priority bugs have been resolved:
 
 ### Still outstanding
 
-**Subscription offers system** — Replaces the original "free pass" concept. Decided 2026-04-06: article unlocks are permanent by nature and gift links already cover sharing individual articles, so the actual gap is flexible subscription pricing offers. Design: a single `subscription_offers` table with two modes — `code` (shareable link, anyone redeems) and `grant` (assigned to a specific reader). Fields: `writer_id`, `label`, `mode`, `discount_pct` (0–100), `duration_months` (null = permanent), `code` (unique slug for code mode), `recipient_id` (for grant mode), `max_redemptions`, `redemption_count`, `expires_at`. Covers all cases: discounted first month for everyone, free/cheap subs gifted to specific readers, permanent comp subs. Dashboard UI: "Offers" tab with "New offer code" and "Gift subscription" actions, plus a table of active/expired offers. Subscription renewal logic checks whether the offer period has elapsed and reverts to standard rate. All parameters freely configurable by the writer. Not started.
+~~Subscription offers system~~ — **done (v5.13.0):** migration 037 creates `subscription_offers` table with `code`/`grant` modes. `POST /subscriptions/:writerId` accepts optional `offerCode`, validates and applies discount. `offer_id` and `offer_periods_remaining` tracked on subscriptions; renewal job decrements and reverts to standard price when offer period elapses. Dashboard Offers tab with create/list/revoke. Public redeem page at `/subscribe/:code`.
 
 ~~Gift link frontend~~ — **done:** dashboard GiftLinksPanel (create/list/revoke per article in Articles tab) + "Gift link" option in ShareButton dropdown.
 
@@ -157,13 +157,17 @@ Multi-currency support. Option 2 (launch with GBP, display-only conversion) is r
 - ~~DM pricing configuration~~ — API endpoints + dashboard settings UI
 - ~~JWT lifetime reduction~~ — 2-hour lifetime with 1-hour refresh
 
+### Completed (v5.13.0 session, 2026-04-06)
+
+- ~~Subscription offers system~~ — migration 037, backend routes, dashboard Offers tab, redeem page, offer-aware renewal
+- ~~Editor bug fixes~~ — stale closure in auto-save, price auto-suggestion overwrite, grey-card styling refresh
+
 ### Next up
 
-1. **Subscription offers system** (full build — schema, backend, dashboard Offers tab). Design agreed: single `subscription_offers` table, two modes (`code`/`grant`), writer-configurable discount_pct + duration_months + max_redemptions. See §2 "Incomplete Features" for full spec.
-2. **Writer analytics** — writers need numbers to stay. Gateway endpoint joining read_events, votes, comments, revenue; dashboard Analytics tab.
-3. **Email-on-publish** — inbox is the feed, critical for retention. Migration + send logic + settings toggle.
-4. **Tags/topics** — discoverability. Migration, editor input, browse page, card display.
-5. **Bookmarks** — reader engagement. Migration, routes, button, /bookmarks page.
+1. **Writer analytics** — writers need numbers to stay. Gateway endpoint joining read_events, votes, comments, revenue; dashboard Analytics tab.
+2. **Email-on-publish** — inbox is the feed, critical for retention. Migration + send logic + settings toggle.
+3. **Tags/topics** — discoverability. Migration, editor input, browse page, card display.
+4. **Bookmarks** — reader engagement. Migration, routes, button, /bookmarks page.
 
 ### Later: strategic work
 
