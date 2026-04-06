@@ -21,6 +21,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   free_allowance: 'Free credit',
   article_read: 'Paywall',
   article_earning: 'Article read',
+  free_read: 'Free',
   subscription_charge: 'Subscription',
   subscription_earning: 'Subscriber',
   vote_charge: 'Vote',
@@ -28,24 +29,26 @@ const CATEGORY_LABELS: Record<string, string> = {
   settlement: 'Settlement',
 }
 
-export function AccountLedger() {
+export function AccountLedger({ initialIncludeFreeReads = false }: { initialIncludeFreeReads?: boolean } = {}) {
   const [entries, setEntries] = useState<LedgerEntry[]>([])
   const [totalEntries, setTotalEntries] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [filter, setFilter] = useState<LedgerFilter>('all')
+  const [includeFreeReads, setIncludeFreeReads] = useState(initialIncludeFreeReads)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
 
   // Map our filter names to the backend's expected values
   const filterMap: Record<LedgerFilter, string> = { all: 'all', income: 'credits', spending: 'debits' }
 
-  async function fetchEntries(f: LedgerFilter, offset: number, append: boolean) {
+  async function fetchEntries(f: LedgerFilter, offset: number, append: boolean, freeReads?: boolean) {
+    const showFree = freeReads ?? includeFreeReads
     const isInitial = offset === 0 && !append
     if (isInitial) setLoading(true)
     else setLoadingMore(true)
     try {
       const res = await fetch(
-        `/api/v1/my/account-statement?filter=${filterMap[f]}&limit=${PAGE_SIZE}&offset=${offset}`,
+        `/api/v1/my/account-statement?filter=${filterMap[f]}&limit=${PAGE_SIZE}&offset=${offset}${showFree ? '&include_free_reads=true' : ''}`,
         { credentials: 'include' }
       )
       if (!res.ok) throw new Error('Failed to load')
@@ -57,21 +60,29 @@ export function AccountLedger() {
     finally { setLoading(false); setLoadingMore(false) }
   }
 
-  useEffect(() => { fetchEntries(filter, 0, false) }, [filter])
+  useEffect(() => { fetchEntries(filter, 0, false, includeFreeReads) }, [filter, includeFreeReads])
 
   return (
     <div className="mb-10">
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 mb-4">
-        {(['all', 'income', 'spending'] as LedgerFilter[]).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`tab-pill ${filter === f ? 'tab-pill-active' : 'tab-pill-inactive'}`}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-1">
+          {(['all', 'income', 'spending'] as LedgerFilter[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`tab-pill ${filter === f ? 'tab-pill-active' : 'tab-pill-inactive'}`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setIncludeFreeReads(!includeFreeReads)}
+          className={`text-ui-xs ${includeFreeReads ? 'text-black' : 'text-grey-300'} hover:text-black transition-colors`}
+        >
+          {includeFreeReads ? 'All reads' : 'Paid only'}
+        </button>
       </div>
 
       {loading ? (
@@ -111,9 +122,9 @@ export function AccountLedger() {
                       )}
                     </td>
                     <td className={`px-4 py-3 text-right tabular-nums font-medium font-mono text-[12px] ${
-                      entry.type === 'credit' ? 'text-crimson' : 'text-black'
+                      entry.category === 'free_read' ? 'text-grey-300' : entry.type === 'credit' ? 'text-crimson' : 'text-black'
                     }`}>
-                      {entry.type === 'credit' ? '+' : '−'}£{(Math.abs(entry.amount_pence) / 100).toFixed(2)}
+                      {entry.category === 'free_read' ? 'Free' : `${entry.type === 'credit' ? '+' : '−'}£${(Math.abs(entry.amount_pence) / 100).toFixed(2)}`}
                     </td>
                   </tr>
                 ))}

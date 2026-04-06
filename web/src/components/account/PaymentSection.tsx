@@ -47,7 +47,7 @@ export function PaymentSection() {
                 <p className="text-[14px] font-sans text-black">Stripe Connect</p>
                 <p className="text-[13px] font-sans text-grey-300 mt-0.5">Connect to receive payouts.</p>
               </div>
-              <Link href="/settings" className="text-[13px] font-sans text-crimson hover:text-crimson-dark underline underline-offset-4">
+              <Link href="/profile" className="text-[13px] font-sans text-crimson hover:text-crimson-dark underline underline-offset-4">
                 Set up
               </Link>
             </div>

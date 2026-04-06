@@ -3,7 +3,7 @@
 Consolidated from 19 planning documents, verified against the codebase as of 2026-04-06. The archived specs live in `planning-archive/`. Documents left in the project root are strategic specs that are still entirely ahead of us.
 
 Last audited: 2026-04-06. Items marked DONE were verified against the codebase in that audit.
-Last worked: 2026-04-06 (v5.13.0 session). Completed: subscription offers system (full build — migration 037, backend routes, dashboard Offers tab, redeem page, offer-aware renewal), plus editor bug fixes (stale closure, price overwrite, grey-card styling). Next up: writer analytics (#2 in attack order).
+Last worked: 2026-04-06 (v5.14.0 session). Completed: settings rationalisation (full implementation — see `SETTINGS-RATIONALISATION.md`). Profile absorbs payment/Stripe/export from `/settings`. Account ledger gains "All reads" toggle replacing `/history`. New `/social` page with feed dial, blocks/mutes lists, DM fees. Dashboard tab renamed settings→pricing. Nav updated. `/settings` and `/history` replaced with redirects. New backend block/mute CRUD routes. Next up: writer analytics (#1 in attack order).
 
 ---
 
@@ -76,7 +76,7 @@ All high-priority bugs have been resolved:
 
 ~~Gift link frontend~~ — **done:** dashboard GiftLinksPanel (create/list/revoke per article in Articles tab) + "Gift link" option in ShareButton dropdown.
 
-~~DM pricing / anti-spam settings~~ — **done:** GET/PUT `/settings/dm-pricing` + per-user override endpoints. Dashboard settings tab has default rate form + collapsible per-user overrides section with username search.
+~~DM pricing / anti-spam settings~~ — **done:** GET/PUT `/settings/dm-pricing` + per-user override endpoints. Moved from dashboard settings tab to `/social` page (v5.14.0 settings rationalisation).
 
 ~~Commission social features~~ — **done:** Commission button in DM thread header opens CommissionForm modal. Migration 036 adds `parent_conversation_id` to `pledge_drives`. Backend and API client pass conversation context through.
 
@@ -134,9 +134,7 @@ Phase 1 is done (auto-renewal, annual pricing, subscribe at paywall, spend-thres
 
 ### Still outstanding
 
-**Settings rationalisation — `SETTINGS-RATIONALISATION.md`**
-
-Replace the current overlapping settings surfaces with four clearly scoped hubs: Profile ("who am I"), Account ("what have I spent"), Social ("how do I experience others" — new page with feed dial, blocks/mutes list, DM fee settings), and Pricing (dashboard tab rename from "settings"). Would delete `/settings` and `/history` pages. Not started — `/settings` still exists, no Social page, dashboard tab still labelled "settings". Not discussed yet.
+~~Settings rationalisation — `SETTINGS-RATIONALISATION.md`~~ — **done (v5.14.0):** Four hubs implemented: Profile (identity + payment + export), Account (ledger with free reads toggle), Social (new page: feed dial, blocks/mutes lists, DM fees), Pricing (dashboard tab renamed). `/settings` and `/history` replaced with redirects. New backend block/mute CRUD routes. Nav updated.
 
 **Bucket categorisation system — `platform-bucket-system-design.md`**
 
@@ -162,6 +160,10 @@ Multi-currency support. Option 2 (launch with GBP, display-only conversion) is r
 - ~~Subscription offers system~~ — migration 037, backend routes, dashboard Offers tab, redeem page, offer-aware renewal
 - ~~Editor bug fixes~~ — stale closure in auto-save, price auto-suggestion overwrite, grey-card styling refresh
 
+### Completed (v5.14.0 session, 2026-04-06)
+
+- ~~Settings rationalisation~~ — Profile absorbs payment/Stripe/export, Account gains free reads toggle, new Social page (feed dial, blocks/mutes, DM fees), dashboard tab settings→pricing, `/settings` and `/history` replaced with redirects, new block/mute CRUD APIs, nav updated
+
 ### Next up
 
 1. **Writer analytics** — writers need numbers to stay. Gateway endpoint joining read_events, votes, comments, revenue; dashboard Analytics tab.
@@ -171,11 +173,10 @@ Multi-currency support. Option 2 (launch with GBP, display-only conversion) is r
 
 ### Later: strategic work
 
-6. Subscription Phase 2 — now partially covered by offers system; remaining: welcome email, subscriber import/export, subscriber analytics, custom subscribe landing page
-7. Settings rationalisation — see `SETTINGS-RATIONALISATION.md`
-8. Currency strategy — see `platform-pub-currency-strategy.md`
-9. Reposts (needs feed algorithm to be meaningful)
-10. Bucket system — see `platform-bucket-system-design.md`
+5. Subscription Phase 2 — now partially covered by offers system; remaining: welcome email, subscriber import/export, subscriber analytics, custom subscribe landing page
+6. Currency strategy — see `platform-pub-currency-strategy.md`
+7. Reposts (needs feed algorithm to be meaningful)
+8. Bucket system — see `platform-bucket-system-design.md`
 
 ### Infrastructure (fit in as time allows)
 

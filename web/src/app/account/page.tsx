@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../stores/auth'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { account as accountApi, payment, type TabOverview, type WriterEarnings } from '../../lib/api'
 import { BalanceHeader } from '../../components/account/BalanceHeader'
 import { AccountLedger } from '../../components/account/AccountLedger'
 import { SubscriptionsSection } from '../../components/account/SubscriptionsSection'
 import { PledgesSection } from '../../components/account/PledgesSection'
-import { PaymentSection } from '../../components/account/PaymentSection'
 
 export default function AccountPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const showAllReads = searchParams.get('filter') === 'all'
   const [tab, setTab] = useState<TabOverview | null>(null)
   const [earnings, setEarnings] = useState<WriterEarnings | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
@@ -62,11 +63,10 @@ export default function AccountPage() {
         />
       )}
 
-      <AccountLedger />
+      <AccountLedger initialIncludeFreeReads={showAllReads} />
 
       <SubscriptionsSection />
       <PledgesSection />
-      <PaymentSection />
     </div>
   )
 }

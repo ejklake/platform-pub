@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../../stores/auth'
 import { auth } from '../../lib/api'
 import { uploadImage } from '../../lib/media'
+import { CardSetup } from '../../components/payment/CardSetup'
+import { ExportModal } from '../../components/ExportModal'
 
 // =============================================================================
 // Profile Settings Page
@@ -16,6 +18,7 @@ import { uploadImage } from '../../lib/media'
 export default function ProfilePage() {
   const { user, loading, fetchMe } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [displayName, setDisplayName] = useState('')
@@ -27,6 +30,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [upgradingStripe, setUpgradingStripe] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
+  const [showExport, setShowExport] = useState(false)
+  const onboardingComplete = searchParams.get('onboarding') === 'complete'
+
+  useEffect(() => { if (onboardingComplete) fetchMe() }, [onboardingComplete, fetchMe])
 
   // Initialise form from auth state once loaded
   if (!loading && user && !initialised) {
@@ -83,6 +93,12 @@ export default function ProfilePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleConnectStripe() {
+    setUpgradingStripe(true); setUpgradeError(null)
+    try { const result = await auth.connectStripe(); window.location.href = result.stripeConnectUrl }
+    catch { setUpgradeError('Failed to start writer setup.'); setUpgradingStripe(false) }
   }
 
   const initial = (displayName || user.username || '?')[0].toUpperCase()
@@ -181,6 +197,14 @@ export default function ProfilePage() {
           <p className="text-[11px] text-grey-300 mt-1">Username cannot be changed.</p>
         </div>
 
+        {/* Public key (read-only) */}
+        <div>
+          <label className="block text-ui-xs text-grey-300 mb-2 uppercase tracking-wider">
+            Public key
+          </label>
+          <p className="text-ui-xs text-grey-300 truncate">{user.pubkey}</p>
+        </div>
+
         {/* Error */}
         {error && (
           <p className="text-sm text-red-500">{error}</p>
@@ -200,6 +224,72 @@ export default function ProfilePage() {
           )}
         </div>
       </form>
+
+      {/* ================================================================= */}
+      {/* Financial plumbing                                                 */}
+      {/* ================================================================= */}
+
+      <div className="mt-12 space-y-8 max-w-md">
+        <h2 className="font-serif text-xl font-light text-black tracking-tight">Payment</h2>
+
+        {/* Payment card */}
+        <div className="bg-white px-6 py-5">
+          <p className="label-ui text-grey-400 mb-4">Payment method</p>
+          {user.hasPaymentMethod ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-ui-sm text-black">Card connected</p>
+                <p className="text-ui-xs text-grey-300 mt-0.5">Your reading tab will settle automatically.</p>
+              </div>
+              <span className="text-ui-xs text-grey-400">Active</span>
+            </div>
+          ) : (
+            <div>
+              <p className="text-ui-xs text-grey-600 mb-4 leading-relaxed">Add a payment method to keep reading after your free £5 allowance.</p>
+              <p className="text-ui-xs text-grey-300 mb-4">Free allowance remaining: £{(user.freeAllowanceRemainingPence / 100).toFixed(2)}</p>
+              <CardSetup onSuccess={() => fetchMe()} />
+            </div>
+          )}
+        </div>
+
+        {/* Stripe Connect */}
+        <div className="bg-white px-6 py-5">
+          <p className="label-ui text-grey-400 mb-4">Stripe Connect</p>
+          {user.stripeConnectKycComplete ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-ui-sm text-black">Verified</p>
+                <p className="text-ui-xs text-grey-300 mt-0.5">Payouts are enabled.</p>
+              </div>
+              <span className="text-ui-xs text-grey-400">Active</span>
+            </div>
+          ) : (
+            <div>
+              <p className="text-ui-xs text-grey-600 leading-relaxed mb-4">Connect a bank account via Stripe to receive payouts from your published articles.</p>
+              {upgradeError && <p className="text-ui-xs text-red-600 mb-3">{upgradeError}</p>}
+              <button onClick={handleConnectStripe} disabled={upgradingStripe} className="btn disabled:opacity-50">
+                {upgradingStripe ? 'Setting up…' : 'Connect Stripe'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ================================================================= */}
+      {/* Data portability                                                   */}
+      {/* ================================================================= */}
+
+      <div className="mt-12 space-y-8 max-w-md">
+        <h2 className="font-serif text-xl font-light text-black tracking-tight">Data</h2>
+
+        <div className="bg-white px-6 py-5">
+          <p className="label-ui text-grey-400 mb-4">Export my data</p>
+          <p className="text-ui-xs text-grey-600 mb-4 leading-relaxed">Download your data, receipts, and content keys.</p>
+          <button onClick={() => setShowExport(true)} className="btn">Export</button>
+        </div>
+      </div>
+
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
     </div>
   )
 }

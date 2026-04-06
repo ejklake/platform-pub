@@ -114,14 +114,13 @@ function AvatarDropdown({ user, onLogout, onClose }: {
               </span>
             </span>
           </Link>
-          <Link href="/history" onClick={onClose} className={linkClass}>Reading history</Link>
+          <Link href="/social" onClick={onClose} className={linkClass}>Social</Link>
         </div>
 
         <div style={{ height: '4px', background: '#F0F0F0' }} />
 
         {/* Group 3 */}
         <div className="py-1">
-          <Link href="/settings" onClick={onClose} className={linkClass}>Settings</Link>
           <button
             onClick={() => { setShowExport(true); onClose() }}
             className="block w-full text-left px-4 py-2 text-[14px] text-black hover:bg-grey-100 transition-colors font-sans"
@@ -211,8 +210,7 @@ function MobileSheet({ user, loading, onLogout, onClose, onSearch }: {
 
           <Link href="/profile" onClick={onClose} className={linkClass('/profile')}>Profile</Link>
           <Link href="/account" onClick={onClose} className={linkClass('/account')}>Account</Link>
-          <Link href="/history" onClick={onClose} className={linkClass('/history')}>Reading history</Link>
-          <Link href="/settings" onClick={onClose} className={linkClass('/settings')}>Settings</Link>
+          <Link href="/social" onClick={onClose} className={linkClass('/social')}>Social</Link>
           <button
             onClick={() => { setShowExport(true); onClose() }}
             className="block py-3 font-mono text-[11px] uppercase tracking-[0.06em] text-grey-400 hover:text-white transition-colors text-left"

@@ -30,6 +30,7 @@ import { giftLinkRoutes } from './routes/gift-links.js'
 import { subscriptionOfferRoutes } from './routes/subscription-offers.js'
 import { messageRoutes } from './routes/messages.js'
 import { feedRoutes } from './routes/feed.js'
+import { socialRoutes } from './routes/social.js'
 import { driveRoutes, expireOverdueDrives } from './routes/drives.js'
 import { expireAndRenewSubscriptions } from './routes/subscriptions.js'
 import { refreshFeedScores } from './workers/feed-scorer.js'
@@ -155,6 +156,9 @@ async function start() {
 
   // Feed (unified endpoint with reach dial — following, explore)
   await app.register(feedRoutes, { prefix: '/api/v1' })
+
+  // Social (blocks, mutes)
+  await app.register(socialRoutes, { prefix: '/api/v1' })
 
   // Pledge drives (crowdfunding, commissions)
   await app.register(driveRoutes, { prefix: '/api/v1' })

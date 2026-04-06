@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.13.0
+# all.haus — Deployment Reference v5.14.0
 
 **Date:** 6 April 2026
-**Replaces:** v5.12.0 (see bottom for change log)
+**Replaces:** v5.13.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,86 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.13.0
+
+No migration. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
+
+This release implements the settings rationalisation (see `SETTINGS-RATIONALISATION.md`). Six overlapping configuration surfaces are replaced with four clearly scoped hubs. The `/settings` and `/history` pages are eliminated and replaced with redirects.
+
+**Settings rationalisation summary:**
+
+- **Profile** (`/profile`) — identity + financial plumbing + data export. Absorbs payment card, Stripe Connect onboarding, public key display, and export from the old `/settings` page.
+- **Account** (`/account`) — financial activity log. PaymentSection removed (moved to Profile). AccountLedger extended with "All reads" toggle that includes free reads (replaces the old `/history` page).
+- **Social** (`/social`) — new page. Feed reach dial (persists to localStorage, syncs with feed page), blocked accounts list with unblock, muted accounts list with unmute, DM fee settings with per-user overrides (moved from dashboard).
+- **Pricing** (`/dashboard?tab=pricing`) — dashboard tab renamed from "Settings" to "Pricing". DM pricing removed (moved to Social). Stripe Connect link updated to point to `/profile`.
+
+**Backend (gateway):**
+
+- New route file `social.ts`: `GET /my/blocks` (list with display info), `POST/DELETE /my/blocks/:userId` (block/unblock), `GET /my/mutes` (list with display info), `POST/DELETE /my/mutes/:userId` (mute/unmute).
+- `GET /my/account-statement` accepts new `include_free_reads=true` query parameter. When set, zero-cost and subscription reads appear in the ledger as `free_read` category entries.
+
+**Frontend (web):**
+
+- **Profile page** — added public key (read-only), payment card section (CardSetup), Stripe Connect onboarding/status, export button with ExportModal. Handles `?onboarding=complete` callback from Stripe. Organised as Identity / Payment / Data groups.
+- **Account page** — PaymentSection removed. AccountLedger gains a "Paid only / All reads" toggle. Free reads display "Free" in the amount column. Supports `?filter=all` query param for deep links.
+- **Social page** (new) — four sections: FeedDial (reach selector), BlockList, MuteList, DmFeeSettings. All in `web/src/components/social/`.
+- **Dashboard** — tab type/array `'settings'` → `'pricing'`, component renamed `WriterSettingsTab` → `PricingTab`, DM pricing section removed. `?tab=settings` auto-redirects to `?tab=pricing`.
+- **Nav** — "Settings" and "Reading history" links removed from both desktop dropdown and mobile sheet. "Social" link added.
+- **Redirects** — `/settings` → `/profile`, `/history` → `/account?filter=all` (server-side via Next.js `redirect()`).
+
+**New files:**
+
+- `gateway/src/routes/social.ts`
+- `web/src/app/social/page.tsx`
+- `web/src/components/social/FeedDial.tsx`
+- `web/src/components/social/BlockList.tsx`
+- `web/src/components/social/MuteList.tsx`
+- `web/src/components/social/DmFeeSettings.tsx`
+
+**Modified files:**
+
+- `gateway/src/index.ts` — registers `socialRoutes`
+- `gateway/src/routes/v1_6.ts` — `include_free_reads` parameter on account-statement
+- `web/src/lib/api.ts` — `social` namespace (blocks/mutes CRUD), `BlockedUser`/`MutedUser` types
+- `web/src/app/profile/page.tsx` — absorbs payment card, Stripe Connect, pubkey, export
+- `web/src/app/account/page.tsx` — removes PaymentSection, passes `initialIncludeFreeReads` prop
+- `web/src/components/account/AccountLedger.tsx` — free reads toggle, `free_read` category
+- `web/src/components/account/PaymentSection.tsx` — Stripe link updated `/settings` → `/profile`
+- `web/src/app/dashboard/page.tsx` — tab rename, PricingTab, DM pricing removed
+- `web/src/components/layout/Nav.tsx` — Settings/History removed, Social added
+- `web/src/app/settings/page.tsx` — replaced with redirect to `/profile`
+- `web/src/app/history/page.tsx` — replaced with redirect to `/account?filter=all`
+
+**Upgrade steps:**
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migration needed — only code changes
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Visual checks:
+# - /profile should show identity fields + payment card + Stripe Connect + export
+# - /account should show balance, ledger with "Paid only/All reads" toggle, subscriptions, pledges
+# - /social should show feed dial, blocked accounts, muted accounts, DM fee settings
+# - /dashboard — tab bar should read: Articles, Drafts, Pledge drives, Offers, Pricing
+# - /settings should redirect to /profile
+# - /history should redirect to /account?filter=all
+# - Nav dropdown: Settings and Reading history gone, Social present
+# - Mobile menu: same changes
+```
+
+No new env vars. No database changes.
+
+---
 
 ### From v5.12.0
 
@@ -4669,6 +4749,12 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | GET | /api/v1/follows/pubkeys | session | Followed writer pubkeys (for feed filter) |
 | GET | /api/v1/follows/followers | session | List accounts who follow you |
 | POST | /api/v1/reports | session | Submit content report |
+| GET | /api/v1/my/blocks | session | List blocked accounts with display info |
+| POST | /api/v1/my/blocks/:userId | session | Block a user |
+| DELETE | /api/v1/my/blocks/:userId | session | Unblock a user |
+| GET | /api/v1/my/mutes | session | List muted accounts with display info |
+| POST | /api/v1/my/mutes/:userId | session | Mute a user |
+| DELETE | /api/v1/my/mutes/:userId | session | Unmute a user |
 
 ### Notifications
 | Method | Path | Auth | Purpose |
@@ -4868,7 +4954,8 @@ Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), conver
 |------|---------|
 | / | Landing (redirects to /feed if logged in) |
 | /feed | Sticky composer + Following / Add tabs |
-| /profile | Edit your display name, bio, and avatar photo |
+| /profile | Identity (name, bio, avatar, username, pubkey), payment card, Stripe Connect, data export |
+| /account | Balance, transaction ledger (paid/all reads toggle), subscriptions, pledges |
 | /following | Writers you follow, with unfollow action |
 | /followers | Accounts who follow you |
 | /notifications | Recent notifications (new followers, replies, subscribers, quotes, mentions) — excludes DM notifications. Full-page view used on mobile |
@@ -4879,8 +4966,10 @@ Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), conver
 | /auth | Signup / login |
 | /auth/google/callback | Google OAuth callback (handles Google redirect, exchanges code, sets session) |
 | /auth/verify | Magic link verification |
-| /dashboard | Articles, drafts, billing |
-| /settings | Payment, Stripe Connect, account, data export |
+| /dashboard | Articles, drafts, pledge drives, offers, pricing |
+| /social | Feed reach dial, blocked accounts, muted accounts, DM fees |
+| /settings | Redirects to /profile |
+| /history | Redirects to /account?filter=all |
 | /search | Article + writer search |
 | /about | About page |
 

@@ -45,7 +45,7 @@ export async function v1_6Routes(app: FastifyInstance) {
   // =========================================================================
   // GET /my/account-statement — unified credits, debits & paginated statement
   // =========================================================================
-  app.get<{ Querystring: { filter?: string; limit?: string; offset?: string } }>(
+  app.get<{ Querystring: { filter?: string; limit?: string; offset?: string; include_free_reads?: string } }>(
     '/my/account-statement',
     { preHandler: requireAuth },
     async (req, reply) => {
@@ -53,6 +53,7 @@ export async function v1_6Routes(app: FastifyInstance) {
       const filter = req.query.filter ?? 'all' // 'all' | 'credits' | 'debits'
       const limit = Math.min(parseInt(req.query.limit ?? '30', 10) || 30, 200)
       const offset = parseInt(req.query.offset ?? '0', 10) || 0
+      const includeFreeReads = req.query.include_free_reads === 'true'
 
       try {
         // 1. Account info + last settlement date
@@ -115,6 +116,24 @@ export async function v1_6Routes(app: FastifyInstance) {
             WHERE re.reader_id = $1
               AND re.amount_pence > 0
               AND re.is_subscription_read = FALSE
+
+            ${includeFreeReads ? `
+            UNION ALL
+
+            -- Free reads (no charge)
+            SELECT
+              'freeread-' || re.id AS id,
+              re.read_at AS date,
+              'debit' AS type,
+              'free_read' AS category,
+              art.title AS description,
+              0 AS amount_pence,
+              '/article/' || art.nostr_d_tag AS link
+            FROM read_events re
+            JOIN articles art ON art.id = re.article_id
+            WHERE re.reader_id = $1
+              AND (re.amount_pence = 0 OR re.is_subscription_read = TRUE)
+            ` : ''}
 
             UNION ALL
 
