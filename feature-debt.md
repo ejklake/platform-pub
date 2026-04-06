@@ -3,7 +3,7 @@
 Consolidated from 19 planning documents, verified against the codebase as of 2026-04-06. The archived specs live in `planning-archive/`. Documents left in the project root are strategic specs that are still entirely ahead of us.
 
 Last audited: 2026-04-06. Items marked DONE were verified against the codebase in that audit.
-Last worked: 2026-04-06 (v5.14.0 session). Completed: settings rationalisation (full implementation — see `SETTINGS-RATIONALISATION.md`). Profile absorbs payment/Stripe/export from `/settings`. Account ledger gains "All reads" toggle replacing `/history`. New `/social` page with feed dial, blocks/mutes lists, DM fees. Dashboard tab renamed settings→pricing. Nav updated. `/settings` and `/history` replaced with redirects. New backend block/mute CRUD routes. Next up: writer analytics (#1 in attack order).
+Last worked: 2026-04-06 (v5.16.0 session). Completed: inline subscription management on Following/Followers tabs (subscribe/unsubscribe/resubscribe buttons with confirmation modal on Following; "Subscriber" badge on Followers). Editor chrome cleanup (title+standfirst as single grey card, white toolbar, hairlines removed). API client `social.block()`/`social.mute()` wrappers added. Next up: writer analytics (#1 in attack order).
 
 ---
 
@@ -159,6 +159,12 @@ Multi-currency support. Option 2 (launch with GBP, display-only conversion) is r
 ### Completed (v5.14.0 session, 2026-04-06)
 
 - ~~Settings rationalisation~~ — Profile absorbs payment/Stripe/export, Account gains free reads toggle, new Social page (feed dial, blocks/mutes, DM fees), dashboard tab settings→pricing, `/settings` and `/history` replaced with redirects, new block/mute CRUD APIs, nav updated
+
+### Completed (v5.16.0 session, 2026-04-06)
+
+- ~~Inline subscription management on Following/Followers tabs~~ — Following tab (own profile): unfollow button + subscribe/unsubscribe/resubscribe per writer, confirmation modal with period-end date. Followers tab (own profile): "Subscriber" badge. Backend enriched following response with `subscriptionPricePence`/`hasPaywalledArticle`, followers response with `subscriptionStatus` (owner-only).
+- ~~Editor hairline cleanup~~ — title + standfirst wrapped in single grey card, toolbar changed to white, inter-field gaps removed
+- ~~Missing API client methods~~ — `social.block()` and `social.mute()` POST wrappers added to match backend endpoints
 
 ### Next up
 

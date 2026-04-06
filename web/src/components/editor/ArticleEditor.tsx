@@ -215,25 +215,27 @@ export function ArticleEditor({
     <div className="mx-auto max-w-editor-frame px-4 sm:px-6 pt-16 lg:pt-8 pb-8">
       {/* Sticky title + toolbar — stays visible while scrolling the body */}
       <div className="sticky top-[53px] lg:top-0 z-20 bg-white pb-4 mb-6">
-      {/* Title input */}
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Article title"
-        className="w-full border-none bg-grey-100 px-5 py-4 font-serif text-4xl font-medium italic text-black placeholder:text-grey-300 focus:outline-none mb-3 sm:text-5xl"
-        style={{ letterSpacing: '-0.02em' }}
-      />
-      <input
-        type="text"
-        value={dek}
-        onChange={(e) => setDek(e.target.value)}
-        placeholder="Add a subtitle or standfirst…"
-        className="w-full border-none bg-grey-100 px-5 py-3 font-serif text-lg text-grey-600 italic placeholder:text-grey-300 focus:outline-none mb-3"
-      />
+      {/* Title + standfirst card */}
+      <div className="bg-grey-100 mb-2">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Article title"
+          className="w-full border-none bg-transparent px-5 pt-5 pb-2 font-serif text-4xl font-medium italic text-black placeholder:text-grey-300 focus:outline-none sm:text-5xl"
+          style={{ letterSpacing: '-0.02em' }}
+        />
+        <input
+          type="text"
+          value={dek}
+          onChange={(e) => setDek(e.target.value)}
+          placeholder="Add a subtitle or standfirst…"
+          className="w-full border-none bg-transparent px-5 pt-0 pb-4 font-serif text-lg text-grey-600 italic placeholder:text-grey-300 focus:outline-none"
+        />
+      </div>
 
       {/* Editor toolbar */}
-      <div className="flex items-center gap-1 flex-wrap bg-grey-100 px-4 py-2.5">
+      <div className="flex items-center gap-1 flex-wrap bg-white px-4 py-2.5">
         <ToolbarButton
           active={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()}

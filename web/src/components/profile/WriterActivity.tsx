@@ -302,10 +302,10 @@ export function WriterActivity({ username, writer }: WriterActivityProps) {
         />
       )}
       {activeTab === 'followers' && (
-        <FollowersTab username={username} />
+        <FollowersTab username={username} isOwnProfile={isOwnProfile} />
       )}
       {activeTab === 'following' && (
-        <FollowingTab username={username} />
+        <FollowingTab username={username} isOwnProfile={isOwnProfile} />
       )}
     </>
   )

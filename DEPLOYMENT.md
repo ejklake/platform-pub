@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.15.0
+# all.haus — Deployment Reference v5.16.0
 
 **Date:** 6 April 2026
-**Replaces:** v5.14.0 (see bottom for change log)
+**Replaces:** v5.15.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,65 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.15.0
+
+No migration. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
+
+This release adds inline subscription management to profile Following/Followers tabs and cleans up the article editor chrome.
+
+**Backend (gateway):**
+
+- `GET /writers/:username/following` — now returns `subscriptionPricePence` and `hasPaywalledArticle` for each followed writer, enabling the frontend to show subscribe buttons inline.
+- `GET /writers/:username/followers` — when the authenticated user is the profile owner, each follower includes `subscriptionStatus` (`'active'` or `'cancelled'`) if they are a subscriber.
+
+**Frontend (web):**
+
+- **FollowingTab** (own profile) — each followed writer now shows:
+  - **Unfollow button** — removes the follow immediately.
+  - **Subscribe button** — shown if the writer sells subscriptions and you're not subscribed; displays price (e.g. "Subscribe £5.00/mo").
+  - **Subscribed button** — for active subscriptions; clicking opens a confirmation modal explaining that access continues until the end of the paid billing period. "Keep subscription" / "Cancel subscription" actions.
+  - **Cancelled state** — button shows "Cancelled — resubscribe" in red with access-until tooltip; clicking resubscribes.
+  - When viewing another user's profile, the tab displays as before (public "Subscribes to" section).
+- **FollowersTab** (own profile) — followers with an active subscription show a "Subscriber" badge next to their name.
+- **Article editor** — title and standfirst inputs wrapped in a single continuous grey (`bg-grey-100`) card with no hairlines between them. Toolbar changed from grey to white (`bg-white`). Gaps between fields eliminated.
+- **API client** (`web/src/lib/api.ts`) — added missing `social.block(userId)` and `social.mute(userId)` POST wrappers to match existing backend endpoints.
+
+**Modified files:**
+
+- `gateway/src/routes/writers.ts` — enriched following/followers responses
+- `web/src/components/profile/WriterActivity.tsx` — passes `isOwnProfile` to FollowersTab and FollowingTab
+- `web/src/components/profile/FollowingTab.tsx` — rewritten: subscription management, unfollow, confirmation modal
+- `web/src/components/profile/FollowersTab.tsx` — subscriber badge for own-profile view
+- `web/src/components/editor/ArticleEditor.tsx` — grey card for title/standfirst, white toolbar, hairlines removed
+- `web/src/lib/api.ts` — added `social.block()` and `social.mute()` methods
+
+**Upgrade steps:**
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migration needed — only code changes
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Visual checks:
+# - Visit own profile → Following tab: each writer should have Unfollow button + Subscribe/Subscribed
+# - Click "Subscribed" → modal asks to confirm cancellation with period-end date
+# - Confirm → button changes to "Cancelled — resubscribe"
+# - Visit own profile → Followers tab: subscribers show "Subscriber" badge
+# - /write page: title + standfirst are one continuous grey card, toolbar is white
+```
+
+No new env vars. No database changes.
+
+---
 
 ### From v5.14.0
 

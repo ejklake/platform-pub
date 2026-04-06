@@ -389,6 +389,7 @@ export async function writerRoutes(app: FastifyInstance) {
       }
 
       const userId = accountResult.rows[0].id
+      const isOwner = req.session?.sub === userId
 
       const [{ rows }, totalResult] = await Promise.all([
         pool.query<{
@@ -399,11 +400,16 @@ export async function writerRoutes(app: FastifyInstance) {
           nostr_pubkey: string
           is_writer: boolean
           followed_at: Date
+          subscription_status: string | null
         }>(
           `SELECT a.id, a.username, a.display_name, a.avatar_blossom_url,
-                  a.nostr_pubkey, a.is_writer, f.followed_at
+                  a.nostr_pubkey, a.is_writer, f.followed_at,
+                  s.status AS subscription_status
            FROM follows f
            JOIN accounts a ON a.id = f.follower_id
+           LEFT JOIN subscriptions s
+             ON s.reader_id = a.id AND s.writer_id = $1
+             AND s.status IN ('active', 'cancelled')
            WHERE f.followee_id = $1 AND a.status = 'active'
            ORDER BY f.followed_at DESC
            LIMIT $2 OFFSET $3`,
@@ -426,6 +432,7 @@ export async function writerRoutes(app: FastifyInstance) {
           pubkey: r.nostr_pubkey,
           isWriter: r.is_writer,
           followedAt: r.followed_at.toISOString(),
+          ...(isOwner && r.subscription_status ? { subscriptionStatus: r.subscription_status } : {}),
         })),
         total: parseInt(totalResult.rows[0].count, 10),
         limit,
@@ -470,9 +477,16 @@ export async function writerRoutes(app: FastifyInstance) {
           avatar_blossom_url: string | null
           nostr_pubkey: string
           followed_at: Date
+          subscription_price_pence: number
+          has_paywalled_article: boolean
         }>(
           `SELECT a.id, a.username, a.display_name, a.avatar_blossom_url,
-                  a.nostr_pubkey, f.followed_at
+                  a.nostr_pubkey, f.followed_at,
+                  a.subscription_price_pence,
+                  EXISTS(
+                    SELECT 1 FROM articles
+                    WHERE author_id = a.id AND price_pence > 0 AND deleted_at IS NULL
+                  ) AS has_paywalled_article
            FROM follows f
            JOIN accounts a ON a.id = f.followee_id
            WHERE f.follower_id = $1 AND a.status = 'active'
@@ -496,6 +510,8 @@ export async function writerRoutes(app: FastifyInstance) {
           avatar: r.avatar_blossom_url,
           pubkey: r.nostr_pubkey,
           followedAt: r.followed_at.toISOString(),
+          subscriptionPricePence: r.subscription_price_pence,
+          hasPaywalledArticle: r.has_paywalled_article,
         })),
         total: parseInt(totalResult.rows[0].count, 10),
         limit,

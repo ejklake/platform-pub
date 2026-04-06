@@ -12,9 +12,10 @@ interface Follower {
   avatar: string | null
   isWriter: boolean
   followedAt: string
+  subscriptionStatus?: string
 }
 
-export function FollowersTab({ username }: { username: string }) {
+export function FollowersTab({ username, isOwnProfile }: { username: string; isOwnProfile: boolean }) {
   const [followers, setFollowers] = useState<Follower[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -67,9 +68,16 @@ export function FollowersTab({ username }: { username: string }) {
           >
             <Avatar src={f.avatar} name={f.displayName ?? f.username} size={36} />
             <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-sans text-black truncate">
-                {f.displayName ?? f.username}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[14px] font-sans text-black truncate">
+                  {f.displayName ?? f.username}
+                </p>
+                {isOwnProfile && f.subscriptionStatus === 'active' && (
+                  <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-mono text-accent leading-none flex-shrink-0">
+                    Subscriber
+                  </span>
+                )}
+              </div>
               <p className="text-ui-xs text-grey-300">@{f.username}</p>
             </div>
             <time className="text-ui-xs text-grey-300 flex-shrink-0">
