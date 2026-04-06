@@ -27,6 +27,7 @@ import { notificationRoutes } from './routes/notifications.js'
 import { voteRoutes } from './routes/votes.js'
 import { historyRoutes } from './routes/history.js'
 import { giftLinkRoutes } from './routes/gift-links.js'
+import { subscriptionOfferRoutes } from './routes/subscription-offers.js'
 import { messageRoutes } from './routes/messages.js'
 import { feedRoutes } from './routes/feed.js'
 import { driveRoutes, expireOverdueDrives } from './routes/drives.js'
@@ -145,6 +146,9 @@ async function start() {
 
   // Gift links (capped shareable access tokens for paywalled articles)
   await app.register(giftLinkRoutes, { prefix: '/api/v1' })
+
+  // Subscription offers (discount codes and gifted subscriptions)
+  await app.register(subscriptionOfferRoutes, { prefix: '/api/v1' })
 
   // Direct messages (NIP-17 E2E encrypted conversations)
   await app.register(messageRoutes, { prefix: '/api/v1' })

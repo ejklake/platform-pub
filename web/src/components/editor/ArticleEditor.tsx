@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
@@ -76,6 +76,15 @@ export function ArticleEditor({
   const [uploading, setUploading] = useState(false)
 
   const isEditing = !!editingEventId
+  const userSetPrice = useRef(!!initialPrice)
+
+  // Refs so the onUpdate closure always sees current values
+  const titleRef = useRef(title)
+  titleRef.current = title
+  const dekRef = useRef(dek)
+  dekRef.current = dek
+  const pricePenceRef = useRef(pricePence)
+  pricePenceRef.current = pricePence
 
   const autoSaver = useMemo(() => createAutoSaver(3000), [])
 
@@ -114,17 +123,18 @@ export function ArticleEditor({
       },
     },
     onUpdate: ({ editor }) => {
-      // Auto-suggest price based on word count
-      if (!initialPrice) {
+      // Auto-suggest price based on word count (unless the user set one manually)
+      if (!userSetPrice.current) {
         const words = editor.storage.characterCount.words()
         const suggested = suggestPrice(words)
         setPricePence(suggested)
+        pricePenceRef.current = suggested
       }
 
       // Auto-save draft
       const content = editor.storage.markdown.getMarkdown()
       autoSaver(
-        { title, dek, content, gatePositionPct: 50, pricePence },
+        { title: titleRef.current, dek: dekRef.current, content, gatePositionPct: 50, pricePence: pricePenceRef.current },
         (saved) => {
           setCurrentDraftId(saved.draftId)
           setDraftStatus('Saved')
@@ -211,7 +221,7 @@ export function ArticleEditor({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Article title"
-        className="w-full border-none bg-transparent font-serif text-4xl font-medium italic text-black placeholder:text-grey-300 focus:outline-none mb-3 pt-4 sm:text-5xl"
+        className="w-full border-none bg-grey-100 px-5 py-4 font-serif text-4xl font-medium italic text-black placeholder:text-grey-300 focus:outline-none mb-3 sm:text-5xl"
         style={{ letterSpacing: '-0.02em' }}
       />
       <input
@@ -219,11 +229,11 @@ export function ArticleEditor({
         value={dek}
         onChange={(e) => setDek(e.target.value)}
         placeholder="Add a subtitle or standfirst…"
-        className="w-full border-none bg-transparent font-serif text-lg text-grey-600 italic placeholder:text-grey-300 focus:outline-none mb-3"
+        className="w-full border-none bg-grey-100 px-5 py-3 font-serif text-lg text-grey-600 italic placeholder:text-grey-300 focus:outline-none mb-3"
       />
 
       {/* Editor toolbar */}
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex items-center gap-1 flex-wrap bg-grey-100 px-4 py-2.5">
         <ToolbarButton
           active={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -318,16 +328,16 @@ export function ArticleEditor({
       </div>
       </div>{/* end sticky */}
 
-      {/* Editor content — ink-bordered writing area */}
-      <div className="bg-white p-8 sm:p-10">
+      {/* Editor content — solid writing area */}
+      <div className="bg-grey-100 p-8 sm:p-10">
         <EditorContent editor={editor} />
       </div>
 
       {/* Price control — only shown when gate is inserted */}
       {gateInserted && (
-        <div className="mt-10 pt-6">
+        <div className="mt-6 bg-grey-100 px-5 py-4">
           <div className="flex items-center gap-4">
-            <label className="block text-sm text-grey-600">
+            <label className="label-ui text-grey-400">
               Price
             </label>
             <div className="flex items-center gap-2">
@@ -337,8 +347,11 @@ export function ArticleEditor({
                 min={0.01}
                 step={0.01}
                 value={(pricePence / 100).toFixed(2)}
-                onChange={(e) => setPricePence(Math.round(parseFloat(e.target.value) * 100))}
-                className="w-24 border border-grey-200 px-3 py-1.5 text-sm focus:border-crimson focus:outline-none"
+                onChange={(e) => {
+                  userSetPrice.current = true
+                  setPricePence(Math.round(parseFloat(e.target.value) * 100))
+                }}
+                className="w-24 bg-white border-none px-3 py-1.5 text-sm focus:outline-none"
               />
               <span className="text-xs text-grey-300">
                 Suggested: &pound;{priceDisplay} based on {wordCount} words
@@ -349,7 +362,7 @@ export function ArticleEditor({
       )}
 
       {/* Replies toggle */}
-      <div className="mt-6 flex items-center gap-2">
+      <div className="mt-3 bg-grey-100 px-5 py-4">
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -364,11 +377,11 @@ export function ArticleEditor({
 
       {/* Publish button */}
       {publishError && (
-        <div className="mt-6 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mt-6 bg-red-50 px-5 py-3 text-sm text-red-700">
           {publishError}
         </div>
       )}
-      <div className="mt-4 flex items-center gap-4">
+      <div className="mt-6 flex items-center gap-4">
         <button
           onClick={handlePublish}
           disabled={publishing || !title.trim() || wordCount < 10}

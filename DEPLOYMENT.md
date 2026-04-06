@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.12.0
+# all.haus — Deployment Reference v5.13.0
 
 **Date:** 6 April 2026
-**Replaces:** v5.11.0 (see bottom for change log)
+**Replaces:** v5.12.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -158,7 +158,7 @@ docker compose ps   # wait for postgres to be healthy
 
 ### 4. Apply schema and migrations
 
-The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v5.12.0, `schema.sql` includes all structural changes through migration 036; the `_migrations` table is pre-seeded accordingly.
+The base schema (`schema.sql`) is auto-applied on first postgres boot via the `initdb.d` volume mount. As of v5.13.0, `schema.sql` includes all structural changes through migration 037; the `_migrations` table is pre-seeded accordingly.
 
 For **fresh** databases: no action needed — the schema and `_migrations` seed handle everything.
 
@@ -249,6 +249,60 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.12.0
+
+New migration (037). Services changed: **gateway**, **web**. Deploy order: **migrate → rebuild gateway + web**.
+
+This release adds the subscription offers system — writers can create shareable discount codes and gift subscriptions to specific readers. Includes a new dashboard Offers tab and a public redeem page at `/subscribe/:code`.
+
+**Database migration:**
+
+- Migration 037: Creates `subscription_offers` table (discount codes and gifted subscriptions). Adds `offer_id` and `offer_periods_remaining` columns to `subscriptions` table for tracking active offer periods.
+
+**Backend (gateway):**
+
+- New route file `subscription-offers.ts`: `POST /subscription-offers` (create), `GET /subscription-offers` (list), `DELETE /subscription-offers/:offerId` (revoke), `GET /subscription-offers/redeem/:code` (public lookup).
+- `POST /subscriptions/:writerId` now accepts optional `offerCode` in body — validates the offer, applies discount to price, tracks offer periods on the subscription row, and increments the offer's redemption count.
+- `expireAndRenewSubscriptions()` now handles offer period expiry — decrements `offer_periods_remaining` on renewal, reverts to the writer's standard price when the offer period elapses.
+
+**Frontend (web):**
+
+- New dashboard "Offers" tab with inline forms for creating offer codes and gifting subscriptions. Offers table with copy-link, revoke, and redemption tracking.
+- New redeem page at `/subscribe/[code]` — shows writer name, standard vs discounted price, duration, and subscribe button (with auth gate).
+- API client: `subscriptionOffers` namespace and `subscribe()` helper added to `api.ts`.
+
+**New files:**
+
+- `migrations/037_subscription_offers.sql`
+- `gateway/src/routes/subscription-offers.ts`
+- `web/src/components/dashboard/OffersTab.tsx`
+- `web/src/app/subscribe/[code]/page.tsx`
+
+**Modified files:**
+
+- `schema.sql` — `subscription_offers` table + `offer_id`/`offer_periods_remaining` on `subscriptions`
+- `gateway/src/index.ts` — registers `subscriptionOfferRoutes`
+- `gateway/src/routes/subscriptions.ts` — offer validation in subscribe, offer period handling in renewal
+- `web/src/lib/api.ts` — `subscriptionOffers` namespace, `subscribe()` helper, types
+- `web/src/app/dashboard/page.tsx` — Offers tab added
+
+**Upgrade steps:**
+```bash
+# 1. Apply migration
+docker compose exec -T postgres psql -U platformpub platformpub \
+  < migrations/037_subscription_offers.sql
+
+# 2. Rebuild and restart
+docker compose build gateway web
+docker compose up -d gateway web
+
+# 3. Verify migration applied
+docker compose exec -T postgres psql -U platformpub platformpub \
+  -c "SELECT filename FROM _migrations ORDER BY filename" | grep '037'
+```
+
+---
 
 ### From v5.11.0
 
@@ -4539,6 +4593,11 @@ docker exec platform-pub-postgres-1 psql -U platformpub platformpub -c \
 | 030_commissions_expansion.sql | Pledge drive expansion columns |
 | 031_fix_media_urls_domain.sql | Media URL domain migration |
 | 032_dm_likes.sql | `dm_likes` table for DM reactions; marks stale `new_message` notifications as read |
+| 033_admin_account_ids_config.sql | Admin account IDs in platform_config |
+| 034_dm_replies.sql | `reply_to_id` column on `direct_messages` for threaded DM replies |
+| 035_feed_scores.sql | `feed_scores` table + config rows for feed scoring weights |
+| 036_commission_conversation.sql | `parent_conversation_id` on `pledge_drives` for DM-linked commissions |
+| 037_subscription_offers.sql | `subscription_offers` table; `offer_id` + `offer_periods_remaining` on `subscriptions` |
 
 Run all pending migrations (requires Node on the host — substitute your `POSTGRES_PASSWORD`):
 ```bash
@@ -4642,13 +4701,21 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 ### Subscriptions
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| POST | /api/v1/subscriptions/:writerId | session | Subscribe (charges immediately) |
+| POST | /api/v1/subscriptions/:writerId | session | Subscribe (charges immediately). Optional body: `{ period?, offerCode? }` |
 | DELETE | /api/v1/subscriptions/:writerId | session | Cancel |
 | GET | /api/v1/subscriptions/mine | session | List my subscriptions |
 | GET | /api/v1/subscriptions/check/:writerId | session | Check subscription status |
 | GET | /api/v1/subscribers | session | List my subscribers (writer) |
 | PATCH | /api/v1/subscriptions/:writerId/visibility | session | Toggle subscription visibility on public profile |
 | PATCH | /api/v1/settings/subscription-price | session | Set subscription price |
+
+### Subscription Offers
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | /api/v1/subscription-offers | session | Create offer (code or grant mode). Body: `{ label, mode, discountPct, durationMonths?, maxRedemptions?, expiresAt?, recipientUsername? }` |
+| GET | /api/v1/subscription-offers | session | List writer's offers (active + revoked) |
+| DELETE | /api/v1/subscription-offers/:offerId | session | Revoke an offer |
+| GET | /api/v1/subscription-offers/redeem/:code | optional | Public lookup — offer details + calculated discounted price for redeem page |
 
 ### Reader account
 | Method | Path | Auth | Purpose |
@@ -4875,6 +4942,29 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.13.0 — 6 April 2026
+
+**Subscription offers system (discount codes + gifted subscriptions)**
+
+New migration (037). Services changed: gateway, web.
+
+- **Subscription offers table:** `subscription_offers` with two modes — `code` (shareable link, anyone redeems) and `grant` (assigned to a specific reader). Writer-configurable: label, discount % (0–100), duration in months (or permanent), max redemptions, expiry date.
+- **Offer-aware subscribe:** `POST /subscriptions/:writerId` accepts optional `offerCode`. Validates offer (not revoked, not expired, under redemption cap, grant recipient matches), applies discount to price, sets `offer_id` and `offer_periods_remaining` on the subscription row, increments redemption count.
+- **Offer period expiry in renewal:** `expireAndRenewSubscriptions()` decrements `offer_periods_remaining` on each renewal. When it reaches 0, the subscription reverts to the writer's current standard price and the offer columns are cleared.
+- **Dashboard Offers tab:** New tab between "Pledge drives" and "Settings". "New offer code" and "Gift subscription" inline forms. Offers table with mode badge, discount, duration, redemption count, copy-link, and revoke actions. Collapsible revoked section.
+- **Redeem page (`/subscribe/:code`):** Public landing page for offer codes. Shows writer name, offer label, standard vs discounted price, duration info. Auth gate with redirect-back. Subscribe button with success redirect to writer profile.
+- **Editor bug fixes:** Fixed stale closure in auto-save (title/dek/price now use refs), fixed price auto-suggestion overwriting manual edits (tracks `userSetPrice`), applied grey-card styling refresh to editor surfaces.
+
+**Upgrade steps:**
+```bash
+docker compose exec -T postgres psql -U platformpub platformpub \
+  < migrations/037_subscription_offers.sql
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+---
 
 ### v5.12.0 — 6 April 2026
 

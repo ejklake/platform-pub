@@ -770,6 +770,79 @@ export const drives = {
 // Gift Links
 // =============================================================================
 
+// =============================================================================
+// Subscription Offers
+// =============================================================================
+
+export interface SubscriptionOffer {
+  id: string
+  label: string
+  mode: 'code' | 'grant'
+  discountPct: number
+  durationMonths: number | null
+  code: string | null
+  recipientId: string | null
+  recipientUsername: string | null
+  maxRedemptions: number | null
+  redemptionCount: number
+  expiresAt: string | null
+  revoked: boolean
+  createdAt: string
+}
+
+export interface OfferLookup {
+  id: string
+  label: string
+  discountPct: number
+  durationMonths: number | null
+  writerId: string
+  writerUsername: string
+  writerDisplayName: string | null
+  standardPricePence: number
+  discountedPricePence: number
+}
+
+export const subscriptionOffers = {
+  create: (data: {
+    label: string
+    mode: 'code' | 'grant'
+    discountPct: number
+    durationMonths?: number | null
+    maxRedemptions?: number | null
+    expiresAt?: string | null
+    recipientUsername?: string
+  }) =>
+    request<{ id: string; code: string | null; url: string | null }>('/subscription-offers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  list: () =>
+    request<{ offers: SubscriptionOffer[] }>('/subscription-offers'),
+
+  revoke: (offerId: string) =>
+    request<{ ok: boolean }>(`/subscription-offers/${offerId}`, {
+      method: 'DELETE',
+    }),
+
+  lookup: (code: string) =>
+    request<OfferLookup>(`/subscription-offers/redeem/${code}`),
+}
+
+export function subscribe(writerId: string, opts?: { period?: string; offerCode?: string }) {
+  return request<{ subscriptionId: string; status: string; pricePence: number; currentPeriodEnd?: string; writerName?: string }>(
+    `/subscriptions/${writerId}`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ period: opts?.period, offerCode: opts?.offerCode }),
+    }
+  )
+}
+
+// =============================================================================
+// Gift Links
+// =============================================================================
+
 export interface GiftLink {
   id: string
   token: string

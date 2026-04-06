@@ -274,6 +274,32 @@ CREATE TABLE reading_tabs (
 CREATE INDEX idx_reading_tabs_reader_id ON reading_tabs (reader_id);
 
 -- =============================================================================
+-- SUBSCRIPTION OFFERS (migration 037)
+-- Flexible discount codes and gifted subscriptions for writers.
+-- Two modes: 'code' (shareable link) and 'grant' (assigned to specific reader).
+-- =============================================================================
+
+CREATE TABLE subscription_offers (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  writer_id         UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  label             TEXT NOT NULL,
+  mode              TEXT NOT NULL CHECK (mode IN ('code', 'grant')),
+  discount_pct      INTEGER NOT NULL CHECK (discount_pct BETWEEN 0 AND 100),
+  duration_months   INTEGER,                          -- NULL = permanent discount
+  code              TEXT UNIQUE,                       -- for mode='code' only
+  recipient_id      UUID REFERENCES accounts(id),      -- for mode='grant' only
+  max_redemptions   INTEGER,                           -- NULL = unlimited (code mode)
+  redemption_count  INTEGER NOT NULL DEFAULT 0,
+  expires_at        TIMESTAMPTZ,
+  revoked_at        TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_sub_offers_writer ON subscription_offers(writer_id);
+CREATE INDEX idx_sub_offers_code ON subscription_offers(code) WHERE code IS NOT NULL;
+CREATE INDEX idx_sub_offers_recipient ON subscription_offers(recipient_id) WHERE recipient_id IS NOT NULL;
+
+-- =============================================================================
 -- SUBSCRIPTIONS (migration 005)
 -- Reader ↔ writer monthly relationships.
 -- Status lifecycle: active → cancelled → expired
@@ -290,6 +316,8 @@ CREATE TABLE subscriptions (
   is_comp BOOLEAN NOT NULL DEFAULT FALSE,        -- (migration 025) complimentary sub granted by writer
   hidden BOOLEAN NOT NULL DEFAULT FALSE,          -- (migration 027) hide from public profile
   nostr_event_id TEXT,                           -- kind 7003 subscription attestation (migration 007)
+  offer_id UUID REFERENCES subscription_offers(id), -- (migration 037) offer used at subscribe time
+  offer_periods_remaining INTEGER,               -- (migration 037) NULL = permanent or no offer
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   current_period_start TIMESTAMPTZ NOT NULL DEFAULT now(),
   current_period_end TIMESTAMPTZ NOT NULL DEFAULT (now() + INTERVAL '1 month'),

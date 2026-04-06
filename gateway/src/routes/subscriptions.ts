@@ -31,13 +31,15 @@ export async function subscriptionRoutes(app: FastifyInstance) {
   // and logs a subscription_charge (debit) and subscription_earning (credit).
   // ---------------------------------------------------------------------------
 
-  app.post<{ Params: { writerId: string }; Body: { period?: string } }>(
+  app.post<{ Params: { writerId: string }; Body: { period?: string; offerCode?: string } }>(
     '/subscriptions/:writerId',
     { preHandler: requireAuth },
     async (req, reply) => {
       const readerId = req.session!.sub!
       const { writerId } = req.params
-      const period = (req.body as any)?.period === 'annual' ? 'annual' : 'monthly'
+      const body = req.body as { period?: string; offerCode?: string }
+      const period = body?.period === 'annual' ? 'annual' : 'monthly'
+      const offerCode = body?.offerCode
 
       if (readerId === writerId) {
         return reply.status(400).send({ error: 'Cannot subscribe to yourself' })
@@ -64,9 +66,53 @@ export async function subscriptionRoutes(app: FastifyInstance) {
 
         const writer = writerResult.rows[0]
         const monthlyPrice = writer.subscription_price_pence
-        const pricePence = period === 'annual'
+        let pricePence = period === 'annual'
           ? Math.round(monthlyPrice * 12 * (1 - writer.annual_discount_pct / 100))
           : monthlyPrice
+
+        // Validate and apply offer if provided
+        let offerId: string | null = null
+        let offerPeriodsRemaining: number | null = null
+
+        if (offerCode) {
+          const offerResult = await client.query<{
+            id: string; mode: string; discount_pct: number; duration_months: number | null
+            max_redemptions: number | null; redemption_count: number; expires_at: Date | null
+            recipient_id: string | null
+          }>(
+            `SELECT id, mode, discount_pct, duration_months, max_redemptions,
+                    redemption_count, expires_at, recipient_id
+             FROM subscription_offers
+             WHERE code = $1 AND writer_id = $2 AND revoked_at IS NULL`,
+            [offerCode, writerId]
+          )
+
+          if (offerResult.rows.length === 0) {
+            return reply.status(404).send({ error: 'Offer not found or no longer available' })
+          }
+
+          const offer = offerResult.rows[0]
+
+          if (offer.expires_at && new Date(offer.expires_at) < new Date()) {
+            return reply.status(410).send({ error: 'This offer has expired' })
+          }
+          if (offer.max_redemptions !== null && offer.redemption_count >= offer.max_redemptions) {
+            return reply.status(410).send({ error: 'This offer has been fully redeemed' })
+          }
+          if (offer.mode === 'grant' && offer.recipient_id !== readerId) {
+            return reply.status(403).send({ error: 'This offer is not available to you' })
+          }
+
+          pricePence = Math.round(pricePence * (1 - offer.discount_pct / 100))
+          offerId = offer.id
+          offerPeriodsRemaining = offer.duration_months ?? null
+
+          // Increment redemption count atomically
+          await client.query(
+            `UPDATE subscription_offers SET redemption_count = redemption_count + 1 WHERE id = $1`,
+            [offer.id]
+          )
+        }
 
         // Check for existing subscription (any status — unique constraint on reader+writer)
         const existing = await client.query<{ id: string; status: string }>(
@@ -89,9 +135,10 @@ export async function subscriptionRoutes(app: FastifyInstance) {
             `UPDATE subscriptions
              SET status = 'active', auto_renew = TRUE, cancelled_at = NULL,
                  current_period_start = $1, current_period_end = $2,
-                 price_pence = $3, subscription_period = $5, updated_at = now()
+                 price_pence = $3, subscription_period = $5,
+                 offer_id = $6, offer_periods_remaining = $7, updated_at = now()
              WHERE id = $4`,
-            [now, periodEnd, pricePence, sub.id, period]
+            [now, periodEnd, pricePence, sub.id, period, offerId, offerPeriodsRemaining]
           )
 
           // Deduct from free allowance (can go negative)
@@ -146,10 +193,11 @@ export async function subscriptionRoutes(app: FastifyInstance) {
 
         const subResult = await client.query<{ id: string }>(
           `INSERT INTO subscriptions (reader_id, writer_id, price_pence, status,
-             current_period_start, current_period_end, subscription_period)
-           VALUES ($1, $2, $3, 'active', $4, $5, $6)
+             current_period_start, current_period_end, subscription_period,
+             offer_id, offer_periods_remaining)
+           VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8)
            RETURNING id`,
-          [readerId, writerId, pricePence, now, periodEnd, period]
+          [readerId, writerId, pricePence, now, periodEnd, period, offerId, offerPeriodsRemaining]
         )
 
         const subscriptionId = subResult.rows[0].id
@@ -738,12 +786,16 @@ export async function expireAndRenewSubscriptions(): Promise<number> {
     reader_pubkey: string
     writer_pubkey: string
     subscription_period: string
+    offer_periods_remaining: number | null
+    writer_standard_price: number
   }>(
     `SELECT s.id, s.reader_id, s.writer_id, s.price_pence,
             s.current_period_end,
             r.nostr_pubkey AS reader_pubkey,
             w.nostr_pubkey AS writer_pubkey,
-            COALESCE(s.subscription_period, 'monthly') AS subscription_period
+            COALESCE(s.subscription_period, 'monthly') AS subscription_period,
+            s.offer_periods_remaining,
+            w.subscription_price_pence AS writer_standard_price
      FROM subscriptions s
      JOIN accounts r ON r.id = s.reader_id
      JOIN accounts w ON w.id = s.writer_id
@@ -758,23 +810,54 @@ export async function expireAndRenewSubscriptions(): Promise<number> {
       const newPeriodStart = sub.current_period_end
       const newPeriodEnd = new Date(newPeriodStart.getTime() + periodDays * 24 * 60 * 60 * 1000)
 
+      // Check if the offer period is expiring — revert to standard price
+      let renewalPrice = sub.price_pence
+      const offerExpiring = sub.offer_periods_remaining !== null && sub.offer_periods_remaining <= 1
+
+      if (offerExpiring) {
+        // Revert to writer's current standard price for this period type
+        renewalPrice = sub.subscription_period === 'annual'
+          ? Math.round(sub.writer_standard_price * 12 * 0.85) // use standard annual calc
+          : sub.writer_standard_price
+      }
+
       await withTransaction(async (client) => {
         // Deduct from reader's free allowance (same mechanism as initial subscribe)
         await client.query(
           `UPDATE accounts SET free_allowance_remaining_pence = free_allowance_remaining_pence - $1, updated_at = now() WHERE id = $2`,
-          [sub.price_pence, sub.reader_id]
+          [renewalPrice, sub.reader_id]
         )
 
-        // Roll the period forward
-        await client.query(
-          `UPDATE subscriptions
-           SET current_period_start = $1, current_period_end = $2, updated_at = now()
-           WHERE id = $3`,
-          [newPeriodStart, newPeriodEnd, sub.id]
-        )
+        // Roll the period forward and handle offer period tracking
+        if (offerExpiring) {
+          // Offer period done — clear offer, revert price
+          await client.query(
+            `UPDATE subscriptions
+             SET current_period_start = $1, current_period_end = $2,
+                 price_pence = $3, offer_id = NULL, offer_periods_remaining = NULL, updated_at = now()
+             WHERE id = $4`,
+            [newPeriodStart, newPeriodEnd, renewalPrice, sub.id]
+          )
+        } else if (sub.offer_periods_remaining !== null) {
+          // Decrement remaining offer periods
+          await client.query(
+            `UPDATE subscriptions
+             SET current_period_start = $1, current_period_end = $2,
+                 offer_periods_remaining = offer_periods_remaining - 1, updated_at = now()
+             WHERE id = $3`,
+            [newPeriodStart, newPeriodEnd, sub.id]
+          )
+        } else {
+          await client.query(
+            `UPDATE subscriptions
+             SET current_period_start = $1, current_period_end = $2, updated_at = now()
+             WHERE id = $3`,
+            [newPeriodStart, newPeriodEnd, sub.id]
+          )
+        }
 
         // Log charge and earning events
-        await logSubscriptionCharge(client, sub.id, sub.reader_id, sub.writer_id, sub.price_pence, newPeriodStart, newPeriodEnd)
+        await logSubscriptionCharge(client, sub.id, sub.reader_id, sub.writer_id, renewalPrice, newPeriodStart, newPeriodEnd)
       })
 
       // Publish renewed Nostr attestation — non-blocking
@@ -783,7 +866,7 @@ export async function expireAndRenewSubscriptions(): Promise<number> {
         readerPubkey: sub.reader_pubkey,
         writerPubkey: sub.writer_pubkey,
         status: 'active',
-        pricePence: sub.price_pence,
+        pricePence: renewalPrice,
         periodStart: sub.current_period_end,
         periodEnd: new Date(sub.current_period_end.getTime() + (sub.subscription_period === 'annual' ? 365 : 30) * 24 * 60 * 60 * 1000),
       }).then(nostrEventId =>
@@ -793,7 +876,7 @@ export async function expireAndRenewSubscriptions(): Promise<number> {
       )
 
       // Send renewal email — non-blocking
-      sendSubscriptionRenewedEmail(sub.reader_id, sub.writer_id, sub.price_pence, newPeriodEnd).catch(err =>
+      sendSubscriptionRenewedEmail(sub.reader_id, sub.writer_id, renewalPrice, newPeriodEnd).catch(err =>
         logger.warn({ err, subscriptionId: sub.id }, 'Renewal email failed')
       )
 

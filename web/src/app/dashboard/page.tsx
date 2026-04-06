@@ -9,9 +9,10 @@ import { loadDrafts, deleteDraft } from '../../lib/drafts'
 import { KIND_DELETION } from '../../lib/ndk'
 import { signAndPublish } from '../../lib/sign'
 import { DrivesTab } from '../../components/dashboard/DrivesTab'
+import { OffersTab } from '../../components/dashboard/OffersTab'
 import { GiftLinksPanel } from '../../components/dashboard/GiftLinksPanel'
 
-type DashboardTab = 'articles' | 'drafts' | 'drives' | 'settings'
+type DashboardTab = 'articles' | 'drafts' | 'drives' | 'offers' | 'settings'
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
@@ -25,7 +26,7 @@ export default function DashboardPage() {
 
   // Sync tab from URL (for notification deep-linking)
   useEffect(() => {
-    if (rawTab && ['articles', 'drafts', 'drives', 'settings'].includes(rawTab)) {
+    if (rawTab && ['articles', 'drafts', 'drives', 'offers', 'settings'].includes(rawTab)) {
       setActiveTab(rawTab as DashboardTab)
     }
   }, [rawTab])
@@ -38,14 +39,14 @@ export default function DashboardPage() {
 
   if (loading || !user) return <DashboardSkeleton />
 
-  const tabs: DashboardTab[] = ['articles', 'drafts', 'drives', 'settings']
+  const tabs: DashboardTab[] = ['articles', 'drafts', 'drives', 'offers', 'settings']
 
   return (
     <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
       <div className="flex items-center justify-between mb-10">
         <div className="flex gap-2">
           {tabs.map(tab => {
-            const label = tab === 'drives' ? 'Pledge drives' : tab.charAt(0).toUpperCase() + tab.slice(1)
+            const label = tab === 'drives' ? 'Pledge drives' : tab === 'offers' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)
             return (
               <button key={tab} onClick={() => switchTab(tab)} className={`tab-pill ${activeTab === tab ? 'tab-pill-active' : 'tab-pill-inactive'}`}>{label}</button>
             )
@@ -59,6 +60,7 @@ export default function DashboardPage() {
       {activeTab === 'articles' && <ArticlesTab userId={user.id} pubkey={user.pubkey} />}
       {activeTab === 'drafts' && <DraftsTab />}
       {activeTab === 'drives' && <DrivesTab userId={user.id} />}
+      {activeTab === 'offers' && <OffersTab />}
       {activeTab === 'settings' && <WriterSettingsTab stripeReady={user.stripeConnectKycComplete} />}
     </div>
   )
