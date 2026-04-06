@@ -162,6 +162,10 @@ export async function articleRoutes(app: FastifyInstance) {
         writer_avatar: string | null
         writer_pubkey: string
         writer_subscription_price_pence: number
+        publication_id: string | null
+        publication_slug: string | null
+        publication_name: string | null
+        publication_subscription_price_pence: number | null
       }>(
         `SELECT a.id, a.writer_id, a.nostr_event_id, a.nostr_d_tag,
                 a.title, a.slug, a.summary, a.content_free, a.word_count,
@@ -171,9 +175,14 @@ export async function articleRoutes(app: FastifyInstance) {
                 w.display_name AS writer_display_name,
                 w.avatar_blossom_url AS writer_avatar,
                 w.nostr_pubkey AS writer_pubkey,
-                w.subscription_price_pence AS writer_subscription_price_pence
+                w.subscription_price_pence AS writer_subscription_price_pence,
+                a.publication_id,
+                p.slug AS publication_slug,
+                p.name AS publication_name,
+                p.subscription_price_pence AS publication_subscription_price_pence
          FROM articles a
          JOIN accounts w ON w.id = a.writer_id
+         LEFT JOIN publications p ON p.id = a.publication_id
          WHERE a.nostr_d_tag = $1 AND a.published_at IS NOT NULL AND a.deleted_at IS NULL`,
         [dTag]
       )
@@ -232,6 +241,12 @@ export async function articleRoutes(app: FastifyInstance) {
           pubkey: r.writer_pubkey,
           subscriptionPricePence: r.writer_subscription_price_pence,
         },
+        publication: r.publication_id ? {
+          id: r.publication_id,
+          slug: r.publication_slug,
+          name: r.publication_name,
+          subscriptionPricePence: r.publication_subscription_price_pence,
+        } : null,
       })
     }
   )

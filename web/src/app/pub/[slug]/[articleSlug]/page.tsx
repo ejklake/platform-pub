@@ -1,17 +1,13 @@
 import { notFound } from 'next/navigation'
-import { renderMarkdown } from '../../../lib/markdown'
-import { ArticleReader } from '../../../components/article/ArticleReader'
-import type { ArticleMetadata } from '../../../lib/api'
+import { renderMarkdown } from '../../../../lib/markdown'
+import { ArticleReader } from '../../../../components/article/ArticleReader'
+import type { ArticleMetadata } from '../../../../lib/api'
 
 // =============================================================================
-// Article Page — /article/:dTag  (Server Component)
+// Publication Article Page — /pub/:slug/:articleSlug  (Server Component)
 //
-// Fetches article metadata + free content from the gateway at request time,
-// renders markdown to HTML on the server, and passes the result to the
-// ArticleReader client component for interactive features (paywall, replies,
-// quote selection).
-//
-// The article body arrives as static HTML — no JavaScript needed to read it.
+// Same as the standard article page but rendered within the publication shell
+// (layout.tsx provides PublicationNav + PublicationFooter).
 // =============================================================================
 
 const GATEWAY = process.env.GATEWAY_INTERNAL_URL ?? process.env.GATEWAY_URL ?? 'http://localhost:3000'
@@ -24,11 +20,14 @@ async function getArticle(dTag: string): Promise<ArticleMetadata | null> {
   return res.json()
 }
 
-export default async function ArticlePage({ params }: { params: { dTag: string } }) {
-  const article = await getArticle(params.dTag)
+export default async function PublicationArticlePage({
+  params,
+}: {
+  params: { slug: string; articleSlug: string }
+}) {
+  const article = await getArticle(params.articleSlug)
   if (!article) return notFound()
 
-  // Render free-section markdown to HTML on the server
   const freeHtml = article.contentFree
     ? await renderMarkdown(article.contentFree)
     : ''
@@ -55,12 +54,10 @@ export default async function ArticlePage({ params }: { params: { dTag: string }
       writerUsername={article.writer.username}
       writerAvatar={article.writer.avatar ?? undefined}
       writerId={article.writer.id}
-      subscriptionPricePence={article.publication?.subscriptionPricePence ?? article.writer.subscriptionPricePence}
+      subscriptionPricePence={article.writer.subscriptionPricePence}
       writerSpendThisMonthPence={article.writerSpendThisMonthPence ?? undefined}
       nudgeShownThisMonth={article.nudgeShownThisMonth ?? false}
       preRenderedFreeHtml={freeHtml}
-      publicationName={article.publication?.name ?? undefined}
-      publicationSlug={article.publication?.slug ?? undefined}
     />
   )
 }

@@ -4,66 +4,180 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../stores/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { myArticles, account as accountApi, type MyArticle } from '../../lib/api'
+import { myArticles, account as accountApi, publications as pubApi, type MyArticle, type PublicationMembership } from '../../lib/api'
 import { loadDrafts, deleteDraft } from '../../lib/drafts'
 import { KIND_DELETION } from '../../lib/ndk'
 import { signAndPublish } from '../../lib/sign'
 import { DrivesTab } from '../../components/dashboard/DrivesTab'
 import { OffersTab } from '../../components/dashboard/OffersTab'
 import { GiftLinksPanel } from '../../components/dashboard/GiftLinksPanel'
+import { PublicationArticlesTab } from '../../components/dashboard/PublicationArticlesTab'
+import { MembersTab } from '../../components/dashboard/MembersTab'
+import { PublicationSettingsTab } from '../../components/dashboard/PublicationSettingsTab'
 
 type DashboardTab = 'articles' | 'drafts' | 'drives' | 'offers' | 'pricing'
+type PubDashboardTab = 'articles' | 'members' | 'settings'
 
 export default function DashboardPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const rawTab = searchParams.get('tab')
+  const contextSlug = searchParams.get('context')
   const resolvedTab = rawTab === 'settings' ? 'pricing' : rawTab
   const initialTab: DashboardTab = (resolvedTab as DashboardTab) || 'articles'
   const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab)
+  const [pubTab, setPubTab] = useState<PubDashboardTab>((rawTab as PubDashboardTab) || 'articles')
+  const [pubMemberships, setPubMemberships] = useState<PublicationMembership[]>([])
+  const [selectedContext, setSelectedContext] = useState<string | null>(contextSlug)
 
   useEffect(() => { if (!loading && !user) router.push('/auth?mode=login') }, [user, loading, router])
+
+  // Load publication memberships
+  useEffect(() => {
+    if (!user) return
+    pubApi.myMemberships()
+      .then(res => setPubMemberships(res.publications))
+      .catch(() => { /* non-critical */ })
+  }, [user])
 
   // Sync tab from URL (for notification deep-linking)
   useEffect(() => {
     const tab = rawTab === 'settings' ? 'pricing' : rawTab
-    if (tab && ['articles', 'drafts', 'drives', 'offers', 'pricing'].includes(tab)) {
-      setActiveTab(tab as DashboardTab)
+    if (selectedContext) {
+      if (tab && ['articles', 'members', 'settings'].includes(tab)) {
+        setPubTab(tab as PubDashboardTab)
+      }
+    } else {
+      if (tab && ['articles', 'drafts', 'drives', 'offers', 'pricing'].includes(tab)) {
+        setActiveTab(tab as DashboardTab)
+      }
     }
-  }, [rawTab])
+  }, [rawTab, selectedContext])
+
+  // Sync context from URL
+  useEffect(() => {
+    setSelectedContext(contextSlug)
+  }, [contextSlug])
 
   function switchTab(tab: DashboardTab) {
     setActiveTab(tab)
+    const url = new URL(window.location.href); url.searchParams.set('tab', tab); url.searchParams.delete('context')
+    window.history.replaceState({}, '', url.toString())
+  }
+
+  function switchPubTab(tab: PubDashboardTab) {
+    setPubTab(tab)
     const url = new URL(window.location.href); url.searchParams.set('tab', tab)
+    window.history.replaceState({}, '', url.toString())
+  }
+
+  function switchContext(slug: string | null) {
+    setSelectedContext(slug)
+    const url = new URL(window.location.href)
+    if (slug) {
+      url.searchParams.set('context', slug)
+      url.searchParams.set('tab', 'articles')
+      setPubTab('articles')
+    } else {
+      url.searchParams.delete('context')
+      url.searchParams.set('tab', 'articles')
+      setActiveTab('articles')
+    }
     window.history.replaceState({}, '', url.toString())
   }
 
   if (loading || !user) return <DashboardSkeleton />
 
-  const tabs: DashboardTab[] = ['articles', 'drafts', 'drives', 'offers', 'pricing']
+  const selectedPub = pubMemberships.find(p => p.slug === selectedContext)
+  const isPublicationContext = !!selectedPub
+
+  const personalTabs: DashboardTab[] = ['articles', 'drafts', 'drives', 'offers', 'pricing']
+  const pubTabs: PubDashboardTab[] = ['articles', 'members', 'settings']
 
   return (
     <div className="mx-auto max-w-content px-4 sm:px-6 py-10">
-      <div className="flex items-center justify-between mb-10">
-        <div className="flex gap-2">
-          {tabs.map(tab => {
-            const label = tab === 'drives' ? 'Pledge drives' : tab === 'pricing' ? 'Pricing' : tab === 'offers' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)
-            return (
-              <button key={tab} onClick={() => switchTab(tab)} className={`tab-pill ${activeTab === tab ? 'tab-pill-active' : 'tab-pill-inactive'}`}>{label}</button>
-            )
-          })}
+      {/* Context switcher */}
+      {pubMemberships.length > 0 && (
+        <div className="flex items-center gap-2 mb-6 text-ui-xs">
+          <span className="text-grey-400">Dashboard:</span>
+          <button
+            onClick={() => switchContext(null)}
+            className={`px-2 py-1 ${!isPublicationContext ? 'text-black font-medium' : 'text-grey-400 hover:text-black'}`}
+          >
+            Personal
+          </button>
+          {pubMemberships.map(p => (
+            <button
+              key={p.slug}
+              onClick={() => switchContext(p.slug)}
+              className={`px-2 py-1 ${selectedContext === p.slug ? 'text-black font-medium' : 'text-grey-400 hover:text-black'}`}
+            >
+              {p.name}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/account" className="text-ui-xs text-grey-400 hover:text-black underline underline-offset-4">View account</Link>
-          <Link href="/write" className="btn">New article</Link>
-        </div>
-      </div>
-      {activeTab === 'articles' && <ArticlesTab userId={user.id} pubkey={user.pubkey} />}
-      {activeTab === 'drafts' && <DraftsTab />}
-      {activeTab === 'drives' && <DrivesTab userId={user.id} />}
-      {activeTab === 'offers' && <OffersTab />}
-      {activeTab === 'pricing' && <PricingTab stripeReady={user.stripeConnectKycComplete} />}
+      )}
+
+      {isPublicationContext ? (
+        /* Publication dashboard */
+        <>
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex gap-2">
+              {pubTabs.map(tab => {
+                const label = tab.charAt(0).toUpperCase() + tab.slice(1)
+                return (
+                  <button key={tab} onClick={() => switchPubTab(tab)} className={`tab-pill ${pubTab === tab ? 'tab-pill-active' : 'tab-pill-inactive'}`}>{label}</button>
+                )
+              })}
+            </div>
+            <Link href={`/write?pub=${selectedPub!.slug}`} className="btn">New article</Link>
+          </div>
+          {pubTab === 'articles' && (
+            <PublicationArticlesTab
+              publicationId={selectedPub!.id}
+              publicationSlug={selectedPub!.slug}
+              canPublish={selectedPub!.can_publish}
+              canEditOthers={selectedPub!.can_edit_others}
+            />
+          )}
+          {pubTab === 'members' && (
+            <MembersTab
+              publicationId={selectedPub!.id}
+              canManageMembers={selectedPub!.can_manage_members}
+            />
+          )}
+          {pubTab === 'settings' && selectedPub!.can_manage_settings && (
+            <PublicationSettingsTab
+              publicationId={selectedPub!.id}
+              publicationSlug={selectedPub!.slug}
+            />
+          )}
+        </>
+      ) : (
+        /* Personal dashboard */
+        <>
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex gap-2">
+              {personalTabs.map(tab => {
+                const label = tab === 'drives' ? 'Pledge drives' : tab === 'pricing' ? 'Pricing' : tab === 'offers' ? 'Offers' : tab.charAt(0).toUpperCase() + tab.slice(1)
+                return (
+                  <button key={tab} onClick={() => switchTab(tab)} className={`tab-pill ${activeTab === tab ? 'tab-pill-active' : 'tab-pill-inactive'}`}>{label}</button>
+                )
+              })}
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/account" className="text-ui-xs text-grey-400 hover:text-black underline underline-offset-4">View account</Link>
+              <Link href="/write" className="btn">New article</Link>
+            </div>
+          </div>
+          {activeTab === 'articles' && <ArticlesTab userId={user.id} pubkey={user.pubkey} />}
+          {activeTab === 'drafts' && <DraftsTab />}
+          {activeTab === 'drives' && <DrivesTab userId={user.id} />}
+          {activeTab === 'offers' && <OffersTab />}
+          {activeTab === 'pricing' && <PricingTab stripeReady={user.stripeConnectKycComplete} />}
+        </>
+      )}
     </div>
   )
 }

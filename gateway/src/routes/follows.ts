@@ -101,16 +101,28 @@ export async function followRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const followerId = req.session!.sub!
 
-      const { rows } = await pool.query<{ nostr_pubkey: string }>(
-        `SELECT a.nostr_pubkey
-         FROM follows f
-         JOIN accounts a ON a.id = f.followee_id
-         WHERE f.follower_id = $1 AND a.status = 'active'`,
-        [followerId]
-      )
+      const [writerRes, pubRes] = await Promise.all([
+        pool.query<{ nostr_pubkey: string }>(
+          `SELECT a.nostr_pubkey
+           FROM follows f
+           JOIN accounts a ON a.id = f.followee_id
+           WHERE f.follower_id = $1 AND a.status = 'active'`,
+          [followerId]
+        ),
+        pool.query<{ nostr_pubkey: string }>(
+          `SELECT p.nostr_pubkey
+           FROM publication_follows pf
+           JOIN publications p ON p.id = pf.publication_id
+           WHERE pf.follower_id = $1 AND p.status = 'active'`,
+          [followerId]
+        ),
+      ])
 
       return reply.status(200).send({
-        pubkeys: rows.map((r) => r.nostr_pubkey),
+        pubkeys: [
+          ...writerRes.rows.map(r => r.nostr_pubkey),
+          ...pubRes.rows.map(r => r.nostr_pubkey),
+        ],
       })
     }
   )
@@ -204,4 +216,56 @@ export async function followRoutes(app: FastifyInstance) {
       return reply.status(200).send({ writers })
     }
   )
+
+  // ===========================================================================
+  // Publication follows
+  // ===========================================================================
+
+  // POST /follows/publication/:id — follow a publication
+  app.post<{ Params: { id: string } }>(
+    '/follows/publication/:id',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const followerId = req.session!.sub!
+      const { id: publicationId } = req.params
+
+      const pubCheck = await pool.query(
+        `SELECT id FROM publications WHERE id = $1 AND status = 'active'`,
+        [publicationId]
+      )
+      if (pubCheck.rows.length === 0) {
+        return reply.status(404).send({ error: 'Publication not found' })
+      }
+
+      await pool.query(
+        `INSERT INTO publication_follows (follower_id, publication_id)
+         VALUES ($1, $2)
+         ON CONFLICT (follower_id, publication_id) DO NOTHING`,
+        [followerId, publicationId]
+      )
+
+      return reply.status(200).send({ ok: true })
+    }
+  )
+
+  // DELETE /follows/publication/:id — unfollow a publication
+  app.delete<{ Params: { id: string } }>(
+    '/follows/publication/:id',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const followerId = req.session!.sub!
+      const { id: publicationId } = req.params
+
+      await pool.query(
+        'DELETE FROM publication_follows WHERE follower_id = $1 AND publication_id = $2',
+        [followerId, publicationId]
+      )
+
+      return reply.status(200).send({ ok: true })
+    }
+  )
+
+  // Extend /follows/pubkeys to include followed publication pubkeys
+  // (Original endpoint above returns writer pubkeys; this is a separate
+  //  path that the feed uses. We augment the existing endpoint response.)
 }

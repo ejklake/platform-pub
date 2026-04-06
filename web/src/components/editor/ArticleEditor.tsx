@@ -37,7 +37,17 @@ interface EditorProps {
   initialCommentsEnabled?: boolean
   editingEventId?: string
   editingDTag?: string
+  publicationMemberships?: PublicationContext[]
+  initialPublicationId?: string | null
   onPublish?: (data: PublishData) => void
+}
+
+export interface PublicationContext {
+  id: string
+  slug: string
+  name: string
+  can_publish: boolean
+  default_article_price_pence?: number
 }
 
 export interface PublishData {
@@ -50,6 +60,8 @@ export interface PublishData {
   pricePence: number
   gatePositionPct: number
   commentsEnabled: boolean
+  publicationId?: string | null
+  showOnWriterProfile: boolean
 }
 
 export function ArticleEditor({
@@ -61,6 +73,8 @@ export function ArticleEditor({
   initialCommentsEnabled = true,
   editingEventId,
   editingDTag,
+  publicationMemberships = [],
+  initialPublicationId = null,
   onPublish,
 }: EditorProps) {
   const { user } = useAuth()
@@ -74,9 +88,12 @@ export function ArticleEditor({
   const [draftStatus, setDraftStatus] = useState<string | null>(null)
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [selectedPublicationId, setSelectedPublicationId] = useState<string | null>(initialPublicationId)
+  const [showOnWriterProfile, setShowOnWriterProfile] = useState(true)
 
   const isEditing = !!editingEventId
   const userSetPrice = useRef(!!initialPrice)
+  const selectedPub = publicationMemberships.find(p => p.id === selectedPublicationId)
 
   // Refs so the onUpdate closure always sees current values
   const titleRef = useRef(title)
@@ -191,6 +208,8 @@ export function ArticleEditor({
         pricePence: isPaywalled ? pricePence : 0,
         gatePositionPct,
         commentsEnabled,
+        publicationId: selectedPublicationId,
+        showOnWriterProfile,
       }
 
       if (onPublish) {
@@ -202,7 +221,7 @@ export function ArticleEditor({
     } finally {
       setPublishing(false)
     }
-  }, [editor, title, pricePence, onPublish, hasGateMarker, commentsEnabled])
+  }, [editor, title, pricePence, onPublish, hasGateMarker, commentsEnabled, selectedPublicationId, showOnWriterProfile])
 
   if (!editor) return null
 
@@ -213,6 +232,33 @@ export function ArticleEditor({
 
   return (
     <div className="mx-auto max-w-editor-frame px-4 sm:px-6 pt-16 lg:pt-8 pb-8">
+      {/* Publication selector — shown when user is a member of publications */}
+      {publicationMemberships.length > 0 && (
+        <div className="mb-4 bg-grey-100 px-5 py-3 flex items-center gap-3 flex-wrap">
+          <label className="label-ui text-grey-400">Publishing as</label>
+          <select
+            value={selectedPublicationId ?? ''}
+            onChange={(e) => setSelectedPublicationId(e.target.value || null)}
+            className="bg-white border border-grey-200 px-3 py-1.5 text-sm text-black"
+          >
+            <option value="">Yourself</option>
+            {publicationMemberships.map(pub => (
+              <option key={pub.id} value={pub.id}>{pub.name}</option>
+            ))}
+          </select>
+          {selectedPublicationId && (
+            <label className="flex items-center gap-2 ml-auto cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showOnWriterProfile}
+                onChange={(e) => setShowOnWriterProfile(e.target.checked)}
+              />
+              <span className="text-sm text-grey-600">Also show on your personal profile</span>
+            </label>
+          )}
+        </div>
+      )}
+
       {/* Sticky title + toolbar — stays visible while scrolling the body */}
       <div className="sticky top-[53px] lg:top-0 z-20 bg-white pb-4 mb-6">
       {/* Title card */}
@@ -393,7 +439,13 @@ export function ArticleEditor({
           disabled={publishing || !title.trim() || wordCount < 10}
           className="btn disabled:opacity-50"
         >
-          {publishing ? (isEditing ? 'Updating...' : 'Publishing...') : (isEditing ? 'Update' : 'Publish')}
+          {publishing
+            ? (isEditing ? 'Updating...' : 'Publishing...')
+            : isEditing
+              ? 'Update'
+              : selectedPub && !selectedPub.can_publish
+                ? 'Submit for review'
+                : 'Publish'}
         </button>
         <button
           className="text-sm text-grey-300 hover:text-grey-600 transition-colors"

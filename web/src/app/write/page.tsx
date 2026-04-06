@@ -18,9 +18,10 @@ const ArticleEditor = dynamic(
     ),
   }
 )
-import { publishArticle } from '../../lib/publish'
+import { publishArticle, publishToPublication } from '../../lib/publish'
 import { loadDraft } from '../../lib/drafts'
-import { articles as articlesApi } from '../../lib/api'
+import { articles as articlesApi, publications as publicationsApi } from '../../lib/api'
+import type { PublicationContext } from '../../components/editor/ArticleEditor'
 
 // =============================================================================
 // Write Page
@@ -38,6 +39,7 @@ export default function WritePage() {
 
   const editEventId = searchParams.get('edit')
   const draftId = searchParams.get('draft')
+  const pubSlug = searchParams.get('pub')
 
   const [editorReady, setEditorReady] = useState(false)
   const [initialData, setInitialData] = useState<{
@@ -49,14 +51,34 @@ export default function WritePage() {
     commentsEnabled: boolean
     editingEventId?: string
     editingDTag?: string
+    publicationId?: string | null
   } | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [pubMemberships, setPubMemberships] = useState<PublicationContext[]>([])
+  const [initialPubId, setInitialPubId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/auth?mode=login')
     }
   }, [user, loading, router])
+
+  // Load publication memberships
+  useEffect(() => {
+    if (!user) return
+    publicationsApi.myMemberships().then(res => {
+      const ctx: PublicationContext[] = res.publications.map(p => ({
+        id: p.id, slug: p.slug, name: p.name,
+        can_publish: p.can_publish,
+      }))
+      setPubMemberships(ctx)
+      // Pre-select from ?pub= query param
+      if (pubSlug) {
+        const match = ctx.find(p => p.slug === pubSlug)
+        if (match) setInitialPubId(match.id)
+      }
+    }).catch(() => { /* non-critical */ })
+  }, [user, pubSlug])
 
   // Load edit or draft data
   useEffect(() => {
@@ -121,12 +143,24 @@ export default function WritePage() {
   async function handlePublish(data: PublishData) {
     if (!user) return
 
-    const result = await publishArticle(
-      data,
-      user.pubkey,
-      initialData?.editingDTag
-    )
-    router.push('/dashboard?tab=articles')
+    if (data.publicationId) {
+      // Publication article — server-side pipeline
+      const result = await publishToPublication(
+        data.publicationId,
+        { ...data, showOnWriterProfile: data.showOnWriterProfile },
+        initialData?.editingDTag
+      )
+      const pub = pubMemberships.find(p => p.id === data.publicationId)
+      router.push(`/dashboard?context=${pub?.slug ?? ''}&tab=articles`)
+    } else {
+      // Personal article — existing client-side pipeline
+      await publishArticle(
+        data,
+        user.pubkey,
+        initialData?.editingDTag
+      )
+      router.push('/dashboard?tab=articles')
+    }
   }
 
   if (loading || !user) {
@@ -167,6 +201,8 @@ export default function WritePage() {
       initialCommentsEnabled={initialData?.commentsEnabled}
       editingEventId={initialData?.editingEventId}
       editingDTag={initialData?.editingDTag}
+      publicationMemberships={pubMemberships}
+      initialPublicationId={initialPubId}
       onPublish={handlePublish}
     />
   )

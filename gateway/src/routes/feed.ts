@@ -121,7 +121,11 @@ async function followingFeed(readerId: string, cursor: number | undefined, limit
       JOIN accounts acc ON acc.id = a.writer_id
       WHERE a.deleted_at IS NULL
         AND a.published_at IS NOT NULL
-        AND (a.writer_id IN (SELECT followee_id FROM follows WHERE follower_id = $1) OR a.writer_id = $1)
+        AND (
+          a.writer_id IN (SELECT followee_id FROM follows WHERE follower_id = $1)
+          OR a.writer_id = $1
+          OR a.publication_id IN (SELECT publication_id FROM publication_follows WHERE follower_id = $1)
+        )
         AND ${BLOCK_FILTER('a.writer_id', 1)}
         AND ${MUTE_FILTER('a.writer_id', 1)}
         ${cursorClause}

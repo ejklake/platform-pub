@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/auth.js'
 import { signEvent, unwrapKey } from '../lib/key-custody-client.js'
 import { publishToRelay } from '../lib/nostr-publisher.js'
+import { pool } from '../../shared/src/db/client.js'
 import logger from '../../shared/src/lib/logger.js'
 
 // =============================================================================
@@ -20,6 +21,7 @@ const SignEventSchema = z.object({
   content: z.string(),
   tags: z.array(z.array(z.string())),
   created_at: z.number().int().optional(),
+  publicationId: z.string().uuid().optional(),
 })
 
 const UnwrapKeySchema = z.object({
@@ -39,18 +41,34 @@ export async function signingRoutes(app: FastifyInstance) {
     }
 
     const accountId = req.session!.sub!
+    const { publicationId } = parsed.data
+
+    // If signing as a publication, verify caller has can_publish
+    if (publicationId) {
+      const { rows } = await pool.query(
+        `SELECT can_publish FROM publication_members
+         WHERE publication_id = $1 AND account_id = $2 AND removed_at IS NULL`,
+        [publicationId, accountId]
+      )
+      if (rows.length === 0 || !rows[0].can_publish) {
+        return reply.status(403).send({ error: 'Not authorized to sign as this publication' })
+      }
+    }
+
+    const signerId = publicationId ?? accountId
+    const signerType = publicationId ? 'publication' as const : 'account' as const
 
     try {
-      const signed = await signEvent(accountId, {
+      const signed = await signEvent(signerId, {
         kind: parsed.data.kind,
         content: parsed.data.content,
         tags: parsed.data.tags,
         created_at: parsed.data.created_at ?? Math.floor(Date.now() / 1000),
-      })
-      logger.info({ accountId, eventKind: parsed.data.kind, eventId: signed.id }, 'Event signed')
+      }, signerType)
+      logger.info({ signerId, signerType, eventKind: parsed.data.kind, eventId: signed.id }, 'Event signed')
       return reply.status(200).send(signed)
     } catch (err) {
-      logger.error({ err, accountId }, 'Event signing failed')
+      logger.error({ err, signerId, signerType }, 'Event signing failed')
       return reply.status(500).send({ error: 'Signing failed' })
     }
   })
@@ -69,21 +87,37 @@ export async function signingRoutes(app: FastifyInstance) {
     }
 
     const accountId = req.session!.sub!
+    const { publicationId } = parsed.data
+
+    // If signing as a publication, verify caller has can_publish
+    if (publicationId) {
+      const { rows } = await pool.query(
+        `SELECT can_publish FROM publication_members
+         WHERE publication_id = $1 AND account_id = $2 AND removed_at IS NULL`,
+        [publicationId, accountId]
+      )
+      if (rows.length === 0 || !rows[0].can_publish) {
+        return reply.status(403).send({ error: 'Not authorized to sign as this publication' })
+      }
+    }
+
+    const signerId = publicationId ?? accountId
+    const signerType = publicationId ? 'publication' as const : 'account' as const
 
     try {
-      const signed = await signEvent(accountId, {
+      const signed = await signEvent(signerId, {
         kind: parsed.data.kind,
         content: parsed.data.content,
         tags: parsed.data.tags,
         created_at: parsed.data.created_at ?? Math.floor(Date.now() / 1000),
-      })
+      }, signerType)
 
       await publishToRelay(signed as any)
 
-      logger.info({ accountId, eventKind: parsed.data.kind, eventId: signed.id }, 'Event signed and published')
+      logger.info({ signerId, signerType, eventKind: parsed.data.kind, eventId: signed.id }, 'Event signed and published')
       return reply.status(200).send(signed)
     } catch (err) {
-      logger.error({ err, accountId }, 'Sign-and-publish failed')
+      logger.error({ err, signerId, signerType }, 'Sign-and-publish failed')
       return reply.status(500).send({ error: 'Sign-and-publish failed' })
     }
   })

@@ -1,6 +1,6 @@
 import { KIND_ARTICLE, KIND_DELETION } from './ndk'
 import { signAndPublish, signViaGateway } from './sign'
-import { articles as articlesApi } from './api'
+import { articles as articlesApi, publications as publicationsApi } from './api'
 import type { PublishData } from '../components/editor/ArticleEditor'
 
 // =============================================================================
@@ -163,6 +163,28 @@ async function encryptPaywallBody(
 
   const result = await res.json()
   return { ciphertext: result.ciphertext, algorithm: result.algorithm }
+}
+
+// =============================================================================
+// Publication publishing — delegates to the server-side pipeline
+// =============================================================================
+
+export async function publishToPublication(
+  publicationId: string,
+  data: PublishData & { showOnWriterProfile: boolean },
+  existingDTag?: string
+): Promise<{ articleId: string; status: string; dTag: string }> {
+  return publicationsApi.submitArticle(publicationId, {
+    title: data.title,
+    summary: data.dek?.trim() || undefined,
+    content: data.isPaywalled ? data.freeContent : data.content,
+    fullContent: data.content,
+    accessMode: data.isPaywalled ? 'paywalled' : 'public',
+    pricePence: data.isPaywalled ? data.pricePence : undefined,
+    gatePositionPct: data.isPaywalled ? data.gatePositionPct : undefined,
+    showOnWriterProfile: data.showOnWriterProfile,
+    existingDTag,
+  })
 }
 
 function generateDTag(title: string): string {

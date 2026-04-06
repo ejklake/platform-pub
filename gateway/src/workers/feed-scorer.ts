@@ -56,6 +56,7 @@ export async function refreshFeedScores(): Promise<void> {
         ec.target_author_id AS author_id,
         COALESCE(a.published_at, n.published_at) AS published_at,
         CASE WHEN a.id IS NOT NULL THEN 'article'::content_type ELSE 'note'::content_type END AS content_type,
+        a.publication_id,
         (ec.reactions * $1 + ec.replies * $2 + ec.quotes * $3 + ec.gate_passes * $4)
           / POWER(GREATEST(EXTRACT(EPOCH FROM (now() - COALESCE(a.published_at, n.published_at))) / 3600, 0) + 2, $5)
           AS score,
@@ -66,13 +67,14 @@ export async function refreshFeedScores(): Promise<void> {
       LEFT JOIN notes n ON n.nostr_event_id = ec.target_nostr_event_id
       WHERE COALESCE(a.published_at, n.published_at) IS NOT NULL
     )
-    INSERT INTO feed_scores (nostr_event_id, author_id, content_type, score, engagement_count, gate_pass_count, published_at, scored_at)
-    SELECT nostr_event_id, author_id, content_type, score, engagement_count, gate_pass_count, published_at, now()
+    INSERT INTO feed_scores (nostr_event_id, author_id, content_type, publication_id, score, engagement_count, gate_pass_count, published_at, scored_at)
+    SELECT nostr_event_id, author_id, content_type, publication_id, score, engagement_count, gate_pass_count, published_at, now()
     FROM scored
     ON CONFLICT (nostr_event_id) DO UPDATE SET
       score = EXCLUDED.score,
       engagement_count = EXCLUDED.engagement_count,
       gate_pass_count = EXCLUDED.gate_pass_count,
+      publication_id = EXCLUDED.publication_id,
       scored_at = EXCLUDED.scored_at
     `,
     [weights.reaction, weights.reply, weights.quoteComment, weights.gatePass, weights.gravity]

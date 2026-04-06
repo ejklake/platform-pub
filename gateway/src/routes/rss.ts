@@ -87,6 +87,67 @@ export async function rssRoutes(app: FastifyInstance) {
   )
 
   // ---------------------------------------------------------------------------
+  // GET /api/v1/pub/:slug/rss — publication RSS feed
+  // ---------------------------------------------------------------------------
+
+  app.get<{ Params: { slug: string } }>(
+    '/api/v1/pub/:slug/rss',
+    async (req, reply) => {
+      const { slug } = req.params
+
+      const pubResult = await pool.query<{
+        id: string; name: string; tagline: string | null
+      }>(
+        `SELECT id, name, tagline FROM publications
+         WHERE slug = $1 AND status = 'active'`,
+        [slug]
+      )
+
+      if (pubResult.rows.length === 0) {
+        return reply.status(404).send('Publication not found')
+      }
+
+      const pub = pubResult.rows[0]
+
+      const { rows: articles } = await pool.query<{
+        nostr_d_tag: string; title: string; summary: string | null
+        content_free: string | null; published_at: Date
+        writer_username: string; writer_display_name: string | null
+      }>(
+        `SELECT a.nostr_d_tag, a.title, a.summary, a.content_free, a.published_at,
+                w.username AS writer_username, w.display_name AS writer_display_name
+         FROM articles a
+         JOIN accounts w ON w.id = a.writer_id
+         WHERE a.publication_id = $1 AND a.published_at IS NOT NULL AND a.deleted_at IS NULL
+           AND a.publication_article_status = 'published'
+         ORDER BY a.published_at DESC
+         LIMIT 20`,
+        [pub.id]
+      )
+
+      const pubUrl = `${SITE_URL}/pub/${slug}`
+      const xml = buildRssFeed({
+        title: `${pub.name}`,
+        description: pub.tagline ?? `Articles from ${pub.name}`,
+        link: pubUrl,
+        feedUrl: `${SITE_URL}/api/v1/pub/${slug}/rss`,
+        items: articles.map(a => ({
+          title: a.title,
+          link: `${SITE_URL}/pub/${slug}/${a.nostr_d_tag}`,
+          description: a.summary ?? truncate(stripHtml(a.content_free ?? ''), 300),
+          content: a.content_free ?? '',
+          pubDate: a.published_at,
+          author: a.writer_display_name ?? a.writer_username,
+        })),
+      })
+
+      reply.header('Content-Type', 'application/rss+xml; charset=utf-8')
+      reply.header('Cache-Control', 'public, max-age=600')
+      return reply.send(xml)
+    }
+  )
+
+  // ---------------------------------------------------------------------------
   // GET /rss — platform-wide recent articles feed
   // ---------------------------------------------------------------------------
 

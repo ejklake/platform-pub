@@ -1,0 +1,296 @@
+import { pool } from '../../shared/src/db/client.js'
+import { signEvent } from '../lib/key-custody-client.js'
+import { publishToRelay } from '../lib/nostr-publisher.js'
+import logger from '../../shared/src/lib/logger.js'
+
+// =============================================================================
+// Publication Publisher — server-side article publishing pipeline
+//
+// Orchestrates the full flow for publication articles:
+//   1. Sign the NIP-23 event with the publication's custodial key
+//   2. Publish to the relay
+//   3. Index in the database
+//
+// Contributors without can_publish get their article saved as 'submitted'
+// without any Nostr event being created.
+// =============================================================================
+
+export interface PublishToPublicationInput {
+  publicationId: string
+  authorId: string
+  authorPubkey: string
+  title: string
+  summary?: string
+  content: string          // full markdown (free content for paywalled, all content for free)
+  fullContent: string      // complete content including paywall body
+  accessMode: 'public' | 'paywalled'
+  pricePence?: number
+  gatePositionPct?: number
+  showOnWriterProfile: boolean
+  canPublish: boolean
+  existingDTag?: string
+}
+
+export interface PublishToPublicationResult {
+  articleId: string
+  status: string
+  nostrEventId?: string
+  dTag: string
+}
+
+export async function publishToPublication(
+  input: PublishToPublicationInput
+): Promise<PublishToPublicationResult> {
+  const dTag = input.existingDTag ?? generateDTag(input.title)
+
+  // Fetch publication for its nostr pubkey
+  const { rows: pubs } = await pool.query<{ nostr_pubkey: string; default_article_price_pence: number }>(
+    'SELECT nostr_pubkey, default_article_price_pence FROM publications WHERE id = $1',
+    [input.publicationId]
+  )
+  if (pubs.length === 0) throw new Error('Publication not found')
+  const pub = pubs[0]
+
+  const pricePence = input.pricePence ?? (input.accessMode === 'paywalled' ? pub.default_article_price_pence : null)
+
+  // If the author can't publish, save as submitted (no Nostr event)
+  if (!input.canPublish) {
+    const slug = dTag
+    const wordCount = input.fullContent.split(/\s+/).length
+
+    const { rows } = await pool.query<{ id: string }>(
+      `INSERT INTO articles (
+         writer_id, nostr_event_id, nostr_d_tag, title, slug, summary,
+         content_free, word_count, tier,
+         access_mode, price_pence, gate_position_pct,
+         publication_id, publication_article_status, show_on_writer_profile,
+         published_at
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8, 'tier1',
+         $9, $10, $11, $12, 'submitted', $13, NULL
+       )
+       RETURNING id`,
+      [
+        input.authorId,
+        `pending-${dTag}`,  // placeholder event ID — replaced on publish
+        dTag,
+        input.title,
+        slug,
+        input.summary || null,
+        input.content,
+        wordCount,
+        input.accessMode,
+        pricePence,
+        input.gatePositionPct || null,
+        input.publicationId,
+        input.showOnWriterProfile,
+      ]
+    )
+
+    // Notify members with can_publish
+    await pool.query(
+      `INSERT INTO notifications (recipient_id, actor_id, type, article_id)
+       SELECT pm.account_id, $1, 'pub_article_submitted', $2
+       FROM publication_members pm
+       WHERE pm.publication_id = $3 AND pm.can_publish = TRUE
+         AND pm.removed_at IS NULL AND pm.account_id != $1
+       ON CONFLICT DO NOTHING`,
+      [input.authorId, rows[0].id, input.publicationId]
+    )
+
+    logger.info({ publicationId: input.publicationId, articleId: rows[0].id, author: input.authorId }, 'Article submitted for review')
+    return { articleId: rows[0].id, status: 'submitted', dTag }
+  }
+
+  // Author can publish — full pipeline
+  const tags: string[][] = [
+    ['d', dTag],
+    ['title', input.title],
+    ['published_at', String(Math.floor(Date.now() / 1000))],
+    ['p', input.authorPubkey, '', 'author'],
+    ['p', pub.nostr_pubkey, '', 'publisher'],
+  ]
+
+  if (input.summary) {
+    tags.push(['summary', input.summary])
+  }
+
+  if (input.accessMode === 'paywalled' && pricePence) {
+    tags.push(
+      ['price', String(pricePence), 'GBP'],
+      ['gate', String(input.gatePositionPct ?? 50)]
+    )
+  }
+
+  const eventTemplate = {
+    kind: 30023,
+    content: input.content,
+    tags,
+    created_at: Math.floor(Date.now() / 1000),
+  }
+
+  // Sign with the publication's key
+  const signed = await signEvent(input.publicationId, eventTemplate, 'publication')
+
+  // Publish to relay
+  await publishToRelay(signed as any)
+
+  // Index in DB
+  const slug = dTag
+  const wordCount = input.fullContent.split(/\s+/).length
+
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO articles (
+       writer_id, nostr_event_id, nostr_d_tag, title, slug, summary,
+       content_free, word_count, tier,
+       access_mode, price_pence, gate_position_pct,
+       publication_id, publication_article_status, show_on_writer_profile,
+       published_at
+     ) VALUES (
+       $1, $2, $3, $4, $5, $6, $7, $8, 'tier1',
+       $9, $10, $11, $12, 'published', $13, now()
+     )
+     ON CONFLICT (writer_id, nostr_d_tag) WHERE deleted_at IS NULL DO UPDATE SET
+       nostr_event_id = EXCLUDED.nostr_event_id,
+       title = EXCLUDED.title,
+       summary = EXCLUDED.summary,
+       content_free = EXCLUDED.content_free,
+       word_count = EXCLUDED.word_count,
+       access_mode = EXCLUDED.access_mode,
+       price_pence = EXCLUDED.price_pence,
+       gate_position_pct = EXCLUDED.gate_position_pct,
+       publication_article_status = 'published',
+       published_at = now()
+     RETURNING id`,
+    [
+      input.authorId,
+      signed.id,
+      dTag,
+      input.title,
+      slug,
+      input.summary || null,
+      input.content,
+      wordCount,
+      input.accessMode,
+      pricePence,
+      input.gatePositionPct || null,
+      input.publicationId,
+      input.showOnWriterProfile,
+    ]
+  )
+
+  // Notify author if different from the publishing editor
+  // (the author submitted, an editor publishes)
+
+  logger.info({
+    publicationId: input.publicationId,
+    articleId: rows[0].id,
+    nostrEventId: signed.id,
+    author: input.authorId,
+  }, 'Publication article published')
+
+  return {
+    articleId: rows[0].id,
+    status: 'published',
+    nostrEventId: signed.id,
+    dTag,
+  }
+}
+
+// =============================================================================
+// Approve and publish a submitted article
+// =============================================================================
+
+export async function approveAndPublishArticle(
+  publicationId: string,
+  articleId: string,
+  editorId: string
+): Promise<{ nostrEventId: string }> {
+  // Fetch the article and publication
+  const { rows: articles } = await pool.query<{
+    writer_id: string
+    title: string
+    summary: string | null
+    content_free: string
+    access_mode: string
+    price_pence: number | null
+    gate_position_pct: number | null
+    nostr_d_tag: string
+    show_on_writer_profile: boolean
+  }>(
+    `SELECT writer_id, title, summary, content_free, access_mode, price_pence,
+            gate_position_pct, nostr_d_tag, show_on_writer_profile
+     FROM articles WHERE id = $1 AND publication_id = $2`,
+    [articleId, publicationId]
+  )
+  if (articles.length === 0) throw new Error('Article not found')
+  const article = articles[0]
+
+  const { rows: pubs } = await pool.query<{ nostr_pubkey: string }>(
+    'SELECT nostr_pubkey FROM publications WHERE id = $1',
+    [publicationId]
+  )
+  const pub = pubs[0]
+
+  const { rows: authors } = await pool.query<{ nostr_pubkey: string }>(
+    'SELECT nostr_pubkey FROM accounts WHERE id = $1',
+    [article.writer_id]
+  )
+  const authorPubkey = authors[0].nostr_pubkey
+
+  // Build and sign event
+  const tags: string[][] = [
+    ['d', article.nostr_d_tag],
+    ['title', article.title],
+    ['published_at', String(Math.floor(Date.now() / 1000))],
+    ['p', authorPubkey, '', 'author'],
+    ['p', pub.nostr_pubkey, '', 'publisher'],
+  ]
+
+  if (article.summary) tags.push(['summary', article.summary])
+  if (article.access_mode === 'paywalled' && article.price_pence) {
+    tags.push(
+      ['price', String(article.price_pence), 'GBP'],
+      ['gate', String(article.gate_position_pct ?? 50)]
+    )
+  }
+
+  const signed = await signEvent(publicationId, {
+    kind: 30023,
+    content: article.content_free ?? '',
+    tags,
+    created_at: Math.floor(Date.now() / 1000),
+  }, 'publication')
+
+  await publishToRelay(signed as any)
+
+  // Update DB
+  await pool.query(
+    `UPDATE articles
+     SET nostr_event_id = $1, publication_article_status = 'published', published_at = now()
+     WHERE id = $2`,
+    [signed.id, articleId]
+  )
+
+  // Notify the author
+  await pool.query(
+    `INSERT INTO notifications (recipient_id, actor_id, type, article_id)
+     VALUES ($1, $2, 'pub_article_published', $3)
+     ON CONFLICT DO NOTHING`,
+    [article.writer_id, editorId, articleId]
+  )
+
+  logger.info({ publicationId, articleId, nostrEventId: signed.id, editor: editorId }, 'Submitted article approved and published')
+  return { nostrEventId: signed.id }
+}
+
+function generateDTag(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 80)
+  const timestamp = Math.floor(Date.now() / 1000).toString(36)
+  return `${slug}-${timestamp}`
+}

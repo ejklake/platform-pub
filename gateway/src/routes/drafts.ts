@@ -22,6 +22,7 @@ const SaveDraftSchema = z.object({
   gatePositionPct: z.number().int().min(0).max(100).optional(),
   pricePence: z.number().int().min(0).optional(),
   dTag: z.string().optional(),   // set when editing an existing published article
+  publicationId: z.string().uuid().optional(),  // set when writing in publication context
 })
 
 export async function draftRoutes(app: FastifyInstance) {
@@ -41,17 +42,18 @@ export async function draftRoutes(app: FastifyInstance) {
       // Otherwise create a new draft row
       if (data.dTag) {
         const result = await pool.query<{ id: string; auto_saved_at: string }>(
-          `INSERT INTO article_drafts (writer_id, nostr_d_tag, title, content_raw, gate_position_pct, price_pence, auto_saved_at)
-           VALUES ($1, $2, $3, $4, $5, $6, now())
+          `INSERT INTO article_drafts (writer_id, nostr_d_tag, title, content_raw, gate_position_pct, price_pence, publication_id, auto_saved_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, now())
            ON CONFLICT (writer_id, nostr_d_tag) WHERE nostr_d_tag IS NOT NULL
            DO UPDATE SET
              title = COALESCE(EXCLUDED.title, article_drafts.title),
              content_raw = COALESCE(EXCLUDED.content_raw, article_drafts.content_raw),
              gate_position_pct = COALESCE(EXCLUDED.gate_position_pct, article_drafts.gate_position_pct),
              price_pence = COALESCE(EXCLUDED.price_pence, article_drafts.price_pence),
+             publication_id = COALESCE(EXCLUDED.publication_id, article_drafts.publication_id),
              auto_saved_at = now()
            RETURNING id, auto_saved_at`,
-          [writerId, data.dTag, data.title ?? null, data.content ?? null, data.gatePositionPct ?? null, data.pricePence ?? null]
+          [writerId, data.dTag, data.title ?? null, data.content ?? null, data.gatePositionPct ?? null, data.pricePence ?? null, data.publicationId ?? null]
         )
 
         return reply.status(200).send({
@@ -87,10 +89,10 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         const result = await pool.query<{ id: string; auto_saved_at: string }>(
-          `INSERT INTO article_drafts (writer_id, title, content_raw, gate_position_pct, price_pence, auto_saved_at)
-           VALUES ($1, $2, $3, $4, $5, now())
+          `INSERT INTO article_drafts (writer_id, title, content_raw, gate_position_pct, price_pence, publication_id, auto_saved_at)
+           VALUES ($1, $2, $3, $4, $5, $6, now())
            RETURNING id, auto_saved_at`,
-          [writerId, data.title ?? null, data.content ?? null, data.gatePositionPct ?? null, data.pricePence ?? null]
+          [writerId, data.title ?? null, data.content ?? null, data.gatePositionPct ?? null, data.pricePence ?? null, data.publicationId ?? null]
         )
 
         return reply.status(201).send({
@@ -112,9 +114,10 @@ export async function draftRoutes(app: FastifyInstance) {
       id: string
       title: string | null
       nostr_d_tag: string | null
+      publication_id: string | null
       auto_saved_at: string
     }>(
-      `SELECT id, title, nostr_d_tag, auto_saved_at
+      `SELECT id, title, nostr_d_tag, publication_id, auto_saved_at
        FROM article_drafts
        WHERE writer_id = $1
        ORDER BY auto_saved_at DESC
@@ -127,6 +130,7 @@ export async function draftRoutes(app: FastifyInstance) {
         draftId: r.id,
         title: r.title,
         dTag: r.nostr_d_tag,
+        publicationId: r.publication_id,
         autoSavedAt: r.auto_saved_at,
       })),
     })
@@ -146,9 +150,10 @@ export async function draftRoutes(app: FastifyInstance) {
         nostr_d_tag: string | null
         gate_position_pct: number | null
         price_pence: number | null
+        publication_id: string | null
         auto_saved_at: string
       }>(
-        `SELECT id, title, content_raw, nostr_d_tag, gate_position_pct, price_pence, auto_saved_at
+        `SELECT id, title, content_raw, nostr_d_tag, gate_position_pct, price_pence, publication_id, auto_saved_at
          FROM article_drafts
          WHERE id = $1 AND writer_id = $2`,
         [req.params.id, writerId]
@@ -166,6 +171,7 @@ export async function draftRoutes(app: FastifyInstance) {
         dTag: r.nostr_d_tag,
         gatePositionPct: r.gate_position_pct,
         pricePence: r.price_pence,
+        publicationId: r.publication_id,
         autoSavedAt: r.auto_saved_at,
       })
     }

@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.18.0
+# all.haus — Deployment Reference v5.19.0
 
 **Date:** 6 April 2026
-**Replaces:** v5.17.0 (see bottom for change log)
+**Replaces:** v5.18.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -249,6 +249,119 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 ## Upgrading from a previous version
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
+
+### From v5.18.0
+
+No new migration (038 was applied in v5.18.0). Services changed: **gateway**, **key-custody**, **web**. Deploy order: **rebuild gateway + key-custody + web**.
+
+This release implements Publications Phases 2 and 3 — the CMS/publishing pipeline and the full reader-facing surface. Writers can now submit articles to publications, editors can approve and publish them (signed with the publication's Nostr keypair), and publications have their own homepage, about page, masthead, archive, RSS feed, subscription, and follow system. The feed and search engines now include publication content. Article pages show "By Author in Publication" bylines when applicable. Writer profiles filter out publication-only articles.
+
+**Backend (key-custody):**
+
+No changes beyond Phase 1 (signerType support already in place).
+
+**Backend (gateway):**
+
+- **Publication CMS routes** (`publications.ts`): `POST/GET /publications/:id/articles` (submit + list), `PATCH/DELETE /publications/:id/articles/:articleId` (edit/delete), `POST .../publish` and `.../unpublish` (approve/reject).
+- **Server-side publishing pipeline** (`publication-publisher.ts`): New service that orchestrates article submission — generates d-tags, builds NIP-23 events with author/publisher p-tags, signs with publication key via key-custody, publishes to relay, indexes in DB. Contributors without `can_publish` save as 'submitted'; editors approve and trigger full pipeline.
+- **Signing routes** (`signing.ts`): `/sign` and `/sign-and-publish` accept optional `publicationId` — checks `can_publish` permission, signs with publication key.
+- **Draft routes** (`drafts.ts`): drafts can be associated with a publication via `publicationId`.
+- **Public reader routes** (`publications.ts`): `GET /:slug/public` (full profile with follower/member/article counts, isFollowing, isSubscribed), `GET /:slug/articles` (paginated), `GET /:slug/masthead`.
+- **Publication subscriptions** (`subscriptions.ts`): `POST/DELETE /subscriptions/publication/:id`.
+- **Publication follows** (`follows.ts`): `POST/DELETE /follows/publication/:id`. `GET /follows/pubkeys` includes followed publication pubkeys.
+- **Publication RSS** (`rss.ts`): `GET /api/v1/pub/:slug/rss`.
+- **Search** (`search.ts`): Publications searchable by name/tagline via pg_trgm.
+- **Feed** (`feed.ts`): Following feed includes articles from followed publications.
+- **Feed scorer** (`feed-scorer.ts`): Populates `publication_id` on feed_scores.
+- **Article page** (`articles.ts`): `GET /articles/:dTag` now returns `publication` object (id, slug, name, subscriptionPricePence) when article belongs to a publication.
+- **Writer profile** (`writers.ts`): Article queries filter `(publication_id IS NULL OR show_on_writer_profile = TRUE)`.
+
+**Frontend (web):**
+
+- **Editor** (`ArticleEditor.tsx`): "Publishing as" dropdown, "Also show on your personal profile" checkbox, "Submit for review" button for non-publishers.
+- **Write page** (`write/page.tsx`): `?pub=<slug>` pre-selection, routes to `publishToPublication()` for publication articles.
+- **Dashboard** (`dashboard/page.tsx`): Context switcher (Personal | Publication), publication-specific tabs (Articles, Members, Settings).
+- **Publication dashboard tabs**: `PublicationArticlesTab.tsx` (CMS with publish/unpublish), `MembersTab.tsx` (invite, manage), `PublicationSettingsTab.tsx` (edit metadata).
+- **Invite page** (`invite/[token]/page.tsx`): Shows invite details, accept/decline for logged-in users, signup redirect for anonymous.
+- **Publication reader pages**: layout shell (`pub/[slug]/layout.tsx`), homepage with blog/magazine/minimal layouts (`page.tsx`), about, masthead, subscribe, archive, article-under-publication pages.
+- **Publication components**: `PublicationNav.tsx`, `PublicationFooter.tsx`, `HomepageBlog.tsx`, `HomepageMagazine.tsx`, `HomepageMinimal.tsx`.
+- **Article reader** (`ArticleReader.tsx`): "By Author in Publication" byline, publication subscription price used when applicable.
+- **API client** (`api.ts`): Full publications namespace with reader-facing methods (getPublic, getPublicArticles, getMasthead, follow, unfollow, subscribe, cancelSubscription).
+
+**New files:**
+
+- `gateway/src/services/publication-publisher.ts`
+- `web/src/components/dashboard/PublicationArticlesTab.tsx`
+- `web/src/components/dashboard/MembersTab.tsx`
+- `web/src/components/dashboard/PublicationSettingsTab.tsx`
+- `web/src/app/invite/[token]/page.tsx`
+- `web/src/app/pub/[slug]/layout.tsx`
+- `web/src/app/pub/[slug]/page.tsx`
+- `web/src/app/pub/[slug]/about/page.tsx`
+- `web/src/app/pub/[slug]/masthead/page.tsx`
+- `web/src/app/pub/[slug]/subscribe/page.tsx`
+- `web/src/app/pub/[slug]/archive/page.tsx`
+- `web/src/app/pub/[slug]/[articleSlug]/page.tsx`
+- `web/src/components/publication/PublicationNav.tsx`
+- `web/src/components/publication/PublicationFooter.tsx`
+- `web/src/components/publication/HomepageBlog.tsx`
+- `web/src/components/publication/HomepageMagazine.tsx`
+- `web/src/components/publication/HomepageMinimal.tsx`
+
+**Modified files:**
+
+- `gateway/src/routes/publications.ts` — CMS + reader-facing routes added
+- `gateway/src/routes/signing.ts` — publicationId support
+- `gateway/src/routes/drafts.ts` — publicationId on drafts
+- `gateway/src/routes/subscriptions.ts` — publication subscription routes
+- `gateway/src/routes/follows.ts` — publication follow routes
+- `gateway/src/routes/rss.ts` — publication RSS feed
+- `gateway/src/routes/search.ts` — publication search
+- `gateway/src/routes/feed.ts` — publication content in following feed
+- `gateway/src/workers/feed-scorer.ts` — publication_id in scoring
+- `gateway/src/routes/articles.ts` — publication info in article response
+- `gateway/src/routes/writers.ts` — publication article filtering on writer profiles
+- `gateway/src/services/access.ts` — publication member free access, publication subscription check
+- `web/src/components/editor/ArticleEditor.tsx` — publication selector, cross-post checkbox
+- `web/src/app/write/page.tsx` — publication pre-selection, routing
+- `web/src/lib/publish.ts` — publishToPublication function
+- `web/src/app/dashboard/page.tsx` — context switcher, publication tabs
+- `web/src/lib/api.ts` — publications namespace, ArticleMetadata.publication field
+- `web/src/components/article/ArticleReader.tsx` — publication byline
+- `web/src/app/article/[dTag]/page.tsx` — passes publication props
+
+**Upgrade steps:**
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No new migration — 038 was applied in v5.18.0
+# Rebuild all three services (gateway has new routes + services, web has new pages)
+docker compose build gateway key-custody web
+docker compose up -d gateway key-custody web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway, key-custody, and web should show (healthy) after ~30s
+
+# Visual checks:
+# - /write page: "Publishing as" dropdown appears if user is a publication member
+# - /dashboard: context switcher shows personal + publication names
+# - /dashboard?context=<slug>: publication Articles/Members/Settings tabs
+# - /pub/<slug>: publication homepage with nav, articles, footer
+# - /pub/<slug>/about: about page with rendered markdown
+# - /pub/<slug>/masthead: team listing with avatars and roles
+# - /pub/<slug>/archive: full article list with dates
+# - /article/<dTag>: articles with publication show "By Author in Publication" byline
+# - /<username>: writer profile excludes publication-only articles
+# - /search: publications appear in search results
+```
+
+No new env vars. No database changes.
+
+---
 
 ### From v5.17.0
 
@@ -555,6 +668,7 @@ No new env vars. No database changes.
 | 035_feed_scores.sql | `feed_scores` table + config rows for feed scoring weights |
 | 036_commission_conversation.sql | `parent_conversation_id` on `pledge_drives` for DM-linked commissions |
 | 037_subscription_offers.sql | `subscription_offers` table; `offer_id` + `offer_periods_remaining` on `subscriptions` |
+| 038_publications.sql | Publications schema: 7 new tables, 2 enums, publication columns on articles/drafts/subscriptions/feed_scores |
 
 Run all pending migrations (requires Node on the host — substitute your `POSTGRES_PASSWORD`):
 ```bash
@@ -680,6 +794,36 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | DELETE | /api/v1/subscription-offers/:offerId | session | Revoke an offer |
 | GET | /api/v1/subscription-offers/redeem/:code | optional | Public lookup — offer details + calculated discounted price for redeem page |
 
+### Publications
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | /api/v1/publications | session | Create publication (generates Nostr keypair) |
+| GET | /api/v1/publications/:slug | session | Get publication by slug |
+| PATCH | /api/v1/publications/:id | session (owner/settings) | Update publication metadata |
+| DELETE | /api/v1/publications/:id | session (owner) | Archive publication |
+| GET | /api/v1/publications/:id/members | session (member) | List members |
+| POST | /api/v1/publications/:id/members/invite | session (manage_members) | Invite member |
+| POST | /api/v1/publications/:id/members/accept | session | Accept invite |
+| PATCH | /api/v1/publications/:id/members/:memberId | session (manage_members) | Update member role/permissions |
+| DELETE | /api/v1/publications/:id/members/:memberId | session (manage_members) | Remove member |
+| POST | /api/v1/publications/:id/transfer-ownership | session (owner) | Transfer ownership |
+| GET | /api/v1/publications/invites/:token | optional | Invite details |
+| GET | /api/v1/my/publications | session | My publication memberships |
+| POST | /api/v1/publications/:id/articles | session (member) | Submit article to publication CMS |
+| GET | /api/v1/publications/:id/articles | session (member) | List CMS articles (filterable by status) |
+| PATCH | /api/v1/publications/:id/articles/:articleId | session (edit_others) | Edit article metadata |
+| DELETE | /api/v1/publications/:id/articles/:articleId | session (edit_others) | Delete article |
+| POST | /api/v1/publications/:id/articles/:articleId/publish | session (can_publish) | Approve and publish article |
+| POST | /api/v1/publications/:id/articles/:articleId/unpublish | session (can_publish) | Unpublish article |
+| GET | /api/v1/publications/:slug/public | optional | Public publication profile |
+| GET | /api/v1/publications/:slug/articles | optional | Published articles (paginated) |
+| GET | /api/v1/publications/:slug/masthead | optional | Public member list |
+| POST | /api/v1/subscriptions/publication/:id | session | Subscribe to publication |
+| DELETE | /api/v1/subscriptions/publication/:id | session | Cancel publication subscription |
+| POST | /api/v1/follows/publication/:id | session | Follow publication |
+| DELETE | /api/v1/follows/publication/:id | session | Unfollow publication |
+| GET | /api/v1/pub/:slug/rss | — | Publication RSS feed |
+
 ### Reader account
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
@@ -703,7 +847,7 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | GET | /api/v1/writers/:username/followers | optional | Public paginated follower list |
 | GET | /api/v1/writers/:username/following | optional | Public paginated following list |
 | GET | /api/v1/writers/:username/subscriptions | optional | Public subscription list (non-hidden only) |
-| GET | /api/v1/search?q=&type= | optional | Search articles + writers |
+| GET | /api/v1/search?q=&type= | optional | Search articles, writers, and publications |
 | GET | /rss | — | Platform-wide RSS |
 | GET | /rss/:username | — | Writer RSS |
 
@@ -718,7 +862,7 @@ docker exec platform-pub-postgres-1 pg_dump -U platformpub platformpub | gzip > 
 | 3 | Contacts | User (via key-custody) | Follow list |
 | 5 | Deletion | User (via key-custody) | Soft-delete article or note. Published by the gateway on article delete and note delete — used by feed clients to filter deleted events from relay query results |
 | 7003 | Subscription | Platform service key | Subscription status (provisional NIP-88) |
-| 30023 | Long-form article | User (via key-custody) | NIP-23 article with optional `['payload', ciphertext, algorithm]` tag for paywalled content |
+| 30023 | Long-form article | User or Publication (via key-custody) | NIP-23 article with optional `['payload', ciphertext, algorithm]` tag for paywalled content. Publication articles are signed with the publication's keypair (signerType='publication') and include author/publisher p-tags |
 | 30024 | Draft | User (via key-custody) | NIP-23 draft |
 | 9901 | Receipt | Platform service key | Gate-pass receipt (public relay: HMAC reader hash; private DB copy: actual reader pubkey) |
 
@@ -740,12 +884,16 @@ Legacy articles (pre-v3.0) used a separate kind 39701 vault event with AES-256-G
 
 ## Key custody
 
-The `key-custody` service (port 3004) is the sole holder of all user Nostr private keys. It holds `ACCOUNT_KEY_HEX` — the AES-256 key used to encrypt private keys at rest in `accounts.nostr_privkey_enc`. **No other service has access to this key.**
+The `key-custody` service (port 3004) is the sole holder of all user and publication Nostr private keys. It holds `ACCOUNT_KEY_HEX` — the AES-256 key used to encrypt private keys at rest in `accounts.nostr_privkey_enc` and `publications.nostr_privkey_enc`. **No other service has access to this key.**
 
-The gateway calls key-custody for three operations:
+The gateway calls key-custody for these operations:
 - `POST /keypairs/generate` — generate and store a new Nostr keypair for a new user
-- `POST /keypairs/sign` — sign a Nostr event with a user's private key
+- `POST /keypairs/sign` — sign a Nostr event with a user's or publication's private key
 - `POST /keypairs/unwrap-nip44` — NIP-44 decrypt (for reading encrypted DMs, key deliveries)
+- `POST /keypairs/nip44-encrypt` — NIP-44 encrypt
+- `POST /keypairs/nip44-decrypt` — NIP-44 decrypt
+
+All signing and encryption endpoints accept `signerId` + `signerType` (`'account'` | `'publication'`). When `signerType` is `'publication'`, the private key is looked up from the `publications` table. Backwards-compatible: `accountId` still accepted.
 
 All calls carry `x-internal-secret` (shared secret between gateway and key-custody). The key-custody service rejects any request missing this header.
 
@@ -813,9 +961,10 @@ A receiving host verifies receipts by:
 ### Access check priority
 
 1. Own content → free
-2. Permanent unlock (`article_unlocks`) → free, key reissued
-3. Active subscription → free, creates permanent unlock + subscription_read log
-4. Payment flow → charges reading tab, creates permanent unlock
+2. Publication member (if article belongs to a publication) → free
+3. Permanent unlock (`article_unlocks`) → free, key reissued
+4. Active subscription (writer or publication) → free, creates permanent unlock + subscription_read log
+5. Payment flow → charges reading tab, creates permanent unlock
 
 ---
 
@@ -847,7 +996,14 @@ Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), conver
 | /social | Feed reach dial, blocked accounts, muted accounts, DM fees |
 | /settings | Redirects to /profile |
 | /history | Redirects to /account?filter=all |
-| /search | Article + writer search |
+| /pub/:slug | Publication homepage (blog/magazine/minimal layout) |
+| /pub/:slug/about | Publication about/mission page |
+| /pub/:slug/masthead | Publication team listing |
+| /pub/:slug/subscribe | Publication subscription CTA |
+| /pub/:slug/archive | Publication full article archive |
+| /pub/:slug/:articleSlug | Article under publication branding |
+| /invite/:token | Publication invite acceptance page |
+| /search | Article, writer, and publication search |
 | /about | About page |
 
 ---
@@ -908,6 +1064,27 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 ---
 
 ## Change log
+
+### v5.19.0 — 6 April 2026
+
+**Publications Phases 2 & 3: CMS pipeline, reader surface, feed/search integration**
+
+No new migration (uses 038 from v5.18.0). Services changed: gateway, key-custody, web.
+
+- **Server-side publishing pipeline:** Articles submitted to publications are signed with the publication's Nostr keypair (via key-custody), published to the relay, and indexed — all orchestrated server-side. Contributors without `can_publish` save as 'submitted'; editors approve to trigger the full pipeline.
+- **Publication CMS routes:** Submit, list, edit, delete, publish, unpublish articles within a publication. Signing routes accept `publicationId` for publication-key signing.
+- **Publication reader pages:** Homepage (blog/magazine/minimal layouts), about, masthead, subscribe, archive, and article-under-publication pages at `/pub/<slug>/...`.
+- **Publication subscriptions and follows:** Subscribe/unsubscribe and follow/unfollow routes for publications. Following feed includes content from followed publications.
+- **Publication RSS:** Per-publication RSS feed at `/api/v1/pub/<slug>/rss`.
+- **Search integration:** Publications searchable by name and tagline.
+- **Feed scoring:** `feed_scores.publication_id` populated by the scoring worker.
+- **Article page awareness:** Articles show "By Author in Publication" byline with link. Publication subscription price used for CTA.
+- **Writer profile filtering:** Publication-only articles hidden unless `show_on_writer_profile` is true.
+- **Editor integration:** "Publishing as" dropdown, "Submit for review" for non-publishers, "Also show on your personal profile" checkbox.
+- **Dashboard context switcher:** Personal vs publication context with publication-specific tabs (Articles, Members, Settings).
+- **Invite acceptance page:** `/invite/<token>` with accept/decline for logged-in, signup redirect for anonymous.
+
+---
 
 ### v5.18.0 — 6 April 2026
 

@@ -57,12 +57,14 @@ export async function writerRoutes(app: FastifyInstance) {
       const [countResult, paywalledResult, followerResult, followingResult] = await Promise.all([
         pool.query<{ count: string }>(
           `SELECT COUNT(*) AS count FROM articles
-           WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL`,
+           WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL
+             AND (publication_id IS NULL OR show_on_writer_profile = TRUE)`,
           [writer.id]
         ),
         pool.query<{ count: string }>(
           `SELECT COUNT(*) AS count FROM articles
-           WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL AND access_mode = 'paywalled'`,
+           WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL AND access_mode = 'paywalled'
+             AND (publication_id IS NULL OR show_on_writer_profile = TRUE)`,
           [writer.id]
         ),
         pool.query<{ count: string }>(
@@ -147,6 +149,7 @@ export async function writerRoutes(app: FastifyInstance) {
                 pinned_on_profile, profile_pin_order
          FROM articles
          WHERE writer_id = $1 AND published_at IS NOT NULL AND deleted_at IS NULL
+           AND (publication_id IS NULL OR show_on_writer_profile = TRUE)
          ORDER BY pinned_on_profile DESC, profile_pin_order ASC, published_at DESC
          LIMIT $2 OFFSET $3`,
         [writerId, limit, offset]

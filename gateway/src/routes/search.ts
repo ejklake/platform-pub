@@ -45,6 +45,9 @@ export async function searchRoutes(app: FastifyInstance) {
       if (type === 'writers') {
         return searchWriters(query, limit, offset, reply)
       }
+      if (type === 'publications') {
+        return searchPublications(query, limit, offset, reply)
+      }
 
       return searchArticles(query, limit, offset, reply)
     }
@@ -164,4 +167,55 @@ async function searchWriters(
   }))
 
   return reply.status(200).send({ query, type: 'writers', results, limit, offset })
+}
+
+// ---------------------------------------------------------------------------
+// Publication search — trigram on name and tagline
+// ---------------------------------------------------------------------------
+
+async function searchPublications(
+  query: string,
+  limit: number,
+  offset: number,
+  reply: any
+) {
+  const { rows } = await pool.query<{
+    id: string
+    slug: string
+    name: string
+    tagline: string | null
+    logo_blossom_url: string | null
+    article_count: string
+    member_count: string
+    similarity: number
+  }>(
+    `SELECT p.id, p.slug, p.name, p.tagline, p.logo_blossom_url,
+            (SELECT COUNT(*) FROM articles WHERE publication_id = p.id AND published_at IS NOT NULL AND deleted_at IS NULL) AS article_count,
+            (SELECT COUNT(*) FROM publication_members WHERE publication_id = p.id AND removed_at IS NULL) AS member_count,
+            similarity(p.name, $1) AS similarity
+     FROM publications p
+     WHERE p.status = 'active'
+       AND (
+         similarity(p.name, $1) > 0.1
+         OR p.name ILIKE $2
+         OR p.tagline ILIKE $2
+       )
+     ORDER BY similarity DESC, p.name
+     LIMIT $3 OFFSET $4`,
+    [query, `%${escapeLike(query)}%`, limit, offset]
+  )
+
+  const results = rows.map(r => ({
+    type: 'publication' as const,
+    id: r.id,
+    slug: r.slug,
+    name: r.name,
+    tagline: r.tagline,
+    logo: r.logo_blossom_url,
+    articleCount: parseInt(r.article_count, 10),
+    memberCount: parseInt(r.member_count, 10),
+    relevance: r.similarity,
+  }))
+
+  return reply.status(200).send({ query, type: 'publications', results, limit, offset })
 }

@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { pool } from '../../shared/src/db/client.js'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, optionalAuth } from '../middleware/auth.js'
 import { requirePublicationPermission, requirePublicationOwner } from '../middleware/publication-auth.js'
 import { generateKeypair } from '../lib/key-custody-client.js'
+import { publishToPublication, approveAndPublishArticle } from '../services/publication-publisher.js'
 import logger from '../../shared/src/lib/logger.js'
 
 // =============================================================================
@@ -594,4 +595,335 @@ export async function publicationRoutes(app: FastifyInstance) {
 
     return reply.send({ publications: rows })
   })
+
+  // ===========================================================================
+  // CMS Routes — Publication article management
+  // ===========================================================================
+
+  const SubmitArticleSchema = z.object({
+    title: z.string().min(1).max(500),
+    summary: z.string().max(500).optional(),
+    content: z.string().min(1),
+    fullContent: z.string().min(1),
+    accessMode: z.enum(['public', 'paywalled']).default('public'),
+    pricePence: z.number().int().min(0).optional(),
+    gatePositionPct: z.number().int().min(1).max(99).optional(),
+    showOnWriterProfile: z.boolean().default(true),
+    existingDTag: z.string().optional(),
+  })
+
+  // ---------------------------------------------------------------------------
+  // GET /publications/:id/articles — CMS article list
+  // ---------------------------------------------------------------------------
+
+  app.get<{ Params: { id: string }; Querystring: { status?: string; limit?: string; offset?: string } }>(
+    '/publications/:id/articles',
+    { preHandler: [requireAuth, requirePublicationPermission()] },
+    async (req, reply) => {
+      const { id } = req.params
+      const member = req.publicationMember!
+      const status = (req.query as any).status
+      const limit = Math.min(parseInt((req.query as any).limit ?? '50', 10), 100)
+      const offset = parseInt((req.query as any).offset ?? '0', 10)
+
+      let statusFilter = ''
+      const values: any[] = [id]
+
+      // Contributors only see their own articles
+      const isContributorOnly = member.role === 'contributor' && !member.can_edit_others
+      if (isContributorOnly) {
+        values.push(member.account_id)
+      }
+
+      if (status) {
+        values.push(status)
+        statusFilter = `AND a.publication_article_status = $${values.length}`
+      }
+
+      const writerFilter = isContributorOnly ? `AND a.writer_id = $2` : ''
+
+      const { rows } = await pool.query(
+        `SELECT a.id, a.title, a.slug, a.nostr_d_tag AS d_tag, a.access_mode,
+                a.price_pence, a.publication_article_status AS status,
+                a.published_at, a.created_at, a.show_on_writer_profile,
+                acc.username AS author_username, acc.display_name AS author_display_name
+         FROM articles a
+         JOIN accounts acc ON acc.id = a.writer_id
+         WHERE a.publication_id = $1 AND a.deleted_at IS NULL
+           ${writerFilter} ${statusFilter}
+         ORDER BY a.created_at DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+        values
+      )
+
+      return reply.send({ articles: rows })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // POST /publications/:id/articles — Submit or publish an article
+  // ---------------------------------------------------------------------------
+
+  app.post<{ Params: { id: string } }>(
+    '/publications/:id/articles',
+    { preHandler: [requireAuth, requirePublicationPermission()] },
+    async (req, reply) => {
+      const parsed = SubmitArticleSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() })
+      }
+
+      const { id } = req.params
+      const member = req.publicationMember!
+      const userId = req.session!.sub!
+      const userPubkey = req.session!.pubkey!
+
+      const result = await publishToPublication({
+        publicationId: id,
+        authorId: userId,
+        authorPubkey: userPubkey,
+        canPublish: member.can_publish,
+        ...parsed.data,
+      })
+
+      return reply.status(201).send(result)
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // PATCH /publications/:id/articles/:articleId — Edit article metadata
+  // ---------------------------------------------------------------------------
+
+  const EditArticleSchema = z.object({
+    title: z.string().min(1).max(500).optional(),
+    summary: z.string().max(500).nullable().optional(),
+    pricePence: z.number().int().min(0).optional(),
+    showOnWriterProfile: z.boolean().optional(),
+  })
+
+  app.patch<{ Params: { id: string; articleId: string } }>(
+    '/publications/:id/articles/:articleId',
+    { preHandler: [requireAuth, requirePublicationPermission('can_edit_others')] },
+    async (req, reply) => {
+      const parsed = EditArticleSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ error: parsed.error.flatten() })
+      }
+
+      const { id, articleId } = req.params
+      const data = parsed.data
+
+      const setClauses: string[] = []
+      const values: any[] = []
+      let idx = 1
+
+      const fields: Record<string, string> = {
+        title: 'title', summary: 'summary',
+        pricePence: 'price_pence', showOnWriterProfile: 'show_on_writer_profile',
+      }
+
+      for (const [jsKey, dbCol] of Object.entries(fields)) {
+        const val = (data as any)[jsKey]
+        if (val !== undefined) {
+          setClauses.push(`${dbCol} = $${idx}`)
+          values.push(val)
+          idx++
+        }
+      }
+
+      if (setClauses.length === 0) {
+        return reply.status(400).send({ error: 'No fields to update' })
+      }
+
+      values.push(articleId, id)
+      await pool.query(
+        `UPDATE articles SET ${setClauses.join(', ')}
+         WHERE id = $${idx} AND publication_id = $${idx + 1}`,
+        values
+      )
+
+      return reply.send({ ok: true })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // DELETE /publications/:id/articles/:articleId — Soft-delete article
+  // ---------------------------------------------------------------------------
+
+  app.delete<{ Params: { id: string; articleId: string } }>(
+    '/publications/:id/articles/:articleId',
+    { preHandler: [requireAuth, requirePublicationPermission('can_edit_others')] },
+    async (req, reply) => {
+      const { id, articleId } = req.params
+
+      await pool.query(
+        `UPDATE articles SET deleted_at = now(), publication_article_status = 'unpublished'
+         WHERE id = $1 AND publication_id = $2`,
+        [articleId, id]
+      )
+
+      return reply.send({ ok: true })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // POST /publications/:id/articles/:articleId/publish — Approve + publish
+  // ---------------------------------------------------------------------------
+
+  app.post<{ Params: { id: string; articleId: string } }>(
+    '/publications/:id/articles/:articleId/publish',
+    { preHandler: [requireAuth, requirePublicationPermission('can_publish')] },
+    async (req, reply) => {
+      const { id, articleId } = req.params
+      const editorId = req.session!.sub!
+
+      const result = await approveAndPublishArticle(id, articleId, editorId)
+      return reply.send(result)
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // POST /publications/:id/articles/:articleId/unpublish — Pull article
+  // ---------------------------------------------------------------------------
+
+  app.post<{ Params: { id: string; articleId: string } }>(
+    '/publications/:id/articles/:articleId/unpublish',
+    { preHandler: [requireAuth, requirePublicationPermission('can_publish')] },
+    async (req, reply) => {
+      const { id, articleId } = req.params
+
+      await pool.query(
+        `UPDATE articles SET publication_article_status = 'unpublished', published_at = NULL
+         WHERE id = $1 AND publication_id = $2`,
+        [articleId, id]
+      )
+
+      return reply.send({ ok: true })
+    }
+  )
+
+  // ===========================================================================
+  // Reader-facing public routes
+  // ===========================================================================
+
+  // ---------------------------------------------------------------------------
+  // GET /publications/:slug/public — Full public profile (for homepage)
+  // ---------------------------------------------------------------------------
+
+  app.get<{ Params: { slug: string } }>(
+    '/publications/:slug/public',
+    { preHandler: optionalAuth },
+    async (req, reply) => {
+      const { slug } = req.params
+
+      const { rows } = await pool.query(
+        `SELECT p.id, p.slug, p.name, p.tagline, p.about, p.logo_blossom_url, p.cover_blossom_url,
+                p.nostr_pubkey, p.subscription_price_pence, p.annual_discount_pct,
+                p.default_article_price_pence, p.theme_config, p.status, p.founded_at,
+                (SELECT COUNT(*) FROM publication_follows WHERE publication_id = p.id) AS follower_count,
+                (SELECT COUNT(*) FROM publication_members WHERE publication_id = p.id AND removed_at IS NULL) AS member_count,
+                (SELECT COUNT(*) FROM articles WHERE publication_id = p.id AND published_at IS NOT NULL AND deleted_at IS NULL) AS article_count
+         FROM publications p
+         WHERE p.slug = $1 AND p.status = 'active'`,
+        [slug]
+      )
+
+      if (rows.length === 0) {
+        return reply.status(404).send({ error: 'Publication not found' })
+      }
+
+      const pub = rows[0]
+
+      // Check if the reader follows this publication
+      let isFollowing = false
+      let isSubscribed = false
+      const readerId = req.session?.sub
+      if (readerId) {
+        const [followRes, subRes] = await Promise.all([
+          pool.query(
+            'SELECT 1 FROM publication_follows WHERE follower_id = $1 AND publication_id = $2',
+            [readerId, pub.id]
+          ),
+          pool.query(
+            `SELECT 1 FROM subscriptions WHERE reader_id = $1 AND publication_id = $2
+               AND status IN ('active', 'cancelled') AND current_period_end > now()`,
+            [readerId, pub.id]
+          ),
+        ])
+        isFollowing = followRes.rows.length > 0
+        isSubscribed = subRes.rows.length > 0
+      }
+
+      return reply.send({ ...pub, isFollowing, isSubscribed })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // GET /publications/:slug/articles — Published articles (paginated)
+  // ---------------------------------------------------------------------------
+
+  app.get<{ Params: { slug: string }; Querystring: { limit?: string; offset?: string } }>(
+    '/publications/:slug/articles',
+    async (req, reply) => {
+      const { slug } = req.params
+      const limit = Math.min(parseInt((req.query as any).limit ?? '20', 10), 50)
+      const offset = parseInt((req.query as any).offset ?? '0', 10)
+
+      const { rows: pubs } = await pool.query<{ id: string }>(
+        `SELECT id FROM publications WHERE slug = $1 AND status = 'active'`,
+        [slug]
+      )
+      if (pubs.length === 0) {
+        return reply.status(404).send({ error: 'Publication not found' })
+      }
+
+      const { rows } = await pool.query(
+        `SELECT a.id, a.nostr_event_id, a.nostr_d_tag, a.title, a.slug, a.summary,
+                a.content_free, a.word_count, a.access_mode, a.price_pence,
+                a.published_at,
+                acc.username AS author_username, acc.display_name AS author_display_name,
+                acc.avatar_blossom_url AS author_avatar
+         FROM articles a
+         JOIN accounts acc ON acc.id = a.writer_id
+         WHERE a.publication_id = $1 AND a.published_at IS NOT NULL AND a.deleted_at IS NULL
+           AND a.publication_article_status = 'published'
+         ORDER BY a.published_at DESC
+         LIMIT $2 OFFSET $3`,
+        [pubs[0].id, limit, offset]
+      )
+
+      return reply.send({ articles: rows })
+    }
+  )
+
+  // ---------------------------------------------------------------------------
+  // GET /publications/:slug/masthead — Public member list with roles/titles
+  // ---------------------------------------------------------------------------
+
+  app.get<{ Params: { slug: string } }>(
+    '/publications/:slug/masthead',
+    async (req, reply) => {
+      const { slug } = req.params
+
+      const { rows: pubs } = await pool.query<{ id: string }>(
+        `SELECT id FROM publications WHERE slug = $1 AND status = 'active'`,
+        [slug]
+      )
+      if (pubs.length === 0) {
+        return reply.status(404).send({ error: 'Publication not found' })
+      }
+
+      const { rows } = await pool.query(
+        `SELECT pm.role, pm.title, pm.is_owner,
+                a.username, a.display_name, a.avatar_blossom_url, a.bio
+         FROM publication_members pm
+         JOIN accounts a ON a.id = pm.account_id
+         WHERE pm.publication_id = $1 AND pm.removed_at IS NULL AND a.status = 'active'
+         ORDER BY pm.is_owner DESC, pm.role ASC, a.display_name ASC`,
+        [pubs[0].id]
+      )
+
+      return reply.send({ members: rows })
+    }
+  )
 }

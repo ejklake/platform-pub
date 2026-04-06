@@ -27,6 +27,8 @@ interface ArticleReaderProps {
   writerSpendThisMonthPence?: number
   nudgeShownThisMonth?: boolean
   preRenderedFreeHtml?: string
+  publicationName?: string
+  publicationSlug?: string
 }
 
 // Extract first image from markdown content
@@ -48,7 +50,7 @@ function stripHeroImage(content: string, heroUrl: string): string {
     .trim()
 }
 
-export function ArticleReader({ article, articleDbId, writerName, writerUsername, writerAvatar, writerId, subscriptionPricePence, writerSpendThisMonthPence, nudgeShownThisMonth, preRenderedFreeHtml }: ArticleReaderProps) {
+export function ArticleReader({ article, articleDbId, writerName, writerUsername, writerAvatar, writerId, subscriptionPricePence, writerSpendThisMonthPence, nudgeShownThisMonth, preRenderedFreeHtml, publicationName, publicationSlug }: ArticleReaderProps) {
   const { user } = useAuth()
   const [paywallBody, setPaywallBody] = useState<string | null>(null)
   const [unlocking, setUnlocking] = useState(false)
@@ -184,7 +186,12 @@ export function ArticleReader({ article, articleDbId, writerName, writerUsername
               <div className="flex items-center gap-3">
                 <Avatar src={writerAvatar} name={writerName} size={36} lazy={false} />
                 <div>
-                  <a href={`/${writerUsername}`} className="font-sans text-[14px] font-semibold text-black hover:opacity-70 transition-opacity">{writerName}</a>
+                  <span className="font-sans text-[14px]">
+                    <a href={`/${writerUsername}`} className="font-semibold text-black hover:opacity-70 transition-opacity">{writerName}</a>
+                    {publicationSlug && publicationName && (
+                      <> in <a href={`/pub/${publicationSlug}`} className="font-semibold text-black hover:opacity-70 transition-opacity">{publicationName}</a></>
+                    )}
+                  </span>
                   <p className="font-sans text-[13px] text-grey-600">{publishDate}</p>
                 </div>
               </div>

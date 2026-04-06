@@ -3,7 +3,7 @@
 Consolidated from 19 planning documents, verified against the codebase as of 2026-04-06. The archived specs live in `planning-archive/`. Documents left in the project root are strategic specs that are still entirely ahead of us.
 
 Last audited: 2026-04-06. Items marked DONE were verified against the codebase in that audit.
-Last worked: 2026-04-06 (v5.16.0 session). Completed: inline subscription management on Following/Followers tabs (subscribe/unsubscribe/resubscribe buttons with confirmation modal on Following; "Subscriber" badge on Followers). Editor chrome cleanup (title+standfirst as single grey card, white toolbar, hairlines removed). API client `social.block()`/`social.mute()` wrappers added. Next up: writer analytics (#1 in attack order).
+Last worked: 2026-04-06 (v5.19.0 session). Completed: Publications Phases 1–3 (schema, key-custody signerType, core CRUD, member management, CMS pipeline, server-side publishing, editor integration, dashboard context switcher, invite page, reader surface — homepage/about/masthead/subscribe/archive/article pages, publication subscriptions/follows, RSS, search, feed integration, article page publication awareness, writer profile filtering). Next up: Publications Phase 5 (revenue — rate card, payroll, payouts, earnings) or writer analytics.
 
 ---
 
@@ -142,12 +142,26 @@ Multi-currency support. Option 2 (launch with GBP, display-only conversion) is r
 
 **Publications — `PUBLICATIONS-SPEC.md`**
 
-Multi-writer federated publications with shared identity, editorial pipeline, and revenue pooling. Phases 1–3 and 5 have a full build plan. Phase 4 (theming and custom domains) is deferred:
+Multi-writer federated publications with shared identity, editorial pipeline, and revenue pooling.
+
+**Phases 1–3 DONE (v5.18.0–v5.19.0):**
+- Phase 1: Schema (migration 038), key-custody signerType, publication auth middleware, CRUD routes, member management, access check extension, API client namespace.
+- Phase 2: Server-side publishing pipeline, CMS routes (submit/list/edit/delete/publish/unpublish), signing route publication support, draft association, editor publication selector + cross-post checkbox, dashboard context switcher + publication tabs (Articles, Members, Settings), invite acceptance page.
+- Phase 3: Public reader routes (profile, articles, masthead), publication subscriptions + follows, RSS feed, search integration, feed integration (following + scoring), publication reader pages (homepage with blog/magazine/minimal layouts, about, masthead, subscribe, archive, article-under-publication), article page publication awareness ("By Author in Publication" byline), writer profile publication filtering.
+
+**Phase 4 DEFERRED (theming and custom domains):**
 - Wildcard subdomain routing (nginx `*.all.haus` + Next.js middleware rewrite)
 - Custom domain DNS TXT verification flow + TLS provisioning (lua-resty-auto-ssl or Caddy)
 - Theme settings UI (colour picker, font selector, layout mode switcher)
 - Custom CSS editor with live preview + server-side sanitiser (`scopeCSS`)
 - Per-publication favicon from logo
+
+**Phase 5 TODO (revenue):**
+- Rate card routes (GET/PATCH `/publications/:id/rate-card`) — view/update subscription and per-article pricing
+- Payroll routes (GET/PATCH `/publications/:id/payroll`, PATCH `.../article/:articleId`) — standing revenue shares and per-article overrides
+- Publication payout worker — settlement splits based on revenue shares, minimum threshold enforcement
+- Earnings routes (GET `/publications/:id/earnings`) — revenue dashboard data
+- Revenue UI tabs: `RateCardTab.tsx`, `PayrollTab.tsx`, `PublicationEarningsTab.tsx`
 
 ---
 
@@ -175,19 +189,25 @@ Multi-writer federated publications with shared identity, editorial pipeline, an
 - ~~Editor hairline cleanup~~ — title + standfirst wrapped in single grey card, toolbar changed to white, inter-field gaps removed
 - ~~Missing API client methods~~ — `social.block()` and `social.mute()` POST wrappers added to match backend endpoints
 
+### Completed (v5.18.0–v5.19.0 sessions, 2026-04-06)
+
+- ~~Publications Phases 1–3~~ — schema, core model, key-custody signerType, member management, CMS pipeline, server-side publishing, editor integration, dashboard context switcher, invite page, reader surface (homepage/about/masthead/subscribe/archive/article pages), publication subscriptions/follows, RSS, search, feed integration, article page publication awareness, writer profile filtering.
+
 ### Next up
 
-1. **Writer analytics** — writers need numbers to stay. Gateway endpoint joining read_events, votes, comments, revenue; dashboard Analytics tab.
-2. **Email-on-publish** — inbox is the feed, critical for retention. Migration + send logic + settings toggle.
-3. **Tags/topics** — discoverability. Migration, editor input, browse page, card display.
-4. **Bookmarks** — reader engagement. Migration, routes, button, /bookmarks page.
+1. **Publications Phase 5 (revenue)** — rate card, payroll, payout worker, earnings dashboard. See `PUBLICATIONS-SPEC.md` §6.3, §10 Phase 5.
+2. **Writer analytics** — writers need numbers to stay. Gateway endpoint joining read_events, votes, comments, revenue; dashboard Analytics tab.
+3. **Email-on-publish** — inbox is the feed, critical for retention. Migration + send logic + settings toggle.
+4. **Tags/topics** — discoverability. Migration, editor input, browse page, card display.
+5. **Bookmarks** — reader engagement. Migration, routes, button, /bookmarks page.
 
 ### Later: strategic work
 
-5. Subscription Phase 2 — now partially covered by offers system; remaining: welcome email, subscriber import/export, subscriber analytics, custom subscribe landing page
-6. Currency strategy — see `platform-pub-currency-strategy.md`
-7. Reposts (needs feed algorithm to be meaningful)
-8. Bucket system — see `platform-bucket-system-design.md`
+6. Subscription Phase 2 — now partially covered by offers system; remaining: welcome email, subscriber import/export, subscriber analytics, custom subscribe landing page
+7. Currency strategy — see `platform-pub-currency-strategy.md`
+8. Reposts (needs feed algorithm to be meaningful)
+9. Bucket system — see `platform-bucket-system-design.md`
+10. Publications Phase 4 (theming/custom domains) — see `PUBLICATIONS-SPEC.md` §10 Phase 4
 
 ### Infrastructure (fit in as time allows)
 
