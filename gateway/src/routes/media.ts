@@ -61,7 +61,7 @@ export async function mediaRoutes(app: FastifyInstance) {
   //   7. Return public URL
   // ---------------------------------------------------------------------------
 
-  app.post('/media/upload', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/media/upload', { preHandler: requireAuth, bodyLimit: 12 * 1024 * 1024 }, async (req, reply) => {
     const uploaderId = req.session!.sub!
 
     try {

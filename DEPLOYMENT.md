@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.25.0
+# all.haus — Deployment Reference v5.26.0
 
 **Date:** 7 April 2026
-**Replaces:** v5.24.0 (see bottom for change log)
+**Replaces:** v5.25.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -250,6 +250,43 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
 
+### From v5.25.0
+
+No migration. Services changed: **gateway**. Deploy order: **rebuild gateway**.
+
+This release fixes profile image uploads (and all media uploads) failing for files over ~1MB. The Fastify default body size limit (1MB) was rejecting multipart payloads before the `@fastify/multipart` plugin could process them, despite the plugin being configured for 12MB.
+
+**Backend (gateway):**
+
+- **Media upload body limit fix** (`media.ts`): Added explicit `bodyLimit: 12 * 1024 * 1024` on the `POST /media/upload` route to match the `@fastify/multipart` file size limit. Previously, Fastify's default 1MB body parser limit silently rejected uploads before the multipart handler ran.
+
+**Modified files:**
+
+- `gateway/src/routes/media.ts` — bodyLimit added to upload route
+
+**Upgrade steps:**
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migration — backend fix only
+docker compose build gateway
+docker compose up -d gateway
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway should show (healthy) after ~30s
+
+# Upload test:
+# - /profile → Upload photo (use a >1MB image) → should succeed
+```
+
+No new env vars. No database changes.
+
+---
+
 ### From v5.24.0
 
 No migration. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
@@ -454,186 +491,7 @@ docker compose logs gateway --tail=5
 
 No new env vars. No database changes.
 
----
-
-### From v5.19.0
-
-No new migration. Services changed: **gateway**, **payment-service**, **web**. Deploy order: **rebuild gateway + payment + web**.
-
-This release implements Publications Phase 5 — revenue management. Publication owners and finance managers can now configure subscription and per-article pricing (rate card), set standing revenue shares and per-article overrides for contributors (payroll), and view earnings dashboards. The daily payout worker now runs a publication payout cycle after the individual writer cycle, distributing revenue to members via Stripe Connect transfers based on their standing shares and article-specific overrides.
-
-**Backend (gateway):**
-
-- **Rate card routes** (`publications.ts`): `GET/PATCH /publications/:id/rate-card` — view and update `subscription_price_pence`, `annual_discount_pct`, `default_article_price_pence`. Requires `can_manage_finances` permission.
-- **Payroll routes** (`publications.ts`): `GET /publications/:id/payroll` — view standing member shares (with user details) and per-article overrides. `PATCH /publications/:id/payroll` — bulk-update standing shares with 10,000 bps (100%) cap validation. `PATCH /publications/:id/payroll/article/:articleId` — upsert per-article share (revenue % or flat fee).
-- **Earnings routes** (`publications.ts`): `GET /publications/:id/earnings` — summary totals (gross/net/pending/paid/readCount), per-article revenue breakdown, payout history with splits. Uses config-loaded `platform_fee_bps`.
-
-**Backend (payment-service):**
-
-- **Publication payout worker** (`payout.ts`): New `runPublicationPayoutCycle()` method on `PayoutService`. Finds publications with settled revenue above the payout threshold, then for each: (1) deducts platform fee, (2) pays flat-fee per-article overrides first, (3) distributes article revenue-share overrides, (4) distributes remaining pool by standing member shares, (5) initiates Stripe Connect transfers to each member's personal account, (6) records `publication_payouts` and `publication_payout_splits` rows, (7) marks `read_events` as `writer_paid`. Members without Stripe KYC get splits recorded as `pending`.
-- **Payout worker** (`workers/payout.ts`): Now calls `runPublicationPayoutCycle()` after the individual writer payout cycle.
-
-**Frontend (web):**
-
-- **RateCardTab** (`RateCardTab.tsx`): Subscription pricing form (monthly price, annual discount %, default per-article price) with live annual price preview.
-- **PayrollTab** (`PayrollTab.tsx`): Standing share editor with visual distribution bar, per-member bps input, 100% cap validation. Per-article overrides table showing article title, contributor, share type, value, and paid status.
-- **PublicationEarningsTab** (`PublicationEarningsTab.tsx`): Summary cards (net earnings, pending, paid, read count), per-article revenue table, payout history with per-member split details.
-- **Dashboard** (`dashboard/page.tsx`): Publication context now shows Rate card, Payroll, and Earnings tabs for members with `can_manage_finances` permission.
-- **API client** (`api.ts`): `getRateCard`, `updateRateCard`, `getPayroll`, `updatePayroll`, `setArticleShare`, `getEarnings` methods on the publications namespace.
-
-**New files:**
-
-- `web/src/components/dashboard/RateCardTab.tsx`
-- `web/src/components/dashboard/PayrollTab.tsx`
-- `web/src/components/dashboard/PublicationEarningsTab.tsx`
-
-**Modified files:**
-
-- `gateway/src/routes/publications.ts` — rate card, payroll, and earnings routes added
-- `payment-service/src/services/payout.ts` — `runPublicationPayoutCycle()` and `initiatePublicationPayout()` methods added
-- `payment-service/src/workers/payout.ts` — calls publication payout cycle after writer cycle
-- `web/src/app/dashboard/page.tsx` — new publication tabs (rate-card, payroll, earnings) with `can_manage_finances` gating
-- `web/src/lib/api.ts` — revenue API client methods
-
-**Upgrade steps:**
-```bash
-cd /root/platform-pub
-git pull origin master
-
-# No new migration — publication schema (038) already in place
-# Rebuild gateway (new routes), payment (payout worker), and web (new tabs)
-docker compose build gateway payment web
-docker compose up -d gateway payment web
-```
-
-Verify:
-```bash
-docker ps --format "table {{.Names}}\t{{.Status}}"
-# gateway, payment, and web should show (healthy) after ~30s
-
-# Visual checks:
-# - /dashboard?context=<slug>: "Rate card", "Payroll", "Earnings" tabs visible for finance managers
-# - Rate card tab: subscription price, annual discount, default article price fields
-# - Payroll tab: standing shares with visual bar, per-article overrides table
-# - Earnings tab: summary cards, per-article revenue table, payout history
-```
-
-No new env vars. No database changes.
-
----
-
-### From v5.18.0
-
-No new migration (038 was applied in v5.18.0). Services changed: **gateway**, **key-custody**, **web**. Deploy order: **rebuild gateway + key-custody + web**.
-
-This release implements Publications Phases 2 and 3 — the CMS/publishing pipeline and the full reader-facing surface. Writers can now submit articles to publications, editors can approve and publish them (signed with the publication's Nostr keypair), and publications have their own homepage, about page, masthead, archive, RSS feed, subscription, and follow system. The feed and search engines now include publication content. Article pages show "By Author in Publication" bylines when applicable. Writer profiles filter out publication-only articles.
-
-**Backend (key-custody):**
-
-No changes beyond Phase 1 (signerType support already in place).
-
-**Backend (gateway):**
-
-- **Publication CMS routes** (`publications.ts`): `POST/GET /publications/:id/articles` (submit + list), `PATCH/DELETE /publications/:id/articles/:articleId` (edit/delete), `POST .../publish` and `.../unpublish` (approve/reject).
-- **Server-side publishing pipeline** (`publication-publisher.ts`): New service that orchestrates article submission — generates d-tags, builds NIP-23 events with author/publisher p-tags, signs with publication key via key-custody, publishes to relay, indexes in DB. Contributors without `can_publish` save as 'submitted'; editors approve and trigger full pipeline.
-- **Signing routes** (`signing.ts`): `/sign` and `/sign-and-publish` accept optional `publicationId` — checks `can_publish` permission, signs with publication key.
-- **Draft routes** (`drafts.ts`): drafts can be associated with a publication via `publicationId`.
-- **Public reader routes** (`publications.ts`): `GET /:slug/public` (full profile with follower/member/article counts, isFollowing, isSubscribed), `GET /by-slug/:slug/articles` (paginated), `GET /:slug/masthead`.
-- **Publication subscriptions** (`subscriptions.ts`): `POST/DELETE /subscriptions/publication/:id`.
-- **Publication follows** (`follows.ts`): `POST/DELETE /follows/publication/:id`. `GET /follows/pubkeys` includes followed publication pubkeys.
-- **Publication RSS** (`rss.ts`): `GET /api/v1/pub/:slug/rss`.
-- **Search** (`search.ts`): Publications searchable by name/tagline via pg_trgm.
-- **Feed** (`feed.ts`): Following feed includes articles from followed publications.
-- **Feed scorer** (`feed-scorer.ts`): Populates `publication_id` on feed_scores.
-- **Article page** (`articles.ts`): `GET /articles/:dTag` now returns `publication` object (id, slug, name, subscriptionPricePence) when article belongs to a publication.
-- **Writer profile** (`writers.ts`): Article queries filter `(publication_id IS NULL OR show_on_writer_profile = TRUE)`.
-
-**Frontend (web):**
-
-- **Editor** (`ArticleEditor.tsx`): "Publishing as" dropdown, "Also show on your personal profile" checkbox, "Submit for review" button for non-publishers.
-- **Write page** (`write/page.tsx`): `?pub=<slug>` pre-selection, routes to `publishToPublication()` for publication articles.
-- **Dashboard** (`dashboard/page.tsx`): Context switcher (Personal | Publication), publication-specific tabs (Articles, Members, Settings).
-- **Publication dashboard tabs**: `PublicationArticlesTab.tsx` (CMS with publish/unpublish), `MembersTab.tsx` (invite, manage), `PublicationSettingsTab.tsx` (edit metadata).
-- **Invite page** (`invite/[token]/page.tsx`): Shows invite details, accept/decline for logged-in users, signup redirect for anonymous.
-- **Publication reader pages**: layout shell (`pub/[slug]/layout.tsx`), homepage with blog/magazine/minimal layouts (`page.tsx`), about, masthead, subscribe, archive, article-under-publication pages.
-- **Publication components**: `PublicationNav.tsx`, `PublicationFooter.tsx`, `HomepageBlog.tsx`, `HomepageMagazine.tsx`, `HomepageMinimal.tsx`.
-- **Article reader** (`ArticleReader.tsx`): "By Author in Publication" byline, publication subscription price used when applicable.
-- **API client** (`api.ts`): Full publications namespace with reader-facing methods (getPublic, getPublicArticles, getMasthead, follow, unfollow, subscribe, cancelSubscription).
-
-**New files:**
-
-- `gateway/src/services/publication-publisher.ts`
-- `web/src/components/dashboard/PublicationArticlesTab.tsx`
-- `web/src/components/dashboard/MembersTab.tsx`
-- `web/src/components/dashboard/PublicationSettingsTab.tsx`
-- `web/src/app/invite/[token]/page.tsx`
-- `web/src/app/pub/[slug]/layout.tsx`
-- `web/src/app/pub/[slug]/page.tsx`
-- `web/src/app/pub/[slug]/about/page.tsx`
-- `web/src/app/pub/[slug]/masthead/page.tsx`
-- `web/src/app/pub/[slug]/subscribe/page.tsx`
-- `web/src/app/pub/[slug]/archive/page.tsx`
-- `web/src/app/pub/[slug]/[articleSlug]/page.tsx`
-- `web/src/components/publication/PublicationNav.tsx`
-- `web/src/components/publication/PublicationFooter.tsx`
-- `web/src/components/publication/HomepageBlog.tsx`
-- `web/src/components/publication/HomepageMagazine.tsx`
-- `web/src/components/publication/HomepageMinimal.tsx`
-
-**Modified files:**
-
-- `gateway/src/routes/publications.ts` — CMS + reader-facing routes added
-- `gateway/src/routes/signing.ts` — publicationId support
-- `gateway/src/routes/drafts.ts` — publicationId on drafts
-- `gateway/src/routes/subscriptions.ts` — publication subscription routes
-- `gateway/src/routes/follows.ts` — publication follow routes
-- `gateway/src/routes/rss.ts` — publication RSS feed
-- `gateway/src/routes/search.ts` — publication search
-- `gateway/src/routes/feed.ts` — publication content in following feed
-- `gateway/src/workers/feed-scorer.ts` — publication_id in scoring
-- `gateway/src/routes/articles.ts` — publication info in article response
-- `gateway/src/routes/writers.ts` — publication article filtering on writer profiles
-- `gateway/src/services/access.ts` — publication member free access, publication subscription check
-- `web/src/components/editor/ArticleEditor.tsx` — publication selector, cross-post checkbox
-- `web/src/app/write/page.tsx` — publication pre-selection, routing
-- `web/src/lib/publish.ts` — publishToPublication function
-- `web/src/app/dashboard/page.tsx` — context switcher, publication tabs
-- `web/src/lib/api.ts` — publications namespace, ArticleMetadata.publication field
-- `web/src/components/article/ArticleReader.tsx` — publication byline
-- `web/src/app/article/[dTag]/page.tsx` — passes publication props
-
-**Upgrade steps:**
-```bash
-cd /root/platform-pub
-git pull origin master
-
-# No new migration — 038 was applied in v5.18.0
-# Rebuild all three services (gateway has new routes + services, web has new pages)
-docker compose build gateway key-custody web
-docker compose up -d gateway key-custody web
-```
-
-Verify:
-```bash
-docker ps --format "table {{.Names}}\t{{.Status}}"
-# gateway, key-custody, and web should show (healthy) after ~30s
-
-# Visual checks:
-# - /write page: "Publishing as" dropdown appears if user is a publication member
-# - /dashboard: context switcher shows personal + publication names
-# - /dashboard?context=<slug>: publication Articles/Members/Settings tabs
-# - /pub/<slug>: publication homepage with nav, articles, footer
-# - /pub/<slug>/about: about page with rendered markdown
-# - /pub/<slug>/masthead: team listing with avatars and roles
-# - /pub/<slug>/archive: full article list with dates
-# - /article/<dTag>: articles with publication show "By Author in Publication" byline
-# - /<username>: writer profile excludes publication-only articles
-# - /search: publications appear in search results
-```
-
-No new env vars. No database changes.
-
-> **Older versions:** Upgrade instructions for v5.18.0 and earlier are available in this file's git history.
+> **Older versions:** Upgrade instructions for v5.20.0 and earlier are available in this file's git history.
 
 ---
 
@@ -992,7 +850,7 @@ A receiving host verifies receipts by:
 
 ## Media uploads
 
-Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), converted to WebP (quality 80), and written to the `media_data` volume at `/app/media/<sha256>.webp`. Nginx serves them at `/media/<sha256>.webp` with 1-year cache headers.
+Images uploaded via `POST /api/v1/media/upload` are resized (max 1200px), converted to WebP (quality 80), and written to the `media_data` volume at `/app/media/<sha256>.webp`. Nginx serves them at `/media/<sha256>.webp` with 1-year cache headers. Maximum upload size is 12MB (enforced by both Fastify `bodyLimit` and `@fastify/multipart` file size limit).
 
 ---
 
@@ -1087,6 +945,42 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 
 ## Change log
 
+### v5.26.0 — 7 April 2026
+
+**Fix: media upload body limit — profile images and large uploads failing**
+
+No migration. Services changed: gateway.
+
+- **Media upload body limit:** `POST /media/upload` route now sets `bodyLimit: 12 * 1024 * 1024` to match the `@fastify/multipart` file size limit. Fastify's default 1MB body parser limit was silently rejecting multipart payloads for any image over ~1MB before the multipart plugin could process them. This affected profile photo uploads and all image uploads from the editor.
+
+---
+
+### v5.25.0 — 7 April 2026
+
+**Paywall-gated comments, DM scroll, export download, publication creation UI**
+
+No migration. Services changed: gateway, web.
+
+- **Paywall-gated comments:** `GET /replies/:targetEventId` checks article paywall access; locked articles return empty comments with `paywallLocked: true`. Frontend shows lock message and re-fetches on unlock.
+- **DM scroll-to-bottom fix:** Conversations scroll to latest message on open via `initialScrollDone` ref.
+- **Export download fix:** Download anchor appended to DOM before click.
+- **Nav export button removed:** Export accessible only from Profile settings page.
+- **Publication creation UI:** "+ New publication" button in dashboard context switcher with inline creation form.
+
+---
+
+### v5.24.0 — 7 April 2026
+
+**CI pipeline, backend ESLint, pre-push hook**
+
+No migration. Services changed: gateway, payment-service, key-service, key-custody, web.
+
+- **CI pipeline:** GitHub Actions workflow for linting, type-checking, and tests across all services.
+- **Backend ESLint:** ESLint configured for all backend services with shared config.
+- **Pre-push hook:** Runs lint and type-check before push.
+
+---
+
 ### v5.23.0 — 7 April 2026
 
 **Fix: FeaturedWriters build error — removed API method still referenced**
@@ -1120,21 +1014,4 @@ No migration. Services changed: gateway, web.
 
 - **Route collision fix:** `GET /publications/:slug/articles` (public) and `GET /publications/:id/articles` (CMS) registered identical Fastify route patterns, causing `FST_ERR_DUPLICATED_ROUTE` and a gateway crash loop. Public route moved to `GET /publications/by-slug/:slug/articles`. Frontend callers (`api.ts`, `pub/[slug]/page.tsx`, `pub/[slug]/archive/page.tsx`) updated.
 
----
-
-### v5.20.0 — 6 April 2026
-
-**Publications Phase 5: Revenue — rate card, payroll, payout worker, earnings dashboard**
-
-No new migration. Services changed: gateway, payment-service, web.
-
-- **Rate card routes:** `GET/PATCH /publications/:id/rate-card` for subscription pricing, annual discount, and default per-article pricing. Gated on `can_manage_finances`.
-- **Payroll routes:** `GET/PATCH /publications/:id/payroll` for standing revenue shares (10,000 bps cap); `PATCH /publications/:id/payroll/article/:articleId` for per-article overrides (revenue % or flat fee, upsert semantics).
-- **Publication payout worker:** `runPublicationPayoutCycle()` runs after individual writer payouts. Processes flat fees first, then article revenue shares, then standing shares. Stripe Connect transfers to members; pending status for unverified accounts. Records `publication_payouts` + `publication_payout_splits`.
-- **Earnings dashboard:** `GET /publications/:id/earnings` returns summary totals, per-article breakdown, and payout history with splits. Platform fee loaded from config.
-- **Dashboard tabs:** Rate card (pricing form), Payroll (share editor with visual bar + overrides table), Earnings (summary cards, revenue table, payout history). All gated on `can_manage_finances`.
-- **API client:** `getRateCard`, `updateRateCard`, `getPayroll`, `updatePayroll`, `setArticleShare`, `getEarnings`.
-
-
-
-> **Older versions:** Changelog entries for v5.19.0 and earlier are available in this file's git history.
+> **Older versions:** Changelog entries for v5.21.0 and earlier are available in this file's git history.
