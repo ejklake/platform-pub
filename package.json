@@ -1,7 +1,9 @@
 {
   "scripts": {
     "seed": "npx tsx scripts/seed.ts",
-    "seed:clean": "npx tsx scripts/seed.ts --clean"
+    "seed:clean": "npx tsx scripts/seed.ts --clean",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
   },
   "dependencies": {
     "dotenv": "^17.3.1",
@@ -10,6 +12,8 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.4.0",
-    "@types/pg": "^8.20.0"
+    "@types/pg": "^8.20.0",
+    "eslint": "^10.2.0",
+    "typescript-eslint": "^8.58.0"
   }
 }

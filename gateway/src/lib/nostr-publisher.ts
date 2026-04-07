@@ -99,7 +99,7 @@ export async function publishToRelay(event: ReturnType<typeof finalizeEvent>): P
         if (type === 'OK') {
           clearTimeout(timeout)
           ws.close()
-          success ? resolve() : reject(new Error(`Relay rejected event: ${message}`))
+          if (success) { resolve() } else { reject(new Error(`Relay rejected event: ${message}`)) }
         }
       } catch { /* ignore NOTICE etc */ }
     })

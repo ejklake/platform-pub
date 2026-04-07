@@ -1,5 +1,4 @@
-import pg from 'pg'
-import type { PoolClient } from 'pg'
+import pg, { type PoolClient } from 'pg'
 import type { PlatformConfig } from '../types/config.js'
 import logger from '../lib/logger.js'
 

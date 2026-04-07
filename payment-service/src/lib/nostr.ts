@@ -134,9 +134,9 @@ async function publishToRelay(event: ReturnType<typeof finalizeEvent>): Promise<
       }
     }
 
-    ws.onerror = (err) => {
+    ws.onerror = () => {
       clearTimeout(timeout)
-      reject(err)
+      reject(new Error('WebSocket connection to relay failed'))
     }
   })
 }

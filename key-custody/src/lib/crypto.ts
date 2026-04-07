@@ -1,5 +1,4 @@
-import { generateSecretKey, getPublicKey, finalizeEvent, nip44 } from 'nostr-tools'
-import type { EventTemplate } from 'nostr-tools'
+import { generateSecretKey, getPublicKey, finalizeEvent, nip44, type EventTemplate } from 'nostr-tools'
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
 import { pool } from '../db/client.js'
 

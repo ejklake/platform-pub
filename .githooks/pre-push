@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#
+# pre-push hook — type-check and lint only the services with staged changes.
+# Runs in ~3-5s for a typical single-service change.
+#
+# Install (once per clone): git config core.hooksPath .githooks
+# Bypass:  git push --no-verify  (use sparingly)
+
+set -euo pipefail
+
+# What's being pushed? Compare against the remote ref.
+# If this is a new branch, compare against master.
+remote="$1"
+while read -r local_ref local_oid remote_ref remote_oid; do
+  if [ "$remote_oid" = "0000000000000000000000000000000000000000" ]; then
+    # New branch — compare against master
+    range="master...$local_oid"
+  elif [ "$local_oid" = "0000000000000000000000000000000000000000" ]; then
+    # Deleting branch — nothing to check
+    exit 0
+  else
+    range="$remote_oid...$local_oid"
+  fi
+done
+
+if [ -z "${range:-}" ]; then
+  exit 0
+fi
+
+changed_files=$(git diff --name-only "$range" 2>/dev/null || true)
+if [ -z "$changed_files" ]; then
+  exit 0
+fi
+
+# Determine which services were touched
+services=()
+for svc in gateway payment-service key-service key-custody shared; do
+  if echo "$changed_files" | grep -q "^${svc}/"; then
+    services+=("$svc")
+  fi
+done
+
+if [ ${#services[@]} -eq 0 ]; then
+  # No backend changes (web-only, docs, etc.) — skip
+  exit 0
+fi
+
+echo "pre-push: checking ${services[*]}"
+
+# Type-check changed services
+for svc in "${services[@]}"; do
+  echo "  tsc --noEmit ${svc}"
+  npx tsc --noEmit -p "${svc}/tsconfig.json"
+done
+
+# Lint all backend services (errors only — warnings are informational)
+echo "  eslint"
+npx eslint --quiet
+
+echo "pre-push: all checks passed"
