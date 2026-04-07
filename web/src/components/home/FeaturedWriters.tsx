@@ -22,8 +22,8 @@ export function FeaturedWriters() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    feedApi.featured()
-      .then(data => setArticles((data.articles ?? []).slice(0, 3)))
+    feedApi.get('explore', undefined, 3)
+      .then(data => setArticles((data.items ?? []).slice(0, 3)))
       .catch(err => console.error('Failed to load featured writers', err))
       .finally(() => setLoading(false))
   }, [])

@@ -1,7 +1,7 @@
-# all.haus — Deployment Reference v5.22.0
+# all.haus — Deployment Reference v5.23.0
 
 **Date:** 7 April 2026
-**Replaces:** v5.21.0 (see bottom for change log)
+**Replaces:** v5.22.0 (see bottom for change log)
 
 This is the single source of truth for deploying and operating all.haus.
 
@@ -250,6 +250,98 @@ The script generates: accounts, articles, notes, follows, subscriptions (monthly
 
 > **Important — how builds work:** The web (and all other) services run entirely inside Docker containers. Running `npm run build` or `npm run dev` locally on the host has **no effect on the live site** — those outputs go to a local `.next/` folder that the container never reads. All deployments must go through `docker compose build <service>` followed by `docker compose up -d <service>`.
 
+### From v5.22.0
+
+No migration. Services changed: **web**. Deploy order: **rebuild web**.
+
+This release fixes a build-breaking type error in the `FeaturedWriters` homepage component. The v5.22.0 audit removed the unused `feed.featured()` API client method, but `FeaturedWriters.tsx` still called it, preventing the Next.js production build from compiling.
+
+**Frontend (web):**
+
+- **FeaturedWriters fix** (`FeaturedWriters.tsx`): Replaced `feedApi.featured()` (removed in v5.22.0) with `feedApi.get('explore', undefined, 3)`. Response field updated from `data.articles` to `data.items` to match the feed endpoint's actual response shape.
+
+**Modified files:**
+
+- `web/src/components/home/FeaturedWriters.tsx` — API call and response field fixed
+
+**Upgrade steps:**
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migration — frontend fix only
+docker compose build web
+docker compose up -d web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# web should show (healthy) after ~30s
+
+# Visual checks:
+# - / (homepage, logged out): featured writers section loads with 3 articles
+```
+
+No new env vars. No database changes.
+
+---
+
+### From v5.21.0
+
+No migration. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
+
+This release fixes critical bugs found during audit: gate-pass access for publication members/subscribers, schema ON DELETE clause sync, publication article deletion on the relay, and dead code removal. Editor title/subtitle sizing is also refined.
+
+**Backend (gateway):**
+
+- **Gate-pass publication access fix (critical):** `publication_id` now passed to `checkArticleAccess()` — publication members and subscribers were previously charged for their own publication's paywalled articles.
+- **Publication article kind 5 deletion:** `DELETE /publications/:id/articles/:articleId` now publishes a Nostr kind 5 deletion event to the relay.
+- **Publication PATCH updated_at:** `PATCH /publications/:id` now sets `updated_at = now()`.
+- **Dead code removal:** Deleted dead comment system (route, 3 components, lib file). Removed legacy `/feed/global` and `/feed/following` endpoints. Removed unused `feed.global()`, `feed.following()`, `feed.featured()` API client wrappers.
+
+**Schema:**
+
+- **schema.sql ON DELETE clauses:** Synced with migration 021 — added missing cascade/restrict/set-null clauses on FK constraints.
+
+**Frontend (web):**
+
+- **Editor sizing:** Title and subtitle card padding and font sizes reduced to match surrounding controls.
+
+**Modified files:**
+
+- `gateway/src/routes/articles.ts` — gate-pass publication_id lookup
+- `gateway/src/services/access.ts` — receives publication_id parameter
+- `gateway/src/routes/publications.ts` — kind 5 deletion, updated_at on PATCH
+- `gateway/src/routes/notes.ts` — dead feed endpoints removed
+- `schema.sql` — ON DELETE clauses synced
+- `web/src/lib/api.ts` — dead feed methods removed
+- `web/src/components/editor/ArticleEditor.tsx` — title/subtitle sizing
+
+**Upgrade steps:**
+```bash
+cd /root/platform-pub
+git pull origin master
+
+# No migration — but schema.sql updated for fresh installs
+docker compose build gateway web
+docker compose up -d gateway web
+```
+
+Verify:
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+# gateway and web should show (healthy) after ~30s
+
+# Critical check — publication members can read paywalled articles without being charged:
+# - Log in as a publication member, read a paywalled publication article
+# - /account: no new debit entry for that read
+```
+
+No new env vars. No database changes.
+
+---
+
 ### From v5.20.0
 
 No new migration. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
@@ -478,161 +570,7 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 
 No new env vars. No database changes.
 
----
-
-### From v5.17.0
-
-**Migration required (038).** Services changed: **gateway**, **key-custody**, **web**. Deploy order: **migrate → rebuild gateway + key-custody + web**.
-
-This release implements Publications Phase 1 — the schema and core services for multi-writer federated publications. Publications get their own custodial Nostr keypairs (stored in the `publications` table, managed by key-custody), an editorial membership model, and revenue pooling tables. The key-custody service now accepts a `signerType` parameter (`'account'` or `'publication'`) on all signing and encryption endpoints, allowing articles to be signed by a publication identity rather than an individual writer. The global CSS input reset is also removed, fixing editor field rendering.
-
-**Database (migration 038):**
-
-- **New types:** `publication_role` (`editor_in_chief`, `editor`, `contributor`), `contributor_type` (`permanent`, `one_off`).
-- **New tables:** `publications`, `publication_members`, `publication_invites`, `publication_article_shares`, `publication_follows`, `publication_payouts`, `publication_payout_splits`.
-- **Modified tables:**
-  - `articles` — added `publication_id`, `publication_article_status`, `show_on_writer_profile` columns.
-  - `article_drafts` — added `publication_id` column.
-  - `subscriptions` — `writer_id` now nullable; added `publication_id`; unique constraint replaced with partial unique indexes per target type; added `subscriptions_target_check` constraint (exactly one of `writer_id`/`publication_id` must be set).
-  - `subscription_nudge_log` — added `publication_id` column.
-  - `feed_scores` — added `publication_id` column and index.
-- **New platform config:** `publication_payout_threshold_pence` (default 2000 = £20.00).
-
-**Backend (key-custody):**
-
-- All signing and encryption endpoints (`/sign`, `/unwrap`, `/nip44-encrypt`, `/nip44-decrypt`) now accept `signerId` + `signerType` instead of `accountId`. When `signerType` is `'publication'`, the private key is looked up from the `publications` table. Backwards-compatible: `accountId` still accepted as a fallback.
-
-**Backend (gateway):**
-
-- `key-custody-client.ts` — all functions (`signEvent`, `unwrapKey`, `nip44Encrypt`, `nip44Decrypt`) updated to pass `signerId` and `signerType` parameters.
-- New middleware: `publication-auth.ts` — publication-scoped authorisation for editorial endpoints.
-
-**Frontend (web):**
-
-- **Global input reset removed** (`globals.css`) — the blanket `input[type="text"]`, `textarea`, `select` rule that forced `bg-white` and `border: 1px solid #E5E5E5` on all form fields has been deleted. This fixes the article editor title and standfirst fields, which now render correctly as grey card panels without hairline outlines. Other form fields (auth page, etc.) are unaffected as they have their own inline styles.
-
-**New files:**
-
-- `migrations/038_publications.sql` — publications schema migration.
-- `gateway/src/middleware/publication-auth.ts` — publication authorisation middleware.
-
-**Modified files:**
-
-- `schema.sql` — updated to incorporate migrations 001–038 (was 001–037).
-- `key-custody/src/lib/crypto.ts` — `signerType` support on `signEvent`, `unwrapKey`, `nip44Encrypt`, `nip44Decrypt`, and `getDecryptedPrivkey`.
-- `key-custody/src/routes/keypairs.ts` — schemas accept `signerId`/`signerType`, backwards-compatible with `accountId`.
-- `gateway/src/lib/key-custody-client.ts` — passes `signerId`/`signerType` to key-custody.
-- `web/src/app/globals.css` — global input/textarea/select reset removed.
-
-**Upgrade steps:**
-```bash
-cd /root/platform-pub
-git pull origin master
-
-# Apply migration
-docker exec -i platform-pub-postgres-1 psql -U platformpub platformpub < migrations/038_publications.sql
-
-# Rebuild changed services
-docker compose build gateway key-custody web
-docker compose up -d gateway key-custody web
-```
-
-Verify:
-```bash
-docker ps --format "table {{.Names}}\t{{.Status}}"
-# gateway, key-custody, and web should show (healthy) after ~30s
-
-# Schema check:
-docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
-  -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'"
-# Should be 45+
-
-# Publications table exists:
-docker exec platform-pub-postgres-1 psql -U platformpub platformpub \
-  -c "\d publications"
-
-# Visual checks:
-# - /write page: title and standfirst fields are grey card panels, no hairline outlines
-# - /write page: no white-box-with-outline artefact on title/subtitle inputs
-```
-
-No new env vars.
-
----
-
-### From v5.16.0
-
-No migration. Services changed: **gateway**, **web**. Deploy order: **rebuild gateway + web**.
-
-This release separates crowdfunding drives (public) from commissions (private, DM-only), fixes the `PledgeDrive` frontend types to match the backend API, and refreshes the article editor layout.
-
-**Backend (gateway):**
-
-- `GET /drives/by-user/:userId` — now filters to `origin = 'crowdfund'` only, so commissions never appear on public profiles or in the dashboard drives tab.
-
-**Frontend (web):**
-
-- **`PledgeDrive` type fixed** — interface now matches backend response: `origin` (not `type`), `fundingTargetPence` (not `targetAmountPence`), `currentTotalPence` (not `currentAmountPence`), `pinned` (not `pinnedOnProfile`), status enum aligned to `open | funded | published | fulfilled | expired | cancelled`.
-- **`Pledge` type fixed** — `writer` is now a nested object `{ username, displayName }` matching backend; added `driveStatus` field.
-- **Commissions removed from public surfaces:**
-  - Commission button removed from writer profile pages (`WriterActivity.tsx`) — commissions now start from DMs only.
-  - Commission button removed from note cards (`NoteCard.tsx`) and reply threads (`ReplyItem.tsx`) — `onCommission` prop removed.
-  - `CommissionCard.tsx` deleted (was unused dead code).
-- **Dashboard drives tab simplified:**
-  - `DriveCreateForm` — crowdfund/commission toggle removed; form now creates crowdfund drives only.
-  - `DriveCard` — commission accept/decline UI removed; always labelled "Pledge drive".
-  - `DrivesTab` — "Incoming commissions" section removed; simplified to active vs completed.
-- **CommissionForm cleaned up** — dead `openToBakers` checkbox removed; form retained for its one call site in `MessageThread.tsx` (DM-only commissions).
-- **Article editor** — title and standfirst are now separate grey (`bg-grey-100`) cards with `p-8 sm:p-10` padding, matching the body editor field. No hairlines.
-
-**Modified files:**
-
-- `gateway/src/routes/drives.ts` — `by-user` endpoint filtered to crowdfund only
-- `web/src/lib/api.ts` — `PledgeDrive` and `Pledge` interfaces fixed to match backend
-- `web/src/components/dashboard/DriveCreateForm.tsx` — crowdfund-only, toggle removed
-- `web/src/components/dashboard/DriveCard.tsx` — commission UI removed, field names fixed
-- `web/src/components/dashboard/DrivesTab.tsx` — commission section removed, field names fixed
-- `web/src/components/profile/ProfileDriveCard.tsx` — field names fixed
-- `web/src/components/profile/WorkTab.tsx` — field name fix (`pinned`)
-- `web/src/components/profile/WriterActivity.tsx` — commission button and modal removed
-- `web/src/components/feed/NoteCard.tsx` — `onCommission` prop removed
-- `web/src/components/replies/ReplyItem.tsx` — `onCommission` prop removed
-- `web/src/components/ui/CommissionForm.tsx` — dead `openToBakers` state removed
-- `web/src/components/account/PledgesSection.tsx` — uses `writer.username` (matches backend)
-- `web/src/components/editor/ArticleEditor.tsx` — title and standfirst as separate grey cards
-
-**Deleted files:**
-
-- `web/src/components/feed/CommissionCard.tsx`
-
-**Upgrade steps:**
-```bash
-cd /root/platform-pub
-git pull origin master
-
-# No migration needed — only code changes
-docker compose build gateway web
-docker compose up -d gateway web
-```
-
-Verify:
-```bash
-docker ps --format "table {{.Names}}\t{{.Status}}"
-# gateway and web should show (healthy) after ~30s
-
-# Visual checks:
-# - Writer profile: no Commission button (Message button is still present)
-# - Writer profile Work tab: pledge drives display correctly with progress bars
-# - /dashboard?tab=drives: only crowdfund drives shown, no incoming commissions section
-# - /dashboard?tab=drives: "New pledge drive" form has no crowdfund/commission toggle
-# - /messages: Commission button still works in 1:1 DM threads
-# - /write page: title and standfirst are separate grey cards, matching body field
-# - /account: Pledges section shows writer names correctly
-```
-
-No new env vars. No database changes.
-
-> **Older versions:** Upgrade instructions for v5.16.0 and earlier are available in this file's git history.
+> **Older versions:** Upgrade instructions for v5.18.0 and earlier are available in this file's git history.
 
 ---
 
@@ -1086,6 +1024,16 @@ Auto-renewal is configured by `harden-server.sh` to run daily at 03:00.
 
 ## Change log
 
+### v5.23.0 — 7 April 2026
+
+**Fix: FeaturedWriters build error — removed API method still referenced**
+
+No migration. Services changed: web.
+
+- **FeaturedWriters build fix:** `FeaturedWriters.tsx` called `feedApi.featured()` which was removed in v5.22.0's dead code cleanup, breaking the Next.js production build. Replaced with `feedApi.get('explore', undefined, 3)` and updated response field from `data.articles` to `data.items`.
+
+---
+
 ### v5.22.0 — 7 April 2026
 
 **Audit fixes: critical bugs, dead code removal, editor polish**
@@ -1124,39 +1072,6 @@ No new migration. Services changed: gateway, payment-service, web.
 - **Dashboard tabs:** Rate card (pricing form), Payroll (share editor with visual bar + overrides table), Earnings (summary cards, revenue table, payout history). All gated on `can_manage_finances`.
 - **API client:** `getRateCard`, `updateRateCard`, `getPayroll`, `updatePayroll`, `setArticleShare`, `getEarnings`.
 
----
-
-### v5.19.0 — 6 April 2026
-
-**Publications Phases 2 & 3: CMS pipeline, reader surface, feed/search integration**
-
-No new migration (uses 038 from v5.18.0). Services changed: gateway, key-custody, web.
-
-- **Server-side publishing pipeline:** Articles submitted to publications are signed with the publication's Nostr keypair (via key-custody), published to the relay, and indexed — all orchestrated server-side. Contributors without `can_publish` save as 'submitted'; editors approve to trigger the full pipeline.
-- **Publication CMS routes:** Submit, list, edit, delete, publish, unpublish articles within a publication. Signing routes accept `publicationId` for publication-key signing.
-- **Publication reader pages:** Homepage (blog/magazine/minimal layouts), about, masthead, subscribe, archive, and article-under-publication pages at `/pub/<slug>/...`.
-- **Publication subscriptions and follows:** Subscribe/unsubscribe and follow/unfollow routes for publications. Following feed includes content from followed publications.
-- **Publication RSS:** Per-publication RSS feed at `/api/v1/pub/<slug>/rss`.
-- **Search integration:** Publications searchable by name and tagline.
-- **Feed scoring:** `feed_scores.publication_id` populated by the scoring worker.
-- **Article page awareness:** Articles show "By Author in Publication" byline with link. Publication subscription price used for CTA.
-- **Writer profile filtering:** Publication-only articles hidden unless `show_on_writer_profile` is true.
-- **Editor integration:** "Publishing as" dropdown, "Submit for review" for non-publishers, "Also show on your personal profile" checkbox.
-- **Dashboard context switcher:** Personal vs publication context with publication-specific tabs (Articles, Members, Settings).
-- **Invite acceptance page:** `/invite/<token>` with accept/decline for logged-in, signup redirect for anonymous.
-
----
-
-### v5.18.0 — 6 April 2026
-
-**Publications Phase 1: schema, key-custody publication signing, CSS fix**
-
-New migration (038). Services changed: gateway, key-custody, web.
-
-- **Publications schema (migration 038):** 7 new tables (`publications`, `publication_members`, `publication_invites`, `publication_article_shares`, `publication_follows`, `publication_payouts`, `publication_payout_splits`), 2 new enums (`publication_role`, `contributor_type`). Modified `articles`, `article_drafts`, `subscriptions`, `subscription_nudge_log`, `feed_scores` with publication columns. New platform config `publication_payout_threshold_pence`.
-- **Key-custody publication signing:** All signing/encryption endpoints (`/sign`, `/unwrap`, `/nip44-encrypt`, `/nip44-decrypt`) accept `signerId` + `signerType` (`'account'` | `'publication'`). Publication keys looked up from `publications` table. Backwards-compatible with `accountId`.
-- **Gateway:** `key-custody-client.ts` updated for `signerId`/`signerType`. New `publication-auth.ts` middleware. New `publications.ts` route file.
-- **CSS fix:** Removed global input/textarea/select reset (`bg-white` + `border: 1px solid`) from `globals.css` that was overriding editor field styling.
 
 
-> **Older versions:** Changelog entries for v5.17.0 and earlier are available in this file's git history.
+> **Older versions:** Changelog entries for v5.19.0 and earlier are available in this file's git history.
