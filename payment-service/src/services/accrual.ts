@@ -104,9 +104,6 @@ export class AccrualService {
            WHERE id = $2`,
           [event.amountPence, event.readerId]
         )
-      } else {
-        // Accrued: reader has a card — add to their tab
-        readState = 'accrued'
       }
 
       // Write the read_event record — DB-first per dual-write architecture (§II.4b)
