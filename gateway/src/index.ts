@@ -33,6 +33,7 @@ import { feedRoutes } from './routes/feed.js'
 import { socialRoutes } from './routes/social.js'
 import { publicationRoutes } from './routes/publications.js'
 import { driveRoutes, expireOverdueDrives } from './routes/drives.js'
+import { traffologyRoutes } from './routes/traffology.js'
 import { refreshFeedScores } from './workers/feed-scorer.js'
 import { pool } from '../shared/src/db/client.js'
 import logger from '../shared/src/lib/logger.js'
@@ -165,6 +166,9 @@ async function start() {
 
   // Pledge drives (crowdfunding, commissions)
   await app.register(driveRoutes, { prefix: '/api/v1' })
+
+  // Traffology (writer analytics — concurrent reader counts)
+  await app.register(traffologyRoutes, { prefix: '/api/v1' })
 
   // ---------------------------------------------------------------------------
   // Service proxies

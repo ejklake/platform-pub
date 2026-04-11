@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
+import Script from 'next/script'
 import { renderMarkdown } from '../../../lib/markdown'
 import { ArticleReader } from '../../../components/article/ArticleReader'
+import { TraffologyMeta } from '../../../components/traffology/TraffologyMeta'
 import type { ArticleMetadata } from '../../../lib/api'
 
 // =============================================================================
@@ -34,6 +36,8 @@ export default async function ArticlePage({ params }: { params: { dTag: string }
     : ''
 
   return (
+    <>
+    <TraffologyMeta articleId={article.id} />
     <ArticleReader
       article={{
         id: article.nostrEventId,
@@ -62,5 +66,7 @@ export default async function ArticlePage({ params }: { params: { dTag: string }
       publicationName={article.publication?.name ?? undefined}
       publicationSlug={article.publication?.slug ?? undefined}
     />
+    <Script src="/traffology.js" strategy="afterInteractive" />
+    </>
   )
 }
