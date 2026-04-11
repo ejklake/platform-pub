@@ -19,13 +19,13 @@ import '@fastify/cookie'
 //   - isWriter: boolean
 //   - iat/exp: standard claims
 //
-// Token lifetime: 2 hours. Refresh-on-use extends the session silently
-// when the token is past its half-life (1 hour). Active users stay
-// logged in indefinitely; idle sessions expire after 2 hours.
+// Token lifetime: 30 days. Refresh-on-use extends the session silently
+// when the token is past its refresh threshold (7 days). Active users
+// stay logged in indefinitely; idle sessions expire after 30 days.
 // =============================================================================
 
-const TOKEN_LIFETIME_SECONDS = 2 * 60 * 60          // 2 hours
-const REFRESH_AFTER_SECONDS = 1 * 60 * 60           // refresh past half-life
+const TOKEN_LIFETIME_SECONDS = 30 * 24 * 60 * 60    // 30 days
+const REFRESH_AFTER_SECONDS = 7 * 24 * 60 * 60      // refresh after 7 days
 const COOKIE_NAME = 'pp_session'
 
 export interface SessionPayload extends JWTPayload {
