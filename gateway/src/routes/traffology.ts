@@ -219,7 +219,7 @@ export async function traffologyRoutes(app: FastifyInstance) {
 
       // Miniature half-day buckets for each piece (for overview grid)
       const pieceIds = pieces.map(p => p.id)
-      let bucketsByPiece: Record<string, any[]> = {}
+      const bucketsByPiece: Record<string, any[]> = {}
       if (pieceIds.length > 0) {
         const { rows: allBuckets } = await pool.query(
           `SELECT piece_id, source_id, bucket_start, is_day, reader_count
